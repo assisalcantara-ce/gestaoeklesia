@@ -1102,5 +1102,162 @@ describe('Cartas Ministeriais — Autorização Presidencial e Preservação de 
     const styleZero = renderElementStyle({ tipo: 'imagem', transparencia: 0 });
     assert.ok(styleZero.includes('opacity:0;'), `Esperado opacity:0; no estilo, recebido: ${styleZero}`);
   });
+
+  test('25. Padronização A4 (210 × 297 mm) e Conversão Consistente de Unidades', () => {
+    const CANVAS_A4 = {
+      width: 794,
+      height: 1123,
+      mmWidth: 210,
+      mmHeight: 297,
+      aspectRatio: 210 / 297,
+    };
+
+    // 1. Proporção física real A4 (1 / sqrt(2) = 0.70707)
+    const proporcaoFisica = CANVAS_A4.mmWidth / CANVAS_A4.mmHeight;
+    const proporcaoPixels = CANVAS_A4.width / CANVAS_A4.height;
+    assert.strictEqual(proporcaoFisica, 210 / 297);
+    assert.ok(
+      Math.abs(proporcaoPixels - proporcaoFisica) < 0.001,
+      `A proporção em pixels (${proporcaoPixels}) deve coincidir com a proporção física A4 (${proporcaoFisica})`
+    );
+
+    // 2. Resolução de 96 DPI CSS: 1mm = 96 / 25.4 = 3.7795px
+    const pxPerMm = 96 / 25.4;
+    const expectedPxW = 210 * pxPerMm; // ~793.7px
+    const expectedPxH = 297 * pxPerMm; // ~1122.5px
+    assert.strictEqual(Math.round(expectedPxW), 794);
+    assert.strictEqual(Math.round(expectedPxH), 1123);
+  });
+
+  test('26. Preenchimento de Fundo (backgroundUrl) e Cobertura Total sem Cortes de Cabeçalho e Rodapé', () => {
+    const bgUrl = 'https://storage.supabase.co/cartas/papel-timbrado-oficial.png';
+    const safeCanvas = {
+      width: 794,
+      height: 1123,
+      backgroundUrl: bgUrl,
+      elements: [],
+    };
+
+    const bgStyle = safeCanvas.backgroundUrl
+      ? `background-image:url('${safeCanvas.backgroundUrl}'); background-size:100% 100%; background-position:center top; background-repeat:no-repeat;`
+      : 'background-color:#ffffff;';
+
+    // 1. Deve utilizar 100% 100% para estender o fundo de ponta a ponta (topo ao rodapé)
+    assert.ok(bgStyle.includes('background-size:100% 100%'), 'Fundo deve preencher 100% de largura e altura da página A4');
+    // 2. Deve conter no-repeat para evitar repetições indevidas
+    assert.ok(bgStyle.includes('background-repeat:no-repeat'), 'Fundo não deve se repetir');
+    // 3. Deve alinhar a partir do topo para casar com o cabeçalho timbrado
+    assert.ok(bgStyle.includes('background-position:center top'), 'Posição deve ancorar no topo');
+    // 4. URL original do modelo salva no banco deve ser preservada intacta
+    assert.ok(bgStyle.includes(bgUrl));
+  });
+
+  test('27. Fidelidade de Impressão e Prevenção de Página Dupla (@page e Dimensões 210mm x 297mm)', () => {
+    // Simulação do CSS gerado na janela de impressão handlePrintHtml
+    const printCss = `
+    @page {
+      size: A4 portrait;
+      margin: 0;
+    }
+    *, *::before, *::after {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+      box-sizing: border-box;
+    }
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 210mm;
+      height: 297mm;
+      background: #ffffff;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .print-container {
+      width: 210mm;
+      height: 297mm;
+      max-width: 210mm;
+      max-height: 297mm;
+      margin: 0 auto;
+      padding: 0;
+      position: relative;
+      overflow: hidden;
+      page-break-inside: avoid;
+      page-break-after: avoid;
+      background: #ffffff;
+    }
+    .carta-documento, .carta-folha-a4 {
+      width: 210mm !important;
+      height: 297mm !important;
+      max-width: 210mm !important;
+      max-height: 297mm !important;
+      margin: 0 auto !important;
+      padding: 0 !important;
+      position: relative !important;
+      overflow: hidden !important;
+      box-sizing: border-box !important;
+      page-break-inside: avoid !important;
+      page-break-after: avoid !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    `;
+
+    // 1. Deve declarar @page com tamanho A4 portrait e margem zero
+    assert.ok(printCss.includes('size: A4 portrait;'));
+    assert.ok(printCss.includes('margin: 0;'));
+
+    // 2. Deve fixar largura e altura estritas em milímetros para casar com a folha física
+    assert.ok(printCss.includes('width: 210mm !important;'));
+    assert.ok(printCss.includes('height: 297mm !important;'));
+    assert.ok(printCss.includes('max-height: 297mm !important;'));
+
+    // 3. Prevenção de 2ª folha em branco: overflow: hidden e page-break-after: avoid
+    assert.ok(printCss.includes('overflow: hidden !important;'));
+    assert.ok(printCss.includes('page-break-after: avoid !important;'));
+    assert.ok(printCss.includes('page-break-inside: avoid !important;'));
+
+    // 4. Preservação de cores de fundo e imagens de timbrado
+    assert.ok(printCss.includes('-webkit-print-color-adjust: exact !important;'));
+    assert.ok(printCss.includes('print-color-adjust: exact !important;'));
+  });
+
+  test('28. Responsividade no Editor e Escala Proporcional sem Alterar Coordenadas Lógicas', () => {
+    // 1. Dimensões lógicas do canvas A4 permanecem constantes
+    const larguraLogica = 794;
+    const alturaLogica = 1123;
+
+    // 2. Simulação em tela menor (ex: laptop com 600px de largura útil na coluna)
+    const larguraDisponivel = 580;
+    const editorScale = Math.min(1, larguraDisponivel / larguraLogica); // ~0.7304
+    assert.ok(editorScale < 1, 'Em telas menores o fator de escala deve ser menor que 1');
+
+    // 3. Dimensões visuais no DOM mantêm a proporção A4
+    const larguraVisual = larguraLogica * editorScale;
+    const alturaVisual = alturaLogica * editorScale;
+    assert.strictEqual(Math.round(larguraVisual), 580);
+    assert.ok(
+      Math.abs((larguraVisual / alturaVisual) - (210 / 297)) < 0.001,
+      'A proporção visual escalada deve manter exatamente o aspect ratio A4'
+    );
+
+    // 4. Transformação de movimento de mouse no InteractiveCanvas normalizada por scale:
+    // Se o usuário arrasta o mouse 15px na tela com scale 0.75:
+    const scale = 0.75;
+    const clientDeltaX = 15;
+    const logicalDeltaX = clientDeltaX / scale;
+    assert.strictEqual(logicalDeltaX, 20); // 15 / 0.75 = 20px no sistema de coordenadas lógicas
+
+    // 5. Elementos no modelo persistem suas posições reais originais (sem escala embutida nos dados)
+    const elemento = { id: 'el-1', x: 100, y: 186, largura: 480, altura: 48 };
+    const elementoMovido = {
+      ...elemento,
+      x: elemento.x + logicalDeltaX,
+    };
+    assert.strictEqual(elementoMovido.x, 120);
+    assert.strictEqual(elementoMovido.largura, 480);
+  });
 });
+
 

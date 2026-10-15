@@ -52,6 +52,7 @@ interface InteractiveCanvasProps {
     alturaCanvas?: number;
     showGrid?: boolean;
     gridSize?: number;
+    scale?: number;
 }
 
 export default function InteractiveCanvas({
@@ -70,7 +71,8 @@ export default function InteractiveCanvas({
     larguraCanvas = 465,
     alturaCanvas = 291,
     showGrid = false,
-    gridSize = 24
+    gridSize = 24,
+    scale = 1
 }: InteractiveCanvasProps) {
     const [isDragging, setIsDragging] = useState(false);
     const [configIgreja, setConfigIgreja] = useState<any>(null);
@@ -194,17 +196,18 @@ export default function InteractiveCanvas({
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
+        const effectiveScale = scale > 0 ? scale : 1;
         if (isBoxSelecting) {
             // Atualizar o retângulo de seleção
             const rect = e.currentTarget.getBoundingClientRect();
             setBoxSelectionEnd({
-                x: e.clientX - rect.left,
-                y: e.clientY - rect.top
+                x: (e.clientX - rect.left) / effectiveScale,
+                y: (e.clientY - rect.top) / effectiveScale
             });
         } else if (isDragging && elementosSelecionados.length > 0) {
             // Arrastar múltiplos elementos
-            const deltaX = e.clientX - dragStart.x;
-            const deltaY = e.clientY - dragStart.y;
+            const deltaX = (e.clientX - dragStart.x) / effectiveScale;
+            const deltaY = (e.clientY - dragStart.y) / effectiveScale;
 
             const elementosMoviveis = elementosSelecionados.filter(elemento => !elemento.locked);
             if (elementosMoviveis.length === 0) {
@@ -236,8 +239,8 @@ export default function InteractiveCanvas({
                 });
             }
         } else if (isResizing && elementoSelecionado && resizeHandle) {
-            const deltaX = e.clientX - resizeStart.x;
-            const deltaY = e.clientY - resizeStart.y;
+            const deltaX = (e.clientX - resizeStart.x) / effectiveScale;
+            const deltaY = (e.clientY - resizeStart.y) / effectiveScale;
 
             let novaLargura = resizeStart.width;
             let novaAltura = resizeStart.height;
@@ -302,9 +305,10 @@ export default function InteractiveCanvas({
     const handleCanvasMouseDown = (e: React.MouseEvent) => {
         if (e.target === e.currentTarget && !e.ctrlKey && !e.metaKey) {
             // Iniciar seleção por área
+            const effectiveScale = scale > 0 ? scale : 1;
             const rect = e.currentTarget.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const x = (e.clientX - rect.left) / effectiveScale;
+            const y = (e.clientY - rect.top) / effectiveScale;
             setBoxSelectionStart({ x, y });
             setBoxSelectionEnd({ x, y });
             setIsBoxSelecting(true);
@@ -763,15 +767,20 @@ export default function InteractiveCanvas({
                         ? 'linear-gradient(to right, rgba(15, 23, 42, 0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(15, 23, 42, 0.08) 1px, transparent 1px)'
                         : 'none',
                 backgroundSize: backgroundUrl
-                    ? `${showGrid ? `${gridSize}px ${gridSize}px, ${gridSize}px ${gridSize}px, ` : ''}cover`
+                    ? `${showGrid ? `${gridSize}px ${gridSize}px, ${gridSize}px ${gridSize}px, ` : ''}100% 100%`
                     : showGrid
                         ? `${gridSize}px ${gridSize}px, ${gridSize}px ${gridSize}px`
                         : 'cover',
                 backgroundPosition: backgroundUrl
-                    ? `${showGrid ? '0 0, 0 0, center' : 'center'}`
+                    ? `${showGrid ? '0 0, 0 0, center top' : 'center top'}`
                     : showGrid
                         ? '0 0, 0 0'
-                        : 'center',
+                        : 'center top',
+                backgroundRepeat: backgroundUrl
+                    ? `${showGrid ? 'repeat, repeat, no-repeat' : 'no-repeat'}`
+                    : showGrid
+                        ? 'repeat, repeat'
+                        : 'no-repeat',
                 border: '1px solid #d1d5db',
                 overflow: 'hidden',
                 cursor: isDragging || isResizing ? 'default' : 'auto',

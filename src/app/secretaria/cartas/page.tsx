@@ -57,12 +57,19 @@ import {
   CheckCircle,
   Clock,
   XCircle,
+  FileText,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { CartasService, type VerificacaoAutorizacaoCarta } from '@/services/cartas-service';
 import { isSecretariaLocal } from '@/lib/access-control';
 
-const CANVAS_A4 = { width: 794, height: 1123 };
+const CANVAS_A4 = {
+  width: 794,
+  height: 1123,
+  mmWidth: 210,
+  mmHeight: 297,
+  aspectRatio: 210 / 297,
+};
 
 const createElementId = () => {
   try {
@@ -386,6 +393,63 @@ export default function CartasPage() {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isIssuing, setIsIssuing] = useState(false);
+
+  // Escala responsiva da folha A4 no editor e na pré-visualização
+  const [editorScale, setEditorScale] = useState(1);
+  const [editorZoomMode, setEditorZoomMode] = useState<'auto' | '100%' | '75%' | '50%'>('auto');
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+
+  const [previewScale, setPreviewScale] = useState(1);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const updateEditorScale = () => {
+      if (!canvasContainerRef.current) return;
+      const containerWidth = canvasContainerRef.current.clientWidth;
+      if (!containerWidth) return;
+
+      if (editorZoomMode === '100%') {
+        setEditorScale(1);
+      } else if (editorZoomMode === '75%') {
+        setEditorScale(0.75);
+      } else if (editorZoomMode === '50%') {
+        setEditorScale(0.5);
+      } else {
+        const padding = 24;
+        const availableWidth = containerWidth - padding;
+        if (availableWidth < CANVAS_A4.width) {
+          const fit = Math.max(0.35, Math.min(1, availableWidth / CANVAS_A4.width));
+          setEditorScale(Math.round(fit * 100) / 100);
+        } else {
+          setEditorScale(1);
+        }
+      }
+    };
+
+    updateEditorScale();
+    window.addEventListener('resize', updateEditorScale);
+    return () => window.removeEventListener('resize', updateEditorScale);
+  }, [editorZoomMode, canvasContent.width]);
+
+  useEffect(() => {
+    const updatePreviewScale = () => {
+      if (!previewContainerRef.current) return;
+      const containerWidth = previewContainerRef.current.clientWidth;
+      if (!containerWidth) return;
+      const padding = 24;
+      const availableWidth = containerWidth - padding;
+      if (availableWidth < CANVAS_A4.width) {
+        const fit = Math.max(0.35, Math.min(1, availableWidth / CANVAS_A4.width));
+        setPreviewScale(Math.round(fit * 100) / 100);
+      } else {
+        setPreviewScale(1);
+      }
+    };
+
+    updatePreviewScale();
+    window.addEventListener('resize', updatePreviewScale);
+    return () => window.removeEventListener('resize', updatePreviewScale);
+  }, [canvasContent.width]);
 
   // Verificação de alterações não salvas no modelo ativo
   const currentSnapshot = useMemo(() => {
@@ -777,7 +841,7 @@ export default function CartasPage() {
   ) => {
     const safeCanvas = normalizeCanvasData(canvas);
     const bgStyle = safeCanvas.backgroundUrl
-      ? `background-image:url('${safeCanvas.backgroundUrl}'); background-size: cover; background-position: center;`
+      ? `background-image:url('${safeCanvas.backgroundUrl}'); background-size:100% 100%; background-position:center top; background-repeat:no-repeat;`
       : 'background-color:#ffffff;';
 
     const elementsHtml = safeCanvas.elements
@@ -880,7 +944,7 @@ export default function CartasPage() {
       .join('');
 
     return `
-      <div style="position:relative; width:${safeCanvas.width}px; height:${safeCanvas.height}px; ${bgStyle} margin:0 auto; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
+      <div class="carta-folha-a4" style="position:relative; width:${safeCanvas.width}px; height:${safeCanvas.height}px; ${bgStyle} margin:0 auto; box-sizing:border-box; overflow:hidden; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
         ${elementsHtml}
       </div>
     `;
@@ -934,8 +998,8 @@ const createSystemTemplate = (
   content_json: {
     mode: 'canvas',
     canvas: {
-      width: 794,
-      height: 1123,
+      width: CANVAS_A4.width,
+      height: CANVAS_A4.height,
       backgroundUrl: '',
       elements: [
         {
@@ -2237,44 +2301,60 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
     const win = window.open('', '_blank');
     if (!win) return;
     win.document.write(`<!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Documento Oficial - Gestão Eklésia</title>
   <style>
     @page {
       size: A4 portrait;
       margin: 0;
     }
-    * {
+    *, *::before, *::after {
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
       color-adjust: exact !important;
       box-sizing: border-box;
     }
     html, body {
-      margin: 0;
-      padding: 0;
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 210mm;
+      height: 297mm;
       background: #ffffff;
       font-family: Arial, sans-serif;
       color: #111;
-      width: 100%;
-      height: 100%;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
     }
     .print-container {
-      width: 100%;
-      display: flex;
-      justify-content: center;
-      padding: 0;
-      margin: 0;
-    }
-    .carta-documento {
-      width: 794px;
-      min-height: 1123px;
-      position: relative;
+      width: 210mm;
+      height: 297mm;
+      max-width: 210mm;
+      max-height: 297mm;
       margin: 0 auto;
-      background: #ffffff;
+      padding: 0;
+      position: relative;
       overflow: hidden;
+      page-break-inside: avoid;
+      page-break-after: avoid;
+      background: #ffffff;
+    }
+    .carta-documento, .carta-folha-a4 {
+      width: 210mm !important;
+      height: 297mm !important;
+      max-width: 210mm !important;
+      max-height: 297mm !important;
+      margin: 0 auto !important;
+      padding: 0 !important;
+      position: relative !important;
+      overflow: hidden !important;
+      box-sizing: border-box !important;
+      page-break-inside: avoid !important;
+      page-break-after: avoid !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
     }
     img {
       max-width: 100%;
@@ -2282,14 +2362,61 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
       print-color-adjust: exact !important;
     }
     @media print {
-      body {
+      @page {
+        size: A4 portrait;
         margin: 0;
-        padding: 0;
+      }
+      html, body {
+        width: 210mm !important;
+        height: 297mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        background: #ffffff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .print-container {
+        width: 210mm !important;
+        height: 297mm !important;
+        max-width: 210mm !important;
+        max-height: 297mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: block !important;
+        position: relative !important;
+        overflow: hidden !important;
+        page-break-inside: avoid !important;
+        page-break-after: avoid !important;
+      }
+      .carta-documento, .carta-folha-a4 {
+        width: 210mm !important;
+        height: 297mm !important;
+        max-width: 210mm !important;
+        max-height: 297mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        position: relative !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
+        page-break-inside: avoid !important;
+        page-break-after: avoid !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
       .no-print {
         display: none !important;
+      }
+    }
+    @media screen {
+      body {
+        background: #4b5563;
+        padding: 24px 0;
+        display: flex;
+        justify-content: center;
+      }
+      .print-container {
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
       }
     }
   </style>
@@ -3054,26 +3181,107 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
 
                   {/* COLUNA 2 (6 cols): CANVAS CENTRAL */}
                   <div className="lg:col-span-6 space-y-4">
-                    {/* Área Principal de Renderização do Canvas (Sem barra superior duplicada) */}
-                    <div className="rounded-2xl border border-gray-300 bg-gray-100 p-4 shadow-inner">
-                      <div className="max-h-[780px] overflow-auto flex justify-center">
-                        <InteractiveCanvas
-                          elementos={canvasContent.elements}
-                          elementoSelecionado={selectedCanvasElement}
-                          elementosSelecionados={selectedCanvasElements}
-                          getPreviewText={getCanvasPreviewText}
-                          onElementoSelecionado={setSelectedCanvasElement}
-                          onElementosSelecionados={setSelectedCanvasElements}
-                          onElementoAtualizado={(id, props) => updateCanvasElement(id, props)}
-                          onMultiplosElementosAtualizados={updateMultipleCanvasElements}
-                          onElementosAdicionados={addCanvasElements}
-                          onElementoRemovido={removeCanvasElement}
-                          backgroundUrl={canvasContent.backgroundUrl}
-                          showGrid
-                          gridSize={24}
-                          larguraCanvas={canvasContent.width}
-                          alturaCanvas={canvasContent.height}
-                        />
+                    {/* Barra de Dimensões A4 e Escala do Papel */}
+                    <div className="rounded-2xl border border-gray-300 bg-gray-100 p-4 shadow-inner space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-2.5">
+                        <div className="flex items-center gap-1.5 text-xs text-gray-700 font-semibold">
+                          <FileText className="h-4 w-4 text-teal-600 shrink-0" />
+                          <span>Papel A4 Retrato</span>
+                          <span className="text-[11px] font-normal text-gray-500">
+                            (210 × 297 mm — {CANVAS_A4.width} × {CANVAS_A4.height} px)
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-0.5 shadow-xs">
+                          <button
+                            type="button"
+                            onClick={() => setEditorZoomMode('auto')}
+                            className={`px-2 py-0.5 rounded text-[11px] font-semibold transition ${
+                              editorZoomMode === 'auto'
+                                ? 'bg-teal-600 text-white shadow-xs'
+                                : 'text-gray-600 hover:bg-gray-100'
+                            }`}
+                            title="Ajustar automaticamente à largura da tela"
+                          >
+                            Ajustar ({Math.round(editorScale * 100)}%)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditorZoomMode('100%')}
+                            className={`px-2 py-0.5 rounded text-[11px] font-semibold transition ${
+                              editorZoomMode === '100%'
+                                ? 'bg-teal-600 text-white shadow-xs'
+                                : 'text-gray-600 hover:bg-gray-100'
+                            }`}
+                          >
+                            100%
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditorZoomMode('75%')}
+                            className={`px-2 py-0.5 rounded text-[11px] font-semibold transition ${
+                              editorZoomMode === '75%'
+                                ? 'bg-teal-600 text-white shadow-xs'
+                                : 'text-gray-600 hover:bg-gray-100'
+                            }`}
+                          >
+                            75%
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditorZoomMode('50%')}
+                            className={`px-2 py-0.5 rounded text-[11px] font-semibold transition ${
+                              editorZoomMode === '50%'
+                                ? 'bg-teal-600 text-white shadow-xs'
+                                : 'text-gray-600 hover:bg-gray-100'
+                            }`}
+                          >
+                            50%
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Área Principal de Renderização do Canvas */}
+                      <div
+                        ref={canvasContainerRef}
+                        className="max-h-[820px] overflow-auto flex justify-center py-1"
+                      >
+                        <div
+                          style={{
+                            width: `${canvasContent.width * editorScale}px`,
+                            height: `${canvasContent.height * editorScale}px`,
+                            position: 'relative',
+                            flexShrink: 0,
+                            transition: 'width 0.15s ease, height 0.15s ease',
+                          }}
+                        >
+                          <div
+                            style={{
+                              transform: `scale(${editorScale})`,
+                              transformOrigin: 'top left',
+                              width: `${canvasContent.width}px`,
+                              height: `${canvasContent.height}px`,
+                            }}
+                          >
+                            <InteractiveCanvas
+                              elementos={canvasContent.elements}
+                              elementoSelecionado={selectedCanvasElement}
+                              elementosSelecionados={selectedCanvasElements}
+                              getPreviewText={getCanvasPreviewText}
+                              onElementoSelecionado={setSelectedCanvasElement}
+                              onElementosSelecionados={setSelectedCanvasElements}
+                              onElementoAtualizado={(id, props) => updateCanvasElement(id, props)}
+                              onMultiplosElementosAtualizados={updateMultipleCanvasElements}
+                              onElementosAdicionados={addCanvasElements}
+                              onElementoRemovido={removeCanvasElement}
+                              backgroundUrl={canvasContent.backgroundUrl}
+                              showGrid
+                              gridSize={24}
+                              larguraCanvas={canvasContent.width}
+                              alturaCanvas={canvasContent.height}
+                              scale={editorScale}
+                            />
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -4140,12 +4348,29 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                   )}
 
                   <div
-                    className="relative min-h-[500px] max-h-[820px] rounded-xl border border-gray-200 bg-gray-100 p-4 shadow-inner overflow-auto flex justify-center"
+                    ref={previewContainerRef}
+                    className="relative min-h-[500px] max-h-[820px] rounded-xl border border-gray-200 bg-gray-100 p-4 shadow-inner overflow-auto flex justify-center py-2"
                   >
                     <div
-                      className="bg-white shadow-md relative"
-                      dangerouslySetInnerHTML={{ __html: previewHtml }}
-                    />
+                      style={{
+                        width: `${CANVAS_A4.width * previewScale}px`,
+                        height: `${CANVAS_A4.height * previewScale}px`,
+                        position: 'relative',
+                        flexShrink: 0,
+                        transition: 'width 0.15s ease, height 0.15s ease',
+                      }}
+                    >
+                      <div
+                        style={{
+                          transform: `scale(${previewScale})`,
+                          transformOrigin: 'top left',
+                          width: `${CANVAS_A4.width}px`,
+                          height: `${CANVAS_A4.height}px`,
+                        }}
+                        className="bg-white shadow-md relative"
+                        dangerouslySetInnerHTML={{ __html: previewHtml }}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
