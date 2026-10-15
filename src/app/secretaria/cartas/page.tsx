@@ -363,6 +363,7 @@ export default function CartasPage() {
   const [selectedCanvasElement, setSelectedCanvasElement] = useState<CartaCanvasElement | null>(null);
   const [selectedCanvasElements, setSelectedCanvasElements] = useState<CartaCanvasElement[]>([]);
   const [canvasImageTargetId, setCanvasImageTargetId] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [records, setRecords] = useState<CartaRegistro[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState<string>('');
@@ -1850,21 +1851,54 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
   };
 
   const handleCanvasImageUpload = async (file: File, targetId?: string) => {
+    // 1. Validação prévia de formato e tamanho (máx. 2 MB, JPG, PNG ou WebP)
+    const validacao = CartasService.validarArquivoImagemCarta(file);
+    if (!validacao.valido) {
+      setNotification({
+        isOpen: true,
+        title: 'Arquivo Inválido',
+        message: validacao.erro || 'Arquivo de imagem inválido.',
+        type: 'warning',
+        autoClose: 5000,
+      });
+      return;
+    }
+
+    // 2. Prevenção de envios concorrentes
+    if (isUploadingImage) return;
+
+    setIsUploadingImage(true);
     try {
       const url = await uploadImageFile(file);
       if (targetId) {
         updateCanvasElement(targetId, { imagemUrl: url });
+        setNotification({
+          isOpen: true,
+          title: 'Imagem Atualizada',
+          message: 'A imagem foi enviada com sucesso e aplicada ao elemento.',
+          type: 'success',
+          autoClose: 3500,
+        });
       } else {
         addCanvasElement('imagem', { imagemUrl: url, largura: 260, altura: 180 });
+        setNotification({
+          isOpen: true,
+          title: 'Imagem Inserida',
+          message: 'Novo elemento de imagem adicionado ao documento.',
+          type: 'success',
+          autoClose: 3500,
+        });
       }
     } catch (err: any) {
       setNotification({
         isOpen: true,
-        title: 'Erro',
-        message: err?.message || 'Erro ao enviar imagem',
+        title: 'Falha no Upload',
+        message: err?.message || 'Não foi possível enviar a imagem. As alterações do documento foram preservadas.',
         type: 'error',
-        autoClose: undefined,
+        autoClose: 5000,
       });
+    } finally {
+      setIsUploadingImage(false);
     }
   };
 
@@ -2074,7 +2108,7 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
       setNotification({
         isOpen: true,
         title: authErr?.message?.includes('Secretaria Local') ? 'Acesso Negado' : 'Emissão Bloqueada',
-        message: authErr?.message || 'Documento ministerial sem autorização válida da Presidência.',
+        message: authErr?.message || 'Não foi possível validar as permissões para emissão deste documento.',
         type: 'error',
         autoClose: undefined,
       });
@@ -2846,15 +2880,16 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                         <input
                           ref={canvasImageInputRef}
                           type="file"
-                          accept="image/*"
+                          accept="image/jpeg,image/png,image/webp"
                           className="hidden"
                           onChange={(e) => {
                             const file = e.target.files?.[0];
-                            if (file) {
-                              handleCanvasImageUpload(file, canvasImageTargetId ?? undefined);
-                            }
+                            const targetId = canvasImageTargetId ?? undefined;
                             e.currentTarget.value = '';
                             setCanvasImageTargetId(null);
+                            if (file) {
+                              handleCanvasImageUpload(file, targetId);
+                            }
                           }}
                         />
                         <input
@@ -3468,16 +3503,114 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
 
                           {/* Especificidades do Tipo Imagem */}
                           {selectedCanvasElement.tipo === 'imagem' && (
-                            <div className="space-y-2">
-                              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">URL DA IMAGEM</label>
-                              <input
-                                type="text"
-                                value={selectedCanvasElement.imagemUrl || ''}
-                                onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { imagemUrl: e.target.value })}
-                                className="w-full rounded border border-gray-200 p-1.5 text-xs"
-                                placeholder="https://..."
-                                disabled={selectedCanvasElement.locked}
-                              />
+                            <div className="space-y-3 border-t border-gray-100 pt-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                                  Origem da Imagem
+                                </span>
+                                {isUploadingImage && (
+                                  <span className="text-[11px] font-medium text-teal-600 flex items-center gap-1">
+                                    <RotateCcw className="h-3 w-3 animate-spin" />
+                                    Enviando...
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Pré-visualização da imagem atual e botão de remoção rápida */}
+                              {selectedCanvasElement.imagemUrl ? (
+                                <div className="space-y-2">
+                                  <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-2.5 flex items-center gap-3">
+                                    <div className="h-14 w-14 rounded-lg border border-gray-200 bg-white overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
+                                      <img
+                                        src={selectedCanvasElement.imagemUrl}
+                                        alt="Pré-visualização da imagem"
+                                        className="h-full w-full object-contain"
+                                        onError={(e) => {
+                                          (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                        }}
+                                      />
+                                    </div>
+                                    <div className="flex-1 min-w-0 space-y-0.5">
+                                      <p
+                                        className="text-[11px] font-medium text-gray-700 truncate"
+                                        title={selectedCanvasElement.imagemUrl}
+                                      >
+                                        {selectedCanvasElement.imagemUrl.split('/').pop() || 'Imagem do elemento'}
+                                      </p>
+                                      <p className="text-[10px] text-gray-400">
+                                        Dimensões: {selectedCanvasElement.largura} × {selectedCanvasElement.altura} px
+                                      </p>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => updateCanvasElement(selectedCanvasElement.id, { imagemUrl: '' })}
+                                      disabled={selectedCanvasElement.locked || isUploadingImage}
+                                      className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
+                                      title="Remover imagem do elemento (sem excluir o elemento)"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => updateCanvasElement(selectedCanvasElement.id, { imagemUrl: '' })}
+                                    disabled={selectedCanvasElement.locked || isUploadingImage}
+                                    className="text-[11px] font-semibold text-red-600 hover:text-red-700 underline inline-flex items-center gap-1 disabled:opacity-50"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                    <span>Remover imagem</span>
+                                  </button>
+                                </div>
+                              ) : null}
+
+                              {/* Botão de Envio de Imagem do Computador */}
+                              <div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (isUploadingImage || selectedCanvasElement.locked) return;
+                                    setCanvasImageTargetId(selectedCanvasElement.id);
+                                    canvasImageInputRef.current?.click();
+                                  }}
+                                  disabled={selectedCanvasElement.locked || isUploadingImage}
+                                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-teal-200 bg-teal-50/70 hover:bg-teal-100/80 px-3 py-2 text-xs font-semibold text-teal-800 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {isUploadingImage ? (
+                                    <>
+                                      <RotateCcw className="h-3.5 w-3.5 animate-spin text-teal-700" />
+                                      <span>Enviando imagem...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Upload className="h-3.5 w-3.5 text-teal-700" />
+                                      <span>
+                                        {selectedCanvasElement.imagemUrl
+                                          ? 'Substituir imagem do computador'
+                                          : 'Enviar imagem do computador'}
+                                      </span>
+                                    </>
+                                  )}
+                                </button>
+                                <p className="text-[10px] text-gray-400 text-center mt-1">
+                                  Formatos aceitos: JPG, PNG e WebP (máx. 2 MB)
+                                </p>
+                              </div>
+
+                              {/* Campo de URL Externa (Preservado) */}
+                              <div className="space-y-1 pt-1">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                                  OU INFORME UMA URL EXTERNA
+                                </label>
+                                <input
+                                  type="text"
+                                  value={selectedCanvasElement.imagemUrl || ''}
+                                  onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { imagemUrl: e.target.value })}
+                                  className="w-full rounded-lg border border-gray-200 p-2 text-xs focus:border-teal-500 focus:outline-none"
+                                  placeholder="https://..."
+                                  disabled={selectedCanvasElement.locked || isUploadingImage}
+                                />
+                              </div>
                             </div>
                           )}
 

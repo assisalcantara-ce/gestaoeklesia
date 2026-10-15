@@ -60,7 +60,7 @@ export class CartasService {
    */
   public static exigeAutorizacaoPresidencial(tipoCarta?: string | null): boolean {
     if (!tipoCarta) return false;
-    const cleanTipo = tipoCarta.trim().toLowerCase();
+    const cleanTipo = this.normalizarTipoCarta(tipoCarta);
     return cleanTipo === 'mudanca' || cleanTipo === 'desligamento';
   }
 
@@ -283,11 +283,14 @@ export class CartasService {
     }
 
     if (pedidoExistente) {
+      const destinoCentral = this.exigeAutorizacaoPresidencial(normalTipo)
+        ? 'na Central de Decisões da Presidência'
+        : 'para deliberação institucional';
       return {
         sucesso: true,
         jaExistente: true,
         pedido: pedidoExistente,
-        mensagem: `Já existe um pedido de ${tipoLabel} pendente de análise para ${input.membroNome.trim()} na Central de Decisões da Presidência.`,
+        mensagem: `Já existe um pedido de ${tipoLabel} pendente de análise para ${input.membroNome.trim()} ${destinoCentral}.`,
       };
     }
 
@@ -331,7 +334,9 @@ export class CartasService {
       sucesso: true,
       jaExistente: false,
       pedido: novoPedido,
-      mensagem: `Pedido de ${tipoLabel} encaminhado com sucesso à Presidência!`,
+      mensagem: this.exigeAutorizacaoPresidencial(normalTipo)
+        ? `Pedido de ${tipoLabel} encaminhado com sucesso à Presidência!`
+        : `Pedido de ${tipoLabel} registrado com sucesso para análise da Secretaria Geral!`,
     };
   }
 
@@ -683,6 +688,35 @@ export class CartasService {
     });
 
     return { sucesso: res.sucesso, eventoId: res.eventoId };
+  }
+
+  /**
+   * Valida arquivo de imagem para inserção em cartas ministeriais e modelos de documentos.
+   * Regras: aceita somente JPG/JPEG, PNG e WebP, com tamanho máximo de 2 MB.
+   */
+  public static validarArquivoImagemCarta(file?: { type?: string; size: number } | null): {
+    valido: boolean;
+    erro?: string;
+  } {
+    if (!file) {
+      return { valido: false, erro: 'Nenhum arquivo de imagem foi fornecido.' };
+    }
+    const formatosPermitidos = ['image/jpeg', 'image/png', 'image/webp'];
+    const tipo = (file.type || '').toLowerCase();
+    if (!tipo || !formatosPermitidos.includes(tipo)) {
+      return {
+        valido: false,
+        erro: 'Formato de imagem inválido. Selecione um arquivo JPG, PNG ou WebP.',
+      };
+    }
+    const maxBytes = 2 * 1024 * 1024; // 2 MB
+    if (file.size > maxBytes) {
+      return {
+        valido: false,
+        erro: 'O arquivo selecionado excede o limite máximo permitido de 2 MB.',
+      };
+    }
+    return { valido: true };
   }
 }
 

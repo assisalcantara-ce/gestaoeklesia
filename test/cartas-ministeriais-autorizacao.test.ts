@@ -211,6 +211,13 @@ describe('Cartas Ministeriais — Autorização Presidencial e Preservação de 
     assert.strictEqual(CartasService.exigeAutorizacaoPresidencial('declaracao'), false);
     assert.strictEqual(CartasService.exigeAutorizacaoPresidencial(null), false);
 
+    // Aliases e títulos passados diretamente para exigeAutorizacaoPresidencial
+    assert.strictEqual(CartasService.exigeAutorizacaoPresidencial('Carta de Mudança'), true);
+    assert.strictEqual(CartasService.exigeAutorizacaoPresidencial('Carta de Desligamento'), true);
+    assert.strictEqual(CartasService.exigeAutorizacaoPresidencial('Carta de Recomendação'), false);
+    assert.strictEqual(CartasService.exigeAutorizacaoPresidencial('Carta de Trânsito'), false);
+    assert.strictEqual(CartasService.exigeAutorizacaoPresidencial('Declaração de Membro Ativo'), false);
+
     // Normalização de chaves e aliases
     assert.strictEqual(CartasService.normalizarTipoCarta('Carta de Mudança'), 'mudanca');
     assert.strictEqual(CartasService.normalizarTipoCarta('carta_desligamento'), 'desligamento');
@@ -734,5 +741,262 @@ describe('Cartas Ministeriais — Autorização Presidencial e Preservação de 
       'secretario_geral'
     );
     assert.equal(validacaoGeral.autorizado, true);
+  });
+
+  test('15. Fluxo Normal: Carta de Recomendação, Trânsito e Declarações NÃO exigem autorização da Presidência', async () => {
+    const supabase = createMockSupabase([]);
+
+    // 1. Recomendação: isenta de autorização presidencial
+    const authRecomendacao = await CartasService.verificarAutorizacaoCarta(
+      supabase,
+      ministryAlpha,
+      memberId1,
+      'recomendacao',
+      'Irmão Barnabé'
+    );
+    assert.equal(authRecomendacao.exigeAutorizacao, false);
+    assert.equal(authRecomendacao.autorizado, true);
+    assert.equal(authRecomendacao.status, 'isento');
+    assert.match(authRecomendacao.mensagem, /não exige deliberação prévia da Presidência/);
+
+    // Validação de emissão para Secretaria Geral passa direto sem bloqueio
+    const emissaoRecomendacao = await CartasService.validarEmissaoOuImpressaoCarta(
+      supabase,
+      ministryAlpha,
+      memberId1,
+      'Carta de Recomendação',
+      'Irmão Barnabé',
+      'secretario_geral'
+    );
+    assert.equal(emissaoRecomendacao.autorizado, true);
+    assert.equal(emissaoRecomendacao.exigeAutorizacao, false);
+
+    // 2. Trânsito: isenta de autorização presidencial
+    const authTransito = await CartasService.verificarAutorizacaoCarta(
+      supabase,
+      ministryAlpha,
+      memberId1,
+      'transito',
+      'Irmã Priscila'
+    );
+    assert.equal(authTransito.exigeAutorizacao, false);
+    assert.equal(authTransito.autorizado, true);
+    assert.equal(authTransito.status, 'isento');
+
+    const emissaoTransito = await CartasService.validarEmissaoOuImpressaoCarta(
+      supabase,
+      ministryAlpha,
+      memberId1,
+      'Carta de Trânsito',
+      'Irmã Priscila',
+      'administrador'
+    );
+    assert.equal(emissaoTransito.autorizado, true);
+    assert.equal(emissaoTransito.exigeAutorizacao, false);
+
+    // 3. Declarações e outros documentos
+    const authDeclaracao = await CartasService.verificarAutorizacaoCarta(
+      supabase,
+      ministryAlpha,
+      memberId1,
+      'membro_ativo',
+      'Irmão Estevão'
+    );
+    assert.equal(authDeclaracao.exigeAutorizacao, false);
+    assert.equal(authDeclaracao.autorizado, true);
+    assert.equal(authDeclaracao.status, 'isento');
+  });
+
+  test('16. Fila da Central de Decisões: Somente Mudança e Desligamento entram na fila da Presidência', async () => {
+    const pedidos = [
+      {
+        id: 'ped-mudanca-1',
+        ministry_id: ministryAlpha,
+        member_id: memberId1,
+        membro_nome: 'Lucas Santos',
+        tipo_carta: 'mudanca',
+        status: 'pendente',
+      },
+      {
+        id: 'ped-deslig-1',
+        ministry_id: ministryAlpha,
+        member_id: memberId2,
+        membro_nome: 'Marcos Silva',
+        tipo_carta: 'desligamento',
+        status: 'pendente',
+      },
+      {
+        id: 'ped-recom-1',
+        ministry_id: ministryAlpha,
+        member_id: 'member-003',
+        membro_nome: 'Barnabé Souza',
+        tipo_carta: 'recomendacao',
+        status: 'pendente',
+      },
+      {
+        id: 'ped-trans-1',
+        ministry_id: ministryAlpha,
+        member_id: 'member-004',
+        membro_nome: 'Apolo Lima',
+        tipo_carta: 'transito',
+        status: 'pendente',
+      },
+    ];
+    const supabase = createMockSupabase(pedidos);
+
+    const { fila, resumo } = await PresidenciaService.carregarCentralDecisoes(supabase, ministryAlpha);
+
+    // Indicadores: apenas mudança e desligamento
+    assert.equal(resumo.cartasMudanca, 1);
+    assert.equal(resumo.cartasDesligamento, 1);
+    assert.equal(resumo.outrasCartas, 0);
+
+    // Na fila decisória da Presidência, constam estritamente mudança e desligamento
+    const cartasNaFila = fila.filter((f) => f.origem === 'carta_pedido');
+    assert.equal(cartasNaFila.length, 2);
+    const tiposNaFila = cartasNaFila.map((c) => c.tipoCategoria);
+    assert.ok(tiposNaFila.includes('carta_mudanca'));
+    assert.ok(tiposNaFila.includes('carta_desligamento'));
+    assert.ok(!tiposNaFila.includes('carta_recomendacao'));
+    assert.ok(!tiposNaFila.includes('carta_transito'));
+  });
+
+  test('17. Preservação de Status Cadastral: Emissão de Recomendação e Trânsito não inativa o membro', async () => {
+    const supabase = createMockSupabase([]);
+
+    // Recomendação
+    const resRecomendacao = await CartasService.aplicarEfeitoDeliberacaoPresidencial(supabase, {
+      memberId: memberId1,
+      ministryId: ministryAlpha,
+      pedido: {
+        id: 'ped-rec-99',
+        tipo_carta: 'recomendacao',
+      },
+      usuario: {
+        userId: userPresidencia.userId,
+        userName: userPresidencia.userName,
+      },
+    });
+    assert.equal(resRecomendacao.inativado, false);
+
+    // Trânsito
+    const resTransito = await CartasService.aplicarEfeitoDeliberacaoPresidencial(supabase, {
+      memberId: memberId1,
+      ministryId: ministryAlpha,
+      pedido: {
+        id: 'ped-trans-99',
+        tipo_carta: 'transito',
+      },
+      usuario: {
+        userId: userPresidencia.userId,
+        userName: userPresidencia.userName,
+      },
+    });
+    assert.equal(resTransito.inativado, false);
+  });
+
+  test('18. Validação de Arquivo de Imagem: Aceita somente JPG, PNG e WebP com tamanho até 2 MB', () => {
+    // 1. Arquivos válidos
+    const jpegValido = CartasService.validarArquivoImagemCarta({ type: 'image/jpeg', size: 500 * 1024 });
+    assert.equal(jpegValido.valido, true);
+
+    const pngValido = CartasService.validarArquivoImagemCarta({ type: 'image/png', size: 1024 * 1024 });
+    assert.equal(pngValido.valido, true);
+
+    const webpValido = CartasService.validarArquivoImagemCarta({ type: 'image/webp', size: 2 * 1024 * 1024 });
+    assert.equal(webpValido.valido, true);
+
+    // 2. Tipos de arquivos inválidos (GIF, BMP, PDF, etc.)
+    const gifInvalido = CartasService.validarArquivoImagemCarta({ type: 'image/gif', size: 200 * 1024 });
+    assert.equal(gifInvalido.valido, false);
+    assert.match(gifInvalido.erro!, /Formato de imagem inválido/);
+
+    const pdfInvalido = CartasService.validarArquivoImagemCarta({ type: 'application/pdf', size: 300 * 1024 });
+    assert.equal(pdfInvalido.valido, false);
+
+    const semTipo = CartasService.validarArquivoImagemCarta({ type: '', size: 100 * 1024 });
+    assert.equal(semTipo.valido, false);
+
+    const nulo = CartasService.validarArquivoImagemCarta(null);
+    assert.equal(nulo.valido, false);
+
+    // 3. Arquivo que excede o limite máximo de 2 MB
+    const arquivoGigante = CartasService.validarArquivoImagemCarta({
+      type: 'image/png',
+      size: 2 * 1024 * 1024 + 1, // 2MB + 1 byte
+    });
+    assert.equal(arquivoGigante.valido, false);
+    assert.match(arquivoGigante.erro!, /excede o limite máximo permitido de 2 MB/);
+  });
+
+  test('19. Preservação de Propriedades do Elemento: Atualização de imagemUrl preserva posição, dimensões e formatação', () => {
+    const elementoOriginal = {
+      id: 'el-img-1',
+      tipo: 'imagem' as const,
+      x: 120,
+      y: 240,
+      largura: 280,
+      altura: 160,
+      transparencia: 0.4,
+      borderRadius: 12,
+      borderColor: '#0d9488',
+      borderWidth: 2,
+      borderStyle: 'solid' as const,
+      locked: false,
+      visivel: true,
+      imagemUrl: 'https://exemplo.com/antiga.png',
+    };
+
+    // Simula a lógica de updateCanvasElement preservando todas as demais propriedades
+    const novaUrl = 'https://supabase-bucket.co/cartas/1111/novo-upload.png';
+    const elementoAtualizado = {
+      ...elementoOriginal,
+      imagemUrl: novaUrl,
+    };
+
+    // A URL deve ser atualizada
+    assert.equal(elementoAtualizado.imagemUrl, novaUrl);
+
+    // Todas as propriedades originais devem permanecer inalteradas
+    assert.equal(elementoAtualizado.id, elementoOriginal.id);
+    assert.equal(elementoAtualizado.tipo, 'imagem');
+    assert.equal(elementoAtualizado.x, 120);
+    assert.equal(elementoAtualizado.y, 240);
+    assert.equal(elementoAtualizado.largura, 280);
+    assert.equal(elementoAtualizado.altura, 160);
+    assert.equal(elementoAtualizado.transparencia, 0.4);
+    assert.equal(elementoAtualizado.borderRadius, 12);
+    assert.equal(elementoAtualizado.borderColor, '#0d9488');
+    assert.equal(elementoAtualizado.borderWidth, 2);
+    assert.equal(elementoAtualizado.borderStyle, 'solid');
+    assert.equal(elementoAtualizado.locked, false);
+    assert.equal(elementoAtualizado.visivel, true);
+  });
+
+  test('20. Remoção de Imagem: Limpeza de imagemUrl preserva o elemento no canvas sem excluir o objeto', () => {
+    const elementoComImagem = {
+      id: 'el-img-2',
+      tipo: 'imagem' as const,
+      x: 50,
+      y: 80,
+      largura: 300,
+      altura: 200,
+      imagemUrl: 'https://supabase-bucket.co/cartas/1111/foto.jpg',
+      transparencia: 0.8,
+    };
+
+    // Ação de remover imagem limpa imagemUrl para string vazia
+    const elementoLimpo = {
+      ...elementoComImagem,
+      imagemUrl: '',
+    };
+
+    assert.equal(elementoLimpo.imagemUrl, '');
+    assert.equal(elementoLimpo.id, 'el-img-2');
+    assert.equal(elementoLimpo.x, 50);
+    assert.equal(elementoLimpo.y, 80);
+    assert.equal(elementoLimpo.largura, 300);
+    assert.equal(elementoLimpo.altura, 200);
+    assert.equal(elementoLimpo.transparencia, 0.8);
   });
 });

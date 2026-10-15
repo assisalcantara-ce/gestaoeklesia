@@ -58,11 +58,22 @@ const fmtDate = (iso: string | null) => {
 };
 
 function CartaParaImprimir({ pedido, ministerioNome }: { pedido: CartaPedido; ministerioNome: string }) {
-  if (pedido.status !== 'autorizado') {
+  const exigePresidencia = CartasService.exigeAutorizacaoPresidencial(pedido.tipo_carta);
+
+  if (pedido.status !== 'autorizado' && exigePresidencia) {
     return (
       <div style={{ padding: 40, textAlign: 'center', color: '#b91c1c', fontFamily: 'sans-serif' }}>
         <h2 style={{ fontSize: 18, fontWeight: 700 }}>Emissão Bloqueada</h2>
-        <p style={{ fontSize: 14 }}>Esta carta ministerial não possui deliberação de autorização e não pode ser impressa como documento oficial.</p>
+        <p style={{ fontSize: 14 }}>Esta carta ministerial exige deliberação prévia da Presidência e não pode ser impressa sem autorização.</p>
+      </div>
+    );
+  }
+
+  if (pedido.status === 'rejeitado') {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: '#b91c1c', fontFamily: 'sans-serif' }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700 }}>Emissão Bloqueada</h2>
+        <p style={{ fontSize: 14 }}>Esta carta foi indeferida e não pode ser impressa como documento oficial.</p>
       </div>
     );
   }
@@ -87,9 +98,12 @@ function CartaParaImprimir({ pedido, ministerioNome }: { pedido: CartaPedido; mi
       <p style={{ textAlign: 'right', marginBottom: 60, fontSize: 14 }}>{hoje}</p>
       <div style={{ textAlign: 'center' }}>
         <div style={{ width: 200, borderTop: '1px solid #555', margin: '0 auto 4px' }} />
-        <p style={{ fontSize: 14, margin: 0 }}>{pedido.autorizador_nome || 'Presidência'}</p>
+        <p style={{ fontSize: 14, margin: 0 }}>
+          {pedido.autorizador_nome || (exigePresidencia ? 'Presidência' : 'Secretaria Geral')}
+        </p>
         <p style={{ fontSize: 12, margin: 0, color: '#666' }}>
-          {pedido.data_autorizacao ? `Autorizado em ${fmtDate(pedido.data_autorizacao)} — ` : ''}Secretaria Geral — {ministerioNome}
+          {pedido.data_autorizacao ? `Autorizado em ${fmtDate(pedido.data_autorizacao)} — ` : ''}
+          {exigePresidencia ? 'Presidência' : 'Secretaria Geral'} — {ministerioNome}
         </p>
       </div>
     </div>
@@ -193,7 +207,7 @@ export default function CartaPedidosPage() {
     e.preventDefault();
     if (!membroNome.trim()) { showNotif('error', 'Campo obrigatório', 'Informe o nome do membro.'); return; }
     if (!userCtx.ministryId || !userCtx.userId) return;
-    const semAutorizacao = tipoCarta === 'transito' || tipoCarta === 'recomendacao';
+    const semAutorizacao = !CartasService.exigeAutorizacaoPresidencial(tipoCarta);
     setSubmitting(true);
     try {
       const { data, error } = await supabase.from('carta_pedidos').insert({

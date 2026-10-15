@@ -140,12 +140,13 @@ export class PresidenciaService {
       console.error('Erro ao carregar movimentações de dirigentes na Presidência:', movsErr);
     }
 
-    // 3. Busca pedidos de cartas pendentes de autorização ('pendente')
+    // 3. Busca pedidos de cartas pendentes de autorização presidencial ('pendente' - apenas mudança e desligamento)
     const { data: cartas, error: cartasErr } = await supabase
       .from('carta_pedidos')
       .select('*')
       .eq('ministry_id', ministryId)
       .eq('status', 'pendente')
+      .in('tipo_carta', ['mudanca', 'desligamento'])
       .order('created_at', { ascending: false });
 
     if (cartasErr) {
@@ -266,9 +267,7 @@ export class PresidenciaService {
     const dirigentesAprovadosAguardandoPosse = (movs || []).filter((m: DirigenteMovimentacao) => m.status === 'aprovada').length;
     const cartasMudanca = (cartas || []).filter((c: any) => c.tipo_carta === 'mudanca').length;
     const cartasDesligamento = (cartas || []).filter((c: any) => c.tipo_carta === 'desligamento').length;
-    const outrasCartas = (cartas || []).filter(
-      (c: any) => c.tipo_carta !== 'mudanca' && c.tipo_carta !== 'desligamento'
-    ).length;
+    const outrasCartas = 0;
 
     const resumo: PresidenciaResumo = {
       totalPendencias: fila.length,
@@ -316,6 +315,7 @@ export class PresidenciaService {
         .select('*')
         .eq('ministry_id', ministryId)
         .in('status', ['autorizado', 'rejeitado'])
+        .in('tipo_carta', ['mudanca', 'desligamento'])
         .order('updated_at', { ascending: false })
         .limit(limite),
     ]);
