@@ -3614,6 +3614,78 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                             </div>
                           )}
 
+                          {/* Especificidades do Tipo Logo */}
+                          {selectedCanvasElement.tipo === 'logo' && (
+                            <div className="space-y-3 border-t border-gray-100 pt-3">
+                              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                                Logo Institucional
+                              </span>
+                              <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-2.5 flex items-center gap-3">
+                                <div className="h-14 w-14 rounded-lg border border-gray-200 bg-white overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
+                                  {configIgreja.logo || selectedCanvasElement.imagemUrl ? (
+                                    <img
+                                      src={configIgreja.logo || selectedCanvasElement.imagemUrl}
+                                      alt="Logo da Igreja"
+                                      className="h-full w-full object-contain"
+                                      style={{ opacity: selectedCanvasElement.transparencia ?? 1 }}
+                                    />
+                                  ) : (
+                                    <span className="text-2xl">🏛️</span>
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0 space-y-0.5">
+                                  <p className="text-[11px] font-semibold text-gray-700">Logo Dinâmico da Igreja</p>
+                                  <p className="text-[10px] text-gray-400">
+                                    Origem dinâmica vinculada às configurações institucionais do ministério.
+                                  </p>
+                                  <p className="text-[10px] text-gray-400">
+                                    Dimensões: {selectedCanvasElement.largura} × {selectedCanvasElement.altura} px
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Controle de Transparência para Imagem e Logo */}
+                          {(selectedCanvasElement.tipo === 'imagem' || selectedCanvasElement.tipo === 'logo') && (
+                            <div className="space-y-2 border-t border-gray-100 pt-3">
+                              <div className="flex items-center justify-between">
+                                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                                  Transparência
+                                </label>
+                                <span className="text-xs font-bold text-teal-800 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full">
+                                  {Math.round((selectedCanvasElement.transparencia ?? 1) * 100)}%
+                                </span>
+                              </div>
+                              <div className="space-y-1">
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={1}
+                                  step={0.01}
+                                  value={selectedCanvasElement.transparencia ?? 1}
+                                  onChange={(e) =>
+                                    updateCanvasElement(selectedCanvasElement.id, {
+                                      transparencia: Number(e.target.value),
+                                    })
+                                  }
+                                  className="w-full accent-teal-600 cursor-pointer"
+                                  disabled={selectedCanvasElement.locked}
+                                  title="Ajuste a transparência: 0% = totalmente transparente; 100% = totalmente opaco"
+                                />
+                                <div className="flex justify-between text-[9px] text-gray-400 font-medium">
+                                  <span>0% (Transparente)</span>
+                                  <span>100% (Opaco)</span>
+                                </div>
+                              </div>
+                              <p className="text-[10px] text-gray-400 pt-0.5 leading-relaxed">
+                                {selectedCanvasElement.tipo === 'logo'
+                                  ? 'Ajuste a transparência para aplicar o logo institucional como marca-d’água discreta atrás dos textos.'
+                                  : 'Ajuste a transparência para usar esta imagem como marca-d’água ou elemento gráfico sutil no documento.'}
+                              </p>
+                            </div>
+                          )}
+
                         </div>
                       )}
                     </div>

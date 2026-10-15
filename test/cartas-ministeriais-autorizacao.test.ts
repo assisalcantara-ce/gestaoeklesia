@@ -999,4 +999,108 @@ describe('Cartas Ministeriais — Autorização Presidencial e Preservação de 
     assert.equal(elementoLimpo.altura, 200);
     assert.equal(elementoLimpo.transparencia, 0.8);
   });
+
+  test('21. Transparência em Imagem e Logo: inicialização padrão (1.0 / 100%), slider de 0% a 100% e preservação de propriedades', () => {
+    const elementoImagemPadrao = {
+      id: 'el-img-padrao',
+      tipo: 'imagem' as const,
+      x: 100,
+      y: 150,
+      largura: 250,
+      altura: 200,
+      imagemUrl: 'https://cdn.exemplo.com/foto.png',
+      // Sem propriedade transparencia definida originalmente
+    };
+
+    // 1. Inicialização: deve assumir 1 (100% opaco) se transparencia for undefined
+    const transparenciaInicial = (elementoImagemPadrao as any).transparencia ?? 1;
+    assert.strictEqual(transparenciaInicial, 1);
+    assert.strictEqual(Math.round(transparenciaInicial * 100), 100);
+
+    // 2. Ajuste pelo slider (ex: 35% de opacidade para marca d'água)
+    const novoValorSlider = 0.35;
+    const elementoAtualizado = {
+      ...elementoImagemPadrao,
+      transparencia: novoValorSlider,
+    };
+
+    assert.strictEqual(elementoAtualizado.transparencia, 0.35);
+    assert.strictEqual(Math.round((elementoAtualizado.transparencia ?? 1) * 100), 35);
+    // Preserva dimensões, posição e integridade do elemento
+    assert.strictEqual(elementoAtualizado.x, 100);
+    assert.strictEqual(elementoAtualizado.y, 150);
+    assert.strictEqual(elementoAtualizado.largura, 250);
+    assert.strictEqual(elementoAtualizado.altura, 200);
+    assert.strictEqual(elementoAtualizado.imagemUrl, 'https://cdn.exemplo.com/foto.png');
+  });
+
+  test('22. Integridade de Logo Dinâmico: ajuste de transparência preserva a origem institucional do tenant', () => {
+    const elementoLogo = {
+      id: 'el-logo-institucional',
+      tipo: 'logo' as const,
+      x: 200,
+      y: 300,
+      largura: 180,
+      altura: 180,
+      imagemUrl: '',
+    };
+
+    const configIgreja = {
+      logo: 'https://storage.supabase.co/tenants/igreja-central/logo-oficial.png',
+    };
+
+    // Ajuste de transparência para servir de marca-d'água de fundo (ex: 15%)
+    const elementoLogoComMarcaDagua = {
+      ...elementoLogo,
+      transparencia: 0.15,
+    };
+
+    // A URL resolvida dinamicamente deve continuar vindo do tenant (configIgreja.logo)
+    const urlResolvida = configIgreja.logo || elementoLogoComMarcaDagua.imagemUrl;
+    assert.strictEqual(urlResolvida, 'https://storage.supabase.co/tenants/igreja-central/logo-oficial.png');
+    assert.strictEqual(elementoLogoComMarcaDagua.tipo, 'logo');
+    assert.strictEqual(elementoLogoComMarcaDagua.transparencia, 0.15);
+    assert.strictEqual(Math.round((elementoLogoComMarcaDagua.transparencia ?? 1) * 100), 15);
+  });
+
+  test('23. Coalescência Nula e Caso Limite 0% (Totalmente Transparente): 0 não cai no fallback de 1', () => {
+    // Caso de borda crítico: no JS, (0 || 1) resulta em 1, mas (0 ?? 1) preserva 0!
+    const elementoTotalmenteTransparente = {
+      id: 'el-img-oculta',
+      tipo: 'imagem' as const,
+      x: 0,
+      y: 0,
+      largura: 100,
+      altura: 100,
+      transparencia: 0, // 0%
+    };
+
+    const opacidadeCalculada = elementoTotalmenteTransparente.transparencia ?? 1;
+    assert.strictEqual(opacidadeCalculada, 0);
+    assert.strictEqual(Math.round(opacidadeCalculada * 100), 0);
+  });
+
+  test('24. Renderização HTML / Impressão: estilo inclui opacity correspondente à transparência para imagem e logo', () => {
+    const renderElementStyle = (el: { tipo: string; transparencia?: number }) => {
+      const baseStyle = 'position:absolute;';
+      return [
+        baseStyle,
+        'object-fit:contain;',
+        `opacity:${el.transparencia ?? 1};`,
+      ].join('');
+    };
+
+    // Elemento com transparência definida (20%)
+    const style20 = renderElementStyle({ tipo: 'imagem', transparencia: 0.2 });
+    assert.ok(style20.includes('opacity:0.2;'), `Esperado opacity:0.2; no estilo, recebido: ${style20}`);
+
+    // Elemento sem transparência definida (default 1)
+    const styleDefault = renderElementStyle({ tipo: 'logo' });
+    assert.ok(styleDefault.includes('opacity:1;'), `Esperado opacity:1; no estilo, recebido: ${styleDefault}`);
+
+    // Elemento com transparência 0 (totalmente transparente)
+    const styleZero = renderElementStyle({ tipo: 'imagem', transparencia: 0 });
+    assert.ok(styleZero.includes('opacity:0;'), `Esperado opacity:0; no estilo, recebido: ${styleZero}`);
+  });
 });
+

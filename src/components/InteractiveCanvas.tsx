@@ -510,7 +510,7 @@ export default function InteractiveCanvas({
                             width: '100%',
                             height: '100%',
                             objectFit: 'contain',
-                            opacity: elemento.transparencia || 1
+                            opacity: elemento.transparencia ?? 1
                         }}
                     />
                 ) : (
@@ -524,7 +524,7 @@ export default function InteractiveCanvas({
                             justifyContent: 'center',
                             fontSize: '10px',
                             color: '#666',
-                            opacity: elemento.transparencia || 1
+                            opacity: elemento.transparencia ?? 1
                         }}
                     >
                         🏛️ Logo
@@ -587,7 +587,7 @@ export default function InteractiveCanvas({
                                 width: '100%',
                                 height: '100%',
                                 objectFit: 'contain',
-                                opacity: elemento.transparencia || 1
+                                opacity: elemento.transparencia ?? 1
                             }}
                         />
                     </div>
@@ -602,7 +602,7 @@ export default function InteractiveCanvas({
                             justifyContent: 'center',
                             fontSize: '10px',
                             color: '#666',
-                            opacity: elemento.transparencia || 1,
+                            opacity: elemento.transparencia ?? 1,
                             borderRadius: `${elemento.borderRadius || 0}px`,
                             border: isTransparentBg ? 'none' : '1px solid #ddd',
                             overflow: 'hidden'
