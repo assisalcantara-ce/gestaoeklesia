@@ -9,13 +9,12 @@ import { useRouter } from 'next/navigation';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { useUserContext } from '@/hooks/useUserContext';
-import { useAuth } from '@/providers/AuthProvider';
 import { useCurrentMinistry } from '@/providers/CurrentMinistryProvider';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { createClient } from '@/lib/supabase-client';
 import { CheckCircle, Clock, FileText, Printer, Send, XCircle } from 'lucide-react';
 import { CartasService } from '@/services/cartas-service';
-import { PresidenciaService } from '@/services/presidencia-service';
+import { isSecretariaGeral } from '@/lib/access-control';
 
 type TipoCarta = 'mudanca' | 'transito' | 'desligamento' | 'recomendacao';
 type StatusPedido = 'pendente' | 'autorizado' | 'rejeitado';
@@ -104,19 +103,16 @@ export default function CartaPedidosPage() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const userCtx = useUserContext();
-  const { user } = useAuth();
   const { ministry: currentMinistry } = useCurrentMinistry();
-  const isGestor = userCtx.nivel === 'administrador' || userCtx.nivel === 'supervisor';
-  const isAuxiliar = userCtx.nivel === 'auxiliar_secretaria';
 
-  // Auxiliar não acessa pedidos de cartas
+  // Secretaria Geral não deve acessar nem visualizar a página de solicitação da Secretaria Local
   useEffect(() => {
-    if (!userCtx.loading) {
-      if (isAuxiliar) {
-        router.replace('/acesso-negado');
+    if (!userCtx.loading && userCtx.nivel) {
+      if (isSecretariaGeral(userCtx.nivel)) {
+        router.replace('/secretaria/cartas');
       }
     }
-  }, [userCtx.loading, isAuxiliar, router]);
+  }, [userCtx.loading, userCtx.nivel, router]);
 
   const [pedidos, setPedidos] = useState<CartaPedido[]>([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -132,10 +128,6 @@ export default function CartaPedidosPage() {
   const [submitting, setSubmitting] = useState(false);
   const [membrosEncontrados, setMembrosEncontrados] = useState<{ id: string; name: string; cargo_ministerial?: string }[]>([]);
   const skipSearchRef = useRef(false);
-
-  const [pedidoParaAutorizar, setPedidoParaAutorizar] = useState<CartaPedido | null>(null);
-  const [motivoRejeicao, setMotivoRejeicao] = useState('');
-  const [autorizando, setAutorizando] = useState(false);
 
   const [pedidoParaImprimir, setPedidoParaImprimir] = useState<CartaPedido | null>(null);
 
@@ -156,8 +148,18 @@ export default function CartaPedidosPage() {
     if (!userCtx.ministryId) return;
     setLoadingData(true);
     try {
-      let query = supabase.from('carta_pedidos').select('*').eq('ministry_id', userCtx.ministryId).order('created_at', { ascending: false });
-      if (!isGestor && userCtx.userId) query = query.eq('solicitante_id', userCtx.userId);
+      let query = supabase
+        .from('carta_pedidos')
+        .select('*')
+        .eq('ministry_id', userCtx.ministryId)
+        .order('created_at', { ascending: false });
+
+      if (userCtx.congregacaoId) {
+        query = query.or(`congregacao_id.eq.${userCtx.congregacaoId},solicitante_id.eq.${userCtx.userId}`);
+      } else if (userCtx.userId) {
+        query = query.eq('solicitante_id', userCtx.userId);
+      }
+
       const { data, error } = await query;
       if (error) throw error;
       setPedidos((data ?? []) as CartaPedido[]);
@@ -234,7 +236,7 @@ export default function CartaPedidosPage() {
       setMembroSearch(''); setMembroNome(''); setMembroId(null); setMembroCargo('');
       setTipoCarta('mudanca'); setDestino(''); setObservacoes('');
       loadData();
-      setActiveTab('meus');
+      setActiveTab(semAutorizacao ? 'historico' : 'pendentes');
     } catch (err: any) {
       await registrarAcao({
         acao: 'criar',
@@ -251,130 +253,13 @@ export default function CartaPedidosPage() {
     }
   }
 
-  const isPresidencia = userCtx.nivel === 'administrador' || userCtx.nivel === 'presidencia';
-
-  async function handleAutorizar() {
-    if (!pedidoParaAutorizar || !userCtx.userId || !userCtx.ministryId) return;
-
-    if (CartasService.exigeAutorizacaoPresidencial(pedidoParaAutorizar.tipo_carta) && !isPresidencia) {
-      showNotif('error', 'Acesso Negado', 'Cartas de Mudança e Desligamento só podem ser deliberadas pela Presidência na Central de Decisões.');
-      return;
-    }
-
-    setAutorizando(true);
-    try {
-      const userAuth = {
-        userId: userCtx.userId || user?.id || '',
-        userName: user?.user_metadata?.full_name || user?.email || 'Presidência',
-        ministryId: userCtx.ministryId,
-        nivel: userCtx.nivel || 'operador',
-        isAdmin: isPresidencia,
-      };
-
-      await PresidenciaService.deliberarCartaPedido(supabase, userAuth, {
-        pedido_id: pedidoParaAutorizar.id,
-        decisao: 'autorizar',
-      });
-
-      await registrarAcao({
-        acao: 'atualizar_status',
-        modulo: 'secretaria',
-        area: 'cartas',
-        tabela_afetada: 'carta_pedidos',
-        registro_id: pedidoParaAutorizar.id,
-        descricao: `Pedido de ${TIPO_LABELS[pedidoParaAutorizar.tipo_carta]} autorizado para ${pedidoParaAutorizar.membro_nome} pela Presidência`,
-        dados_novos: { status: 'autorizado', autorizador_id: userCtx.userId },
-        status: 'sucesso',
-      });
-
-      showNotif('success', 'Autorizado', 'A carta foi autorizada e está liberada para emissão e impressão.');
-      setPedidoParaAutorizar(null);
-      loadData();
-    } catch (err: any) {
-      await registrarAcao({
-        acao: 'atualizar_status',
-        modulo: 'secretaria',
-        area: 'cartas',
-        tabela_afetada: 'carta_pedidos',
-        registro_id: pedidoParaAutorizar.id,
-        descricao: `Falha ao autorizar pedido de carta para ${pedidoParaAutorizar.membro_nome}`,
-        status: 'erro',
-        mensagem_erro: err?.message,
-      });
-      showNotif('error', 'Erro', err?.message || 'Não foi possível autorizar o pedido.');
-    } finally {
-      setAutorizando(false);
-    }
-  }
-
-  async function handleRejeitar() {
-    if (!pedidoParaAutorizar || !userCtx.userId || !userCtx.ministryId) return;
-    if (!motivoRejeicao.trim()) { showNotif('error', 'Campo obrigatório', 'Informe o motivo da rejeição.'); return; }
-
-    if (CartasService.exigeAutorizacaoPresidencial(pedidoParaAutorizar.tipo_carta) && !isPresidencia) {
-      showNotif('error', 'Acesso Negado', 'Cartas de Mudança e Desligamento só podem ser deliberadas pela Presidência na Central de Decisões.');
-      return;
-    }
-
-    setAutorizando(true);
-    try {
-      const userAuth = {
-        userId: userCtx.userId || user?.id || '',
-        userName: user?.user_metadata?.full_name || user?.email || 'Presidência',
-        ministryId: userCtx.ministryId,
-        nivel: userCtx.nivel || 'operador',
-        isAdmin: isPresidencia,
-      };
-
-      await PresidenciaService.deliberarCartaPedido(supabase, userAuth, {
-        pedido_id: pedidoParaAutorizar.id,
-        decisao: 'rejeitar',
-        motivo_rejeicao: motivoRejeicao.trim(),
-      });
-
-      await registrarAcao({
-        acao: 'atualizar_status',
-        modulo: 'secretaria',
-        area: 'cartas',
-        tabela_afetada: 'carta_pedidos',
-        registro_id: pedidoParaAutorizar.id,
-        descricao: `Pedido de ${TIPO_LABELS[pedidoParaAutorizar.tipo_carta]} rejeitado para ${pedidoParaAutorizar.membro_nome}. Motivo: ${motivoRejeicao.trim()}`,
-        dados_novos: { status: 'rejeitado', motivo_rejeicao: motivoRejeicao.trim(), autorizador_id: userCtx.userId },
-        status: 'sucesso',
-      });
-
-      showNotif('warning', 'Rejeitado', 'O pedido foi rejeitado e a emissão oficial permanece bloqueada.');
-      setPedidoParaAutorizar(null);
-      setMotivoRejeicao('');
-      loadData();
-    } catch (err: any) {
-      await registrarAcao({
-        acao: 'atualizar_status',
-        modulo: 'secretaria',
-        area: 'cartas',
-        tabela_afetada: 'carta_pedidos',
-        registro_id: pedidoParaAutorizar.id,
-        descricao: `Falha ao rejeitar pedido de carta para ${pedidoParaAutorizar.membro_nome}`,
-        status: 'erro',
-        mensagem_erro: err?.message,
-      });
-      showNotif('error', 'Erro', err?.message || 'Não foi possível rejeitar o pedido.');
-    } finally {
-      setAutorizando(false);
-    }
-  }
-
   const pedidosPendentes = pedidos.filter(p => p.status === 'pendente');
+  const pedidosHistorico = pedidos.filter(p => p.status !== 'pendente');
 
   const tabs = [
     { id: 'solicitar', label: 'Solicitar' },
-    ...(isGestor
-      ? [
-          { id: 'pendentes', label: pedidosPendentes.length > 0 ? `Pendentes (${pedidosPendentes.length})` : 'Pendentes' },
-          { id: 'historico', label: 'Histórico' },
-        ]
-      : [{ id: 'meus', label: 'Meus Pedidos' }]
-    ),
+    { id: 'pendentes', label: pedidosPendentes.length > 0 ? `Pendentes (${pedidosPendentes.length})` : 'Pendentes' },
+    { id: 'historico', label: 'Histórico' },
   ];
 
   function StatusBadge({ status }: { status: StatusPedido }) {
@@ -403,7 +288,7 @@ export default function CartaPedidosPage() {
           <span>{TIPO_LABELS[pedido.tipo_carta]}</span>
           {pedido.destino && <span>📍 {pedido.destino}</span>}
           <span>📅 {fmtDate(pedido.created_at)}</span>
-          {isGestor && pedido.solicitante_nome && <span>👤 {pedido.solicitante_nome}</span>}
+          {pedido.solicitante_nome && <span>👤 {pedido.solicitante_nome}</span>}
         </div>
         {pedido.observacoes && (
           <p className="text-xs text-gray-400 italic border-l-2 border-gray-200 pl-3">"{pedido.observacoes}"</p>
@@ -411,7 +296,7 @@ export default function CartaPedidosPage() {
         {pedido.status === 'rejeitado' && (
           <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 space-y-1">
             <p className="font-semibold flex items-center gap-1">
-              <XCircle size={12} /> Pedido indeferido pela Presidência (Emissão oficial bloqueada)
+              <XCircle size={12} /> Pedido indeferido (Emissão oficial bloqueada)
             </p>
             {pedido.motivo_rejeicao && (
               <p>
@@ -422,7 +307,7 @@ export default function CartaPedidosPage() {
         )}
         {pedido.status === 'autorizado' && (
           <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-            Autorizado por <strong>{pedido.autorizador_nome || 'Presidência'}</strong> em {fmtDate(pedido.data_autorizacao)}
+            Autorizado por <strong>{pedido.autorizador_nome || 'Secretaria Geral'}</strong> em {fmtDate(pedido.data_autorizacao)}
           </p>
         )}
         <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -436,27 +321,14 @@ export default function CartaPedidosPage() {
           )}
           {pedido.status === 'pendente' && (
             CartasService.exigeAutorizacaoPresidencial(pedido.tipo_carta) ? (
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 flex items-center gap-1 font-medium">
-                  <Clock size={12} /> Aguardando deliberação da Presidência
-                </span>
-                {isPresidencia && (
-                  <button
-                    onClick={() => { setPedidoParaAutorizar(pedido); setMotivoRejeicao(''); }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-lg transition"
-                  >
-                    <CheckCircle size={12} /> Avaliar (Presidência)
-                  </button>
-                )}
-              </div>
-            ) : isGestor ? (
-              <button
-                onClick={() => { setPedidoParaAutorizar(pedido); setMotivoRejeicao(''); }}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-lg transition"
-              >
-                <CheckCircle size={12} /> Avaliar
-              </button>
-            ) : null
+              <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 flex items-center gap-1 font-medium">
+                <Clock size={12} /> Aguardando deliberação da Presidência
+              </span>
+            ) : (
+              <span className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-1.5 flex items-center gap-1 font-medium">
+                <Clock size={12} /> Aguardando autorização da Secretaria Geral
+              </span>
+            )
           )}
         </div>
       </div>
@@ -474,6 +346,7 @@ export default function CartaPedidosPage() {
 
   if (loading || userCtx.loading) return null;
   if (bloqueado) return null;
+  if (isSecretariaGeral(userCtx.nivel)) return null;
 
   return (
     <PageLayout
@@ -489,58 +362,6 @@ export default function CartaPedidosPage() {
         onClose={() => setNotif(n => ({ ...n, isOpen: false }))}
         autoClose={3000}
       />
-
-      {pedidoParaAutorizar && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
-            <h3 className="text-lg font-bold text-gray-800 mb-1">Avaliar Pedido</h3>
-            <p className="text-sm text-gray-500 mb-4">
-              {TIPO_LABELS[pedidoParaAutorizar.tipo_carta]} —{' '}
-              <strong className="text-gray-700">{pedidoParaAutorizar.membro_nome}</strong>
-            </p>
-            {pedidoParaAutorizar.observacoes && (
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-sm text-gray-600">
-                <span className="text-xs text-gray-400 block mb-1">Observações do solicitante:</span>
-                {pedidoParaAutorizar.observacoes}
-              </div>
-            )}
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Motivo da rejeição{' '}
-              <span className="text-gray-400 font-normal">(obrigatório para rejeitar)</span>
-            </label>
-            <textarea
-              value={motivoRejeicao}
-              onChange={e => setMotivoRejeicao(e.target.value)}
-              rows={3}
-              placeholder="Informe o motivo caso vá rejeitar..."
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none mb-4"
-            />
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setPedidoParaAutorizar(null)}
-                disabled={autorizando}
-                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleRejeitar}
-                disabled={autorizando}
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition disabled:opacity-50"
-              >
-                <XCircle size={15} /> Rejeitar
-              </button>
-              <button
-                onClick={handleAutorizar}
-                disabled={autorizando}
-                className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-lg transition disabled:opacity-50"
-              >
-                <CheckCircle size={15} /> Autorizar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {pedidoParaImprimir && (
         <div className="print-carta hidden print:block">
@@ -662,18 +483,7 @@ export default function CartaPedidosPage() {
           </Section>
         )}
 
-        {activeTab === 'meus' && !isGestor && (
-          <Section title="Meus Pedidos">
-            {loadingData
-              ? <p className="text-sm text-gray-400">Carregando...</p>
-              : pedidos.length === 0
-                ? <ListaVazia mensagem="Nenhum pedido registrado ainda." />
-                : <div className="grid gap-3 max-w-2xl">{pedidos.map(p => <PedidoCard key={p.id} pedido={p} />)}</div>
-            }
-          </Section>
-        )}
-
-        {activeTab === 'pendentes' && isGestor && (
+        {activeTab === 'pendentes' && (
           <Section title={`Pedidos Pendentes (${pedidosPendentes.length})`}>
             {loadingData
               ? <p className="text-sm text-gray-400">Carregando...</p>
@@ -684,13 +494,13 @@ export default function CartaPedidosPage() {
           </Section>
         )}
 
-        {activeTab === 'historico' && isGestor && (
+        {activeTab === 'historico' && (
           <Section title="Histórico de Pedidos">
             {loadingData
               ? <p className="text-sm text-gray-400">Carregando...</p>
-              : pedidos.length === 0
-                ? <ListaVazia mensagem="Nenhum pedido registrado." />
-                : <div className="grid gap-3 max-w-2xl">{pedidos.map(p => <PedidoCard key={p.id} pedido={p} />)}</div>
+              : pedidosHistorico.length === 0
+                ? <ListaVazia mensagem="Nenhum pedido registrado no histórico." />
+                : <div className="grid gap-3 max-w-2xl">{pedidosHistorico.map(p => <PedidoCard key={p.id} pedido={p} />)}</div>
             }
           </Section>
         )}

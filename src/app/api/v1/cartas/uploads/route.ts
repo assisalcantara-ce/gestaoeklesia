@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { createServerClient } from '@/lib/supabase-server'
 import { resolveTenantAuth } from '@/lib/tenant-auth'
 import { authTenantErrorResponse } from '@/lib/api-errors'
+import { isSecretariaLocal } from '@/lib/access-control'
 
 const BUCKET = 'cartas-templates'
 const MAX_BYTES = 2 * 1024 * 1024
@@ -26,7 +27,14 @@ async function ensureBucket(supabaseAdmin: any) {
 export async function POST(request: NextRequest) {
   try {
     const context = await resolveTenantAuth(request)
-    const { ministryId } = context
+    const { ministryId, nivel } = context
+
+    if (isSecretariaLocal(nivel)) {
+      return NextResponse.json(
+        { error: 'Acesso negado: Usuários da Secretaria Local não possuem permissão para gerenciar modelos de cartas.' },
+        { status: 403 }
+      )
+    }
 
     const form = await request.formData()
     const file = form.get('file')

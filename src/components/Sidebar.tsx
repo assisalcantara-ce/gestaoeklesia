@@ -8,6 +8,7 @@ import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { FeatureFlag } from '@/lib/feature-flags';
 import EbdSidebarMenu, { ALL_EBD_IDS } from '@/components/EbdSidebarMenu';
 import { useUserContext } from '@/hooks/useUserContext';
+import { isSecretariaGeral, isSecretariaLocal } from '@/lib/access-control';
 import {
   LayoutDashboard,
   FileText,
@@ -230,7 +231,7 @@ export default function Sidebar() {
         { id: 'batismo-aguas', label: 'Batismo nas Águas', path: '/secretaria/batismo-aguas', modulo: 'secretaria_local' },
         { id: 'casamento', label: 'Casamento', path: '/secretaria/casamento', modulo: 'gestao' },
         { id: 'cartas', label: 'Cartas e Declarações', path: '/secretaria/cartas', modulo: 'gestao' },
-        { id: 'cartas-pedidos', label: 'Pedidos de Cartas', path: '/secretaria/cartas/pedidos', modulo: 'secretaria_local' },
+        { id: 'cartas-pedidos', label: 'Cartas', path: '/secretaria/cartas/pedidos', modulo: 'secretaria_local' },
         { id: 'relatorios-secretaria', label: 'Relatórios', path: '/secretaria/relatorios', modulo: 'gestao' },
         { id: 'sorteios', label: 'Sorteios', path: '/secretaria/sorteios', modulo: 'secretaria_local' },
       ],
@@ -545,7 +546,17 @@ export default function Sidebar() {
                 <div className="mt-1 mb-2 ml-4 pl-3.5 border-l border-white/[0.12] space-y-0.5 animate-fadeIn">
                   {item.submenu
                     .filter((sub) => !sub.modulo || userCtx.podeAcessar(sub.modulo))
-                    .filter((sub) => !(sub.id === 'cartas-pedidos' && userCtx.nivel === 'administrador'))
+                    .filter((sub) => {
+                      // Secretaria Geral não deve visualizar nem utilizar a página de solicitação local
+                      if (sub.id === 'cartas-pedidos' && isSecretariaGeral(userCtx.nivel)) {
+                        return false;
+                      }
+                      // Secretaria Local não deve visualizar a página de emissão direta / editor da Secretaria Geral
+                      if (sub.id === 'cartas' && isSecretariaLocal(userCtx.nivel)) {
+                        return false;
+                      }
+                      return true;
+                    })
                     .filter((sub) => !sub.featureFlag || planFeatures.hasFeature(sub.featureFlag))
                     .filter((sub) => !sub.planFeature || (planFeatures as any)[sub.planFeature])
                     .map((submenu) => {

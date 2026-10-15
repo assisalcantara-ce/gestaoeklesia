@@ -60,6 +60,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { CartasService, type VerificacaoAutorizacaoCarta } from '@/services/cartas-service';
+import { isSecretariaLocal } from '@/lib/access-control';
 
 const CANVAS_A4 = { width: 794, height: 1123 };
 
@@ -292,8 +293,17 @@ export default function CartasPage() {
   const router = useRouter();
   const userCtx = useUserContext();
   const { registrarAcao } = useAuditLog();
-  const isOperador = !userCtx.loading && ['secretaria_local', 'admin_local', 'operador'].includes(userCtx.nivel || '');
   const { fetchMembers } = useMembers();
+
+  // Secretaria Local não pode emitir cartas diretamente nem editar modelos; redireciona para a central de pedidos
+  useEffect(() => {
+    if (!userCtx.loading && userCtx.nivel) {
+      if (isSecretariaLocal(userCtx.nivel)) {
+        router.replace('/secretaria/cartas/pedidos');
+      }
+    }
+  }, [userCtx.loading, userCtx.nivel, router]);
+
   const canvasImageInputRef = useRef<HTMLInputElement>(null);
   const canvasBackgroundInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -416,35 +426,177 @@ export default function CartasPage() {
     autoClose: 3000,
   });
 
+  const [pedidosRecebidos, setPedidosRecebidos] = useState<any[]>([]);
+  const [loadingPedidos, setLoadingPedidos] = useState(false);
+  const [pedidoParaAvaliar, setPedidoParaAvaliar] = useState<any | null>(null);
+  const [motivoRejeicaoPedido, setMotivoRejeicaoPedido] = useState('');
+  const [avaliandoPedido, setAvaliandoPedido] = useState(false);
+  const [pedidosFiltroStatus, setPedidosFiltroStatus] = useState<'todos' | 'pendente' | 'autorizado' | 'rejeitado'>('pendente');
+
+  const effMinistryId = ministryId || userCtx.ministryId;
+
+  const fetchPedidosRecebidos = useCallback(async () => {
+    if (!effMinistryId) return;
+    setLoadingPedidos(true);
+    try {
+      const { data, error } = await supabase
+        .from('carta_pedidos')
+        .select('*')
+        .eq('ministry_id', effMinistryId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setPedidosRecebidos(data || []);
+    } catch (err: any) {
+      console.error('Erro ao carregar pedidos de cartas recebidos:', err);
+    } finally {
+      setLoadingPedidos(false);
+    }
+  }, [effMinistryId, supabase]);
+
+  useEffect(() => {
+    if (effMinistryId) {
+      fetchPedidosRecebidos();
+    }
+  }, [effMinistryId, fetchPedidosRecebidos]);
+
+  const handleAutorizarPedido = async (pedido: any) => {
+    if (CartasService.exigeAutorizacaoPresidencial(pedido.tipo_carta)) {
+      setNotification({
+        isOpen: true,
+        title: 'Deliberação Presidencial Obrigatória',
+        message: 'Cartas de Mudança e Desligamento devem ser deliberadas na Central de Decisões da Presidência.',
+        type: 'warning',
+        autoClose: 4000,
+      });
+      return;
+    }
+
+    setAvaliandoPedido(true);
+    try {
+      const { error } = await supabase
+        .from('carta_pedidos')
+        .update({
+          status: 'autorizado',
+          autorizador_id: userCtx.userId,
+          autorizador_nome: userCtx.userId || 'Secretaria Geral',
+          data_autorizacao: new Date().toISOString(),
+        })
+        .eq('id', pedido.id)
+        .eq('ministry_id', effMinistryId);
+
+      if (error) throw error;
+
+      await registrarAcao({
+        acao: 'atualizar_status',
+        modulo: 'secretaria',
+        area: 'cartas',
+        tabela_afetada: 'carta_pedidos',
+        registro_id: pedido.id,
+        descricao: `Pedido de carta para ${pedido.membro_nome} autorizado pela Secretaria Geral`,
+        dados_novos: { status: 'autorizado', autorizador_id: userCtx.userId },
+        status: 'sucesso',
+      });
+
+      setNotification({
+        isOpen: true,
+        title: 'Pedido Autorizado',
+        message: 'O pedido foi autorizado com sucesso e está liberado para emissão e impressão.',
+        type: 'success',
+        autoClose: 3000,
+      });
+      setPedidoParaAvaliar(null);
+      fetchPedidosRecebidos();
+    } catch (err: any) {
+      setNotification({
+        isOpen: true,
+        title: 'Erro ao autorizar',
+        message: err?.message || 'Falha ao autorizar o pedido.',
+        type: 'error',
+        autoClose: 4000,
+      });
+    } finally {
+      setAvaliandoPedido(false);
+    }
+  };
+
+  const handleRejeitarPedido = async () => {
+    if (!pedidoParaAvaliar) return;
+    if (!motivoRejeicaoPedido.trim()) {
+      setNotification({
+        isOpen: true,
+        title: 'Campo Obrigatório',
+        message: 'Informe o motivo da rejeição do pedido.',
+        type: 'warning',
+        autoClose: 3000,
+      });
+      return;
+    }
+
+    setAvaliandoPedido(true);
+    try {
+      const { error } = await supabase
+        .from('carta_pedidos')
+        .update({
+          status: 'rejeitado',
+          autorizador_id: userCtx.userId,
+          autorizador_nome: userCtx.userId || 'Secretaria Geral',
+          motivo_rejeicao: motivoRejeicaoPedido.trim(),
+          data_autorizacao: new Date().toISOString(),
+        })
+        .eq('id', pedidoParaAvaliar.id)
+        .eq('ministry_id', effMinistryId);
+
+      if (error) throw error;
+
+      await registrarAcao({
+        acao: 'atualizar_status',
+        modulo: 'secretaria',
+        area: 'cartas',
+        tabela_afetada: 'carta_pedidos',
+        registro_id: pedidoParaAvaliar.id,
+        descricao: `Pedido de carta para ${pedidoParaAvaliar.membro_nome} rejeitado pela Secretaria Geral. Motivo: ${motivoRejeicaoPedido.trim()}`,
+        dados_novos: { status: 'rejeitado', motivo_rejeicao: motivoRejeicaoPedido.trim() },
+        status: 'sucesso',
+      });
+
+      setNotification({
+        isOpen: true,
+        title: 'Pedido Rejeitado',
+        message: 'O pedido foi rejeitado e a emissão oficial permanece bloqueada.',
+        type: 'warning',
+        autoClose: 3000,
+      });
+      setPedidoParaAvaliar(null);
+      setMotivoRejeicaoPedido('');
+      fetchPedidosRecebidos();
+    } catch (err: any) {
+      setNotification({
+        isOpen: true,
+        title: 'Erro ao rejeitar',
+        message: err?.message || 'Falha ao rejeitar o pedido.',
+        type: 'error',
+        autoClose: 4000,
+      });
+    } finally {
+      setAvaliandoPedido(false);
+    }
+  };
+
+  const pedidosPendentesCount = pedidosRecebidos.filter(p => p.status === 'pendente').length;
+
   const tabs = [
+    {
+      id: 'pedidos',
+      label: pedidosPendentesCount > 0 ? `Pedidos (${pedidosPendentesCount})` : 'Pedidos Recebidos',
+      icon: '📬',
+    },
     { id: 'modelos', label: 'Modelos', icon: '🧩' },
     { id: 'emitir', label: 'Emitir', icon: '📄' },
-    { id: 'historico', label: 'Historico', icon: '🗂️' },
+    { id: 'historico', label: 'Histórico', icon: '🗂️' },
   ];
 
-  const isAuxiliar = userCtx.nivel === 'auxiliar_secretaria';
-
-  // Operador não acessa o editor de modelos; Auxiliar acessa apenas Histórico
-  const visibleTabs = isAuxiliar
-    ? tabs.filter(t => t.id === 'historico')
-    : isOperador
-    ? tabs.filter(t => t.id !== 'modelos')
-    : tabs;
-
-  // Se operador/auxiliar cair em abas restritas, redireciona para aba permitida
-  useEffect(() => {
-    if (isAuxiliar && activeTab !== 'historico') {
-      setActiveTab('historico');
-    } else if (isOperador && activeTab === 'modelos') {
-      setActiveTab('emitir');
-    }
-  }, [isAuxiliar, isOperador, activeTab]);
-
-  // Templates disponíveis para operador: cartas de trânsito/recomendação e declarações oficiais
-  const TIPOS_LIVRES: TemplateTipo[] = ['transito', 'recomendacao', 'membro_ativo', 'batismo', 'cargo', 'apresentacao_crianca'];
-  const templatesFiltrados = isOperador
-    ? templates.filter(t => TIPOS_LIVRES.includes(t.tipo) || t.categoria === 'declaracao')
-    : templates;
+  const visibleTabs = tabs;
+  const templatesFiltrados = templates;
 
   const selectedMember = useMemo(
     () => members.find((m) => m.id === selectedMemberId) || null,
@@ -1915,12 +2067,13 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
         effMinistryId,
         selectedMember.id,
         tipoCartaOuDoc,
-        selectedMember.name
+        selectedMember.name,
+        userCtx.nivel
       );
     } catch (authErr: any) {
       setNotification({
         isOpen: true,
-        title: 'Emissão Bloqueada pela Presidência',
+        title: authErr?.message?.includes('Secretaria Local') ? 'Acesso Negado' : 'Emissão Bloqueada',
         message: authErr?.message || 'Documento ministerial sem autorização válida da Presidência.',
         type: 'error',
         autoClose: undefined,
@@ -2118,8 +2271,9 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
     setTimeout(() => win.print(), 350);
   };
 
-  if (loading) return <div className="p-8">Carregando...</div>;
+  if (loading || userCtx.loading) return <div className="p-8">Carregando...</div>;
   if (bloqueado) return null;
+  if (isSecretariaLocal(userCtx.nivel)) return null;
 
   return (
     <PageLayout
@@ -2135,6 +2289,52 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
         onClose={() => setNotification((prev) => ({ ...prev, isOpen: false }))}
         autoClose={notification.autoClose}
       />
+
+      {pedidoParaAvaliar && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
+            <h3 className="text-lg font-bold text-gray-800 mb-1">Rejeitar Pedido de Carta</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              {pedidoParaAvaliar.tipo_carta} —{' '}
+              <strong className="text-gray-700">{pedidoParaAvaliar.membro_nome}</strong>
+            </p>
+            {pedidoParaAvaliar.observacoes && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-sm text-gray-600">
+                <span className="text-xs text-gray-400 block mb-1">Observações do solicitante:</span>
+                {pedidoParaAvaliar.observacoes}
+              </div>
+            )}
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Motivo da rejeição <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              value={motivoRejeicaoPedido}
+              onChange={(e) => setMotivoRejeicaoPedido(e.target.value)}
+              rows={3}
+              placeholder="Descreva o motivo da recusa para a congregação..."
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none mb-4"
+            />
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setPedidoParaAvaliar(null)}
+                disabled={avaliandoPedido}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleRejeitarPedido}
+                disabled={avaliandoPedido}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition disabled:opacity-50"
+              >
+                <XCircle size={15} /> Confirmar Rejeição
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="relative font-sans">
         <div className="absolute inset-0 -z-10">
@@ -2183,6 +2383,187 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
         <div className="rounded-2xl border border-white/70 bg-white/80 shadow-xl/10 backdrop-blur">
           <div className="p-4 md:p-6">
             <Tabs tabs={visibleTabs} activeTab={activeTab} onTabChange={setActiveTab}>
+        {activeTab === 'pedidos' && (
+          <Section icon="📬" title="Pedidos de Cartas Recebidos">
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-2 border-b border-gray-100">
+                <div>
+                  <h3 className="text-base font-bold text-gray-800">Solicitações das Congregações</h3>
+                  <p className="text-xs text-gray-500">
+                    Analise e aprove os pedidos de cartas ministeriais encaminhados pelas secretarias locais.
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-200 text-xs font-semibold">
+                  {(['pendente', 'todos', 'autorizado', 'rejeitado'] as const).map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => setPedidosFiltroStatus(st)}
+                      className={`px-3 py-1.5 rounded-lg transition capitalize ${
+                        pedidosFiltroStatus === st
+                          ? 'bg-white text-teal-800 shadow-sm border border-gray-200 font-bold'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      {st === 'todos'
+                        ? 'Todos'
+                        : st === 'pendente'
+                        ? `Pendentes (${pedidosPendentesCount})`
+                        : st === 'autorizado'
+                        ? 'Autorizados'
+                        : 'Rejeitados'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {loadingPedidos ? (
+                <div className="py-12 text-center text-gray-400 text-sm">Carregando solicitações...</div>
+              ) : (
+                (() => {
+                  const filtered = pedidosRecebidos.filter((p) => {
+                    if (pedidosFiltroStatus === 'todos') return true;
+                    return p.status === pedidosFiltroStatus;
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="py-16 text-center text-gray-400">
+                        <FileCheck size={40} className="mx-auto mb-2 opacity-40" />
+                        <p className="text-sm">Nenhum pedido encontrado com o filtro selecionado.</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="grid gap-3">
+                      {filtered.map((pedido) => {
+                        const exigePresidencia = CartasService.exigeAutorizacaoPresidencial(pedido.tipo_carta);
+                        return (
+                          <div
+                            key={pedido.id}
+                            className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4"
+                          >
+                            <div className="space-y-1.5 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-gray-800 text-base">{pedido.membro_nome}</span>
+                                {pedido.membro_cargo && (
+                                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
+                                    {pedido.membro_cargo}
+                                  </span>
+                                )}
+                                <span
+                                  className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${
+                                    pedido.status === 'pendente'
+                                      ? 'bg-amber-50 text-amber-700 border-amber-300'
+                                      : pedido.status === 'autorizado'
+                                      ? 'bg-green-50 text-green-700 border-green-300'
+                                      : 'bg-red-50 text-red-700 border-red-300'
+                                  }`}
+                                >
+                                  {pedido.status === 'pendente'
+                                    ? 'Pendente'
+                                    : pedido.status === 'autorizado'
+                                    ? 'Autorizado'
+                                    : 'Rejeitado'}
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+                                <span>
+                                  Tipo:{' '}
+                                  <strong>
+                                    {pedido.tipo_carta === 'mudanca'
+                                      ? 'Carta de Mudança'
+                                      : pedido.tipo_carta === 'desligamento'
+                                      ? 'Carta de Desligamento'
+                                      : pedido.tipo_carta === 'transito'
+                                      ? 'Carta de Trânsito'
+                                      : 'Carta de Recomendação'}
+                                  </strong>
+                                </span>
+                                {pedido.destino && <span>Destino: <strong>{pedido.destino}</strong></span>}
+                                <span>Data: <strong>{new Date(pedido.created_at).toLocaleDateString('pt-BR')}</strong></span>
+                                {pedido.solicitante_nome && <span>Solicitado por: <strong>{pedido.solicitante_nome}</strong></span>}
+                              </div>
+                              {pedido.observacoes && (
+                                <p className="text-xs text-gray-500 italic bg-gray-50 rounded-lg p-2 border border-gray-100">
+                                  "{pedido.observacoes}"
+                                </p>
+                              )}
+                              {pedido.status === 'rejeitado' && pedido.motivo_rejeicao && (
+                                <p className="text-xs text-red-600 bg-red-50 rounded-lg p-2 border border-red-100">
+                                  <strong>Motivo da rejeição:</strong> {pedido.motivo_rejeicao}
+                                </p>
+                              )}
+                              {pedido.status === 'autorizado' && (
+                                <p className="text-xs text-green-700">
+                                  Autorizado por {pedido.autorizador_nome || 'Secretaria'} em{' '}
+                                  {pedido.data_autorizacao
+                                    ? new Date(pedido.data_autorizacao).toLocaleDateString('pt-BR')
+                                    : '—'}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              {pedido.status === 'pendente' && (
+                                exigePresidencia ? (
+                                  <div className="flex flex-col items-end gap-1">
+                                    <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 font-medium">
+                                      <Clock size={12} /> Exige deliberação da Presidência
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => router.push('/presidencia/decisoes')}
+                                      className="text-xs text-blue-600 hover:text-blue-800 underline font-medium"
+                                    >
+                                      Abrir Central de Decisões →
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => { setPedidoParaAvaliar(pedido); setMotivoRejeicaoPedido(''); }}
+                                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-xs font-semibold transition"
+                                    >
+                                      <XCircle size={13} /> Rejeitar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAutorizarPedido(pedido)}
+                                      disabled={avaliandoPedido}
+                                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition disabled:opacity-50"
+                                    >
+                                      <CheckCircle size={13} /> Autorizar
+                                    </button>
+                                  </div>
+                                )
+                              )}
+                              {pedido.status === 'autorizado' && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (pedido.member_id) setSelectedMemberId(pedido.member_id);
+                                    setActiveTab('emitir');
+                                  }}
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-semibold transition"
+                                >
+                                  <FileCheck size={13} /> Emitir Carta Oficial
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()
+              )}
+            </div>
+          </Section>
+        )}
+
         {activeTab === 'modelos' && (
           <Section icon="🧩" title="Modelos de Documentos">
             {/* Cabeçalho da Seção de Modelos com Botão de Novo Modelo */}
@@ -3271,8 +3652,8 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                     </select>
                   </div>
 
-                  {/* Aviso de Operador Sede (Cartas restritas) */}
-                  {isOperador && (
+                  {/* Aviso de Cartas com deliberação presidencial obrigatória */}
+                  {selectedTemplate && CartasService.exigeAutorizacaoPresidencial(selectedTemplate.tipo || selectedTemplate.template_key) && (
                     <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 space-y-2">
                       <div className="flex items-center gap-2 text-amber-800">
                         <span className="text-sm">⚠️</span>

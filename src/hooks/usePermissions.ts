@@ -13,7 +13,7 @@ import {
 } from '@/lib/access-control';
 
 export type { NivelAcesso } from '@/lib/access-control';
-export { temAcesso, temAcessoEscrita } from '@/lib/access-control';
+export { temAcesso, temAcessoEscrita, isSecretariaGeral, isSecretariaLocal } from '@/lib/access-control';
 
 export function getModulosAcessiveis(nivel: NivelAcesso): string[] {
   return MODULOS_ACESSO[nivel] ?? [];

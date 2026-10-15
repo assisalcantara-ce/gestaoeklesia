@@ -473,3 +473,15 @@ export function isLocalNivel(nivel: NivelAcesso): boolean {
     'operador'
   ].includes(nivel);
 }
+
+export function isSecretariaGeral(nivel: NivelAcesso | string | null | undefined): boolean {
+  if (!nivel) return false;
+  const n = String(nivel).toLowerCase();
+  return n === 'secretario_geral' || n === 'administrador';
+}
+
+export function isSecretariaLocal(nivel: NivelAcesso | string | null | undefined): boolean {
+  if (!nivel) return false;
+  const n = String(nivel).toLowerCase();
+  return ['secretaria_local', 'admin_local', 'operador', 'auxiliar_secretaria'].includes(n);
+}

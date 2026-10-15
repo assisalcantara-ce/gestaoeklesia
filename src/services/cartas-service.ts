@@ -3,6 +3,8 @@
  * Gestão Eklésia
  */
 
+import { isSecretariaLocal } from '@/lib/access-control';
+
 export interface VerificacaoAutorizacaoCarta {
   exigeAutorizacao: boolean;
   autorizado: boolean;
@@ -215,8 +217,14 @@ export class CartasService {
     ministryId: string,
     memberId: string | null | undefined,
     tipoCarta: string,
-    membroNome?: string | null
+    membroNome?: string | null,
+    userNivel?: string | null
   ): Promise<VerificacaoAutorizacaoCarta> {
+    if (userNivel && isSecretariaLocal(userNivel)) {
+      throw new Error(
+        'Acesso negado: Usuários da Secretaria Local não possuem permissão para realizar emissão direta de cartas ministeriais. Registre a solicitação para deliberação da Secretaria Geral.'
+      );
+    }
     const auth = await this.verificarAutorizacaoCarta(supabase, ministryId, memberId, tipoCarta, membroNome);
     if (auth.exigeAutorizacao && !auth.autorizado) {
       throw new Error(`Emissão bloqueada: ${auth.mensagem}`);

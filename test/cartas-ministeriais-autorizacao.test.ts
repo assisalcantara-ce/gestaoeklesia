@@ -2,6 +2,7 @@ import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { CartasService } from '../src/services/cartas-service.js';
 import { PresidenciaService } from '../src/services/presidencia-service.js';
+import { isSecretariaGeral, isSecretariaLocal } from '../src/lib/access-control.js';
 import type { UserContextAuth } from '../src/services/dirigentes-service.js';
 
 describe('Cartas Ministeriais — Autorização Presidencial e Preservação de Impressão', () => {
@@ -670,5 +671,68 @@ describe('Cartas Ministeriais — Autorização Presidencial e Preservação de 
       },
       /Os dados do membro destinatário são obrigatórios/
     );
+  });
+
+  test('13. Separação de Papéis: Funções de verificação de Secretaria Geral e Secretaria Local', () => {
+    // Secretaria Geral
+    assert.equal(isSecretariaGeral('secretario_geral'), true);
+    assert.equal(isSecretariaGeral('administrador'), true);
+    assert.equal(isSecretariaGeral('secretaria_local'), false);
+    assert.equal(isSecretariaGeral('operador'), false);
+    assert.equal(isSecretariaGeral('auxiliar_secretaria'), false);
+    assert.equal(isSecretariaGeral(null), false);
+
+    // Secretaria Local
+    assert.equal(isSecretariaLocal('secretaria_local'), true);
+    assert.equal(isSecretariaLocal('admin_local'), true);
+    assert.equal(isSecretariaLocal('operador'), true);
+    assert.equal(isSecretariaLocal('auxiliar_secretaria'), true);
+    assert.equal(isSecretariaLocal('secretario_geral'), false);
+    assert.equal(isSecretariaLocal('administrador'), false);
+    assert.equal(isSecretariaLocal(null), false);
+  });
+
+  test('14. Bloqueio no Backend: Secretaria Local não pode realizar emissão direta de cartas ministeriais', async () => {
+    const supabase = createMockSupabase([
+      {
+        id: 'pedido-aprovado-1',
+        ministry_id: ministryAlpha,
+        member_id: memberId1,
+        membro_nome: 'Carlos Santos',
+        tipo_carta: 'mudanca',
+        status: 'autorizado',
+        autorizador_nome: 'Pr. Carlos Presidente',
+        data_autorizacao: '2026-10-14T10:00:00Z',
+      },
+    ]);
+
+    // Tentativa de emissão direta por usuário da Secretaria Local deve falhar com erro 403 / Acesso Negado
+    const papeisLocais = ['secretaria_local', 'admin_local', 'operador', 'auxiliar_secretaria'];
+    for (const papel of papeisLocais) {
+      await assert.rejects(
+        async () => {
+          await CartasService.validarEmissaoOuImpressaoCarta(
+            supabase,
+            ministryAlpha,
+            memberId1,
+            'mudanca',
+            'Carlos Santos',
+            papel
+          );
+        },
+        /Acesso negado: Usuários da Secretaria Local não possuem permissão para realizar emissão direta/
+      );
+    }
+
+    // Usuário da Secretaria Geral é liberado
+    const validacaoGeral = await CartasService.validarEmissaoOuImpressaoCarta(
+      supabase,
+      ministryAlpha,
+      memberId1,
+      'mudanca',
+      'Carlos Santos',
+      'secretario_geral'
+    );
+    assert.equal(validacaoGeral.autorizado, true);
   });
 });
