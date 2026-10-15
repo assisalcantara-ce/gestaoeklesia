@@ -43,48 +43,89 @@ describe('Cartas Ministeriais — Autorização Presidencial e Preservação de 
       from: (table: string) => {
         if (table === 'carta_pedidos') {
           return {
-            select: (_fields?: string) => ({
-              eq: (col1: string, val1: any) => ({
-                eq: (col2: string, val2: any) => ({
-                  eq: (col3: string, val3: any) => ({
-                    order: (_col: string, _opt: any) => ({
-                      limit: (_num: number) => ({
-                        maybeSingle: async () => {
-                          const item = pedidos.find(
-                            (p) => p[col1] === val1 && p[col2] === val2 && p[col3] === val3
-                          );
-                          return { data: item ? { ...item } : null, error: null };
-                        },
-                      }),
-                    }),
-                  }),
-                  maybeSingle: async () => {
-                    const item = pedidos.find(
-                      (p) => p[col1] === val1 && p[col2] === val2
-                    );
-                    return { data: item ? { ...item } : null, error: null };
-                  },
+            insert: (row: any) => {
+              const newRow = {
+                id: row.id || `pedido-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                ...row,
+              };
+              pedidos.push(newRow);
+              return {
+                select: () => ({
+                  single: async () => ({ data: { ...newRow }, error: null }),
                 }),
-                ilike: (col2: string, val2: string) => ({
-                  eq: (col3: string, val3: any) => ({
-                    order: (_col: string, _opt: any) => ({
-                      limit: (_num: number) => ({
-                        maybeSingle: async () => {
-                          const term = val2.replace(/%/g, '').toLowerCase();
-                          const item = pedidos.find(
-                            (p) =>
-                              p[col1] === val1 &&
-                              String(p[col2] || '').toLowerCase().includes(term) &&
-                              p[col3] === val3
-                          );
-                          return { data: item ? { ...item } : null, error: null };
-                        },
-                      }),
-                    }),
-                  }),
-                }),
-              }),
-            }),
+              };
+            },
+            select: (_fields?: string) => {
+              const filters: Record<string, any> = {};
+              const inFilters: Record<string, any[]> = {};
+              const ilikeFilters: Record<string, string> = {};
+
+              const builder: any = {
+                eq: (col: string, val: any) => {
+                  filters[col] = val;
+                  return builder;
+                },
+                in: (col: string, vals: any[]) => {
+                  inFilters[col] = vals;
+                  return builder;
+                },
+                ilike: (col: string, val: string) => {
+                  ilikeFilters[col] = val.replace(/%/g, '').toLowerCase();
+                  return builder;
+                },
+                order: (_col: string, _opts?: any) => builder,
+                limit: (_lim: number) => builder,
+                then: (resolve: any) => {
+                  const filtered = pedidos.filter((p) => {
+                    for (const [k, v] of Object.entries(filters)) {
+                      if (p[k] !== v) return false;
+                    }
+                    for (const [k, v] of Object.entries(inFilters)) {
+                      if (!v.includes(p[k])) return false;
+                    }
+                    for (const [k, v] of Object.entries(ilikeFilters)) {
+                      if (!String(p[k] || '').toLowerCase().includes(v)) return false;
+                    }
+                    return true;
+                  });
+                  return Promise.resolve({ data: filtered, error: null }).then(resolve);
+                },
+                maybeSingle: async () => {
+                  const match = pedidos.find((p) => {
+                    for (const [k, v] of Object.entries(filters)) {
+                      if (p[k] !== v) return false;
+                    }
+                    for (const [k, v] of Object.entries(inFilters)) {
+                      if (!v.includes(p[k])) return false;
+                    }
+                    for (const [k, v] of Object.entries(ilikeFilters)) {
+                      if (!String(p[k] || '').toLowerCase().includes(v)) return false;
+                    }
+                    return true;
+                  });
+                  return { data: match ? { ...match } : null, error: null };
+                },
+                single: async () => {
+                  const match = pedidos.find((p) => {
+                    for (const [k, v] of Object.entries(filters)) {
+                      if (p[k] !== v) return false;
+                    }
+                    for (const [k, v] of Object.entries(inFilters)) {
+                      if (!v.includes(p[k])) return false;
+                    }
+                    for (const [k, v] of Object.entries(ilikeFilters)) {
+                      if (!String(p[k] || '').toLowerCase().includes(v)) return false;
+                    }
+                    return true;
+                  });
+                  if (!match) return { data: null, error: new Error('Registro não encontrado') };
+                  return { data: { ...match }, error: null };
+                },
+              };
+              return builder;
+            },
             update: (values: any) => ({
               eq: (col1: string, val1: any) => ({
                 eq: (col2: string, val2: any) => {
@@ -129,6 +170,29 @@ describe('Cartas Ministeriais — Autorização Presidencial e Preservação de 
             update: (_values: any) => ({
               eq: (_col1: string, _val1: any) => ({
                 eq: (_col2: string, _val2: any) => Promise.resolve({ data: [{}], error: null }),
+              }),
+            }),
+          };
+        }
+        if (table === 'congregacoes' || table === 'dirigentes_movimentacoes') {
+          return {
+            select: () => ({
+              eq: () => ({
+                in: () => ({
+                  order: () => ({
+                    limit: () => Promise.resolve({ data: [], error: null }),
+                  }),
+                }),
+              }),
+              then: (resolve: any) => Promise.resolve({ data: [], error: null }).then(resolve),
+            }),
+          };
+        }
+        if (table === 'dirigentes_designacoes') {
+          return {
+            select: () => ({
+              eq: () => ({
+                eq: () => Promise.resolve({ count: 0, error: null }),
               }),
             }),
           };
@@ -436,5 +500,175 @@ describe('Cartas Ministeriais — Autorização Presidencial e Preservação de 
     // 3. Deve possuir print-color-adjust:exact para ambos os motores WebKit e padrão
     assert.ok(linhaHtml.includes('-webkit-print-color-adjust:exact'));
     assert.ok(linhaHtml.includes('print-color-adjust:exact'));
+  });
+
+  test('9. Fluxo Direto no Formulário: Registro de Pedido Presidencial sem redirecionamento e sem dados duplicados', async () => {
+    const supabase = createMockSupabase([]);
+
+    // Usuário da Secretaria preenche os dados no formulário de emissão e clica em "Registrar Pedido de Carta"
+    const inputSolicitacao = {
+      ministryId: ministryAlpha,
+      memberId: memberId1,
+      membroNome: 'Carlos Eduardo Oliveira',
+      membroCargo: 'Diácono',
+      congregacaoId: 'cong-sede',
+      tipoCarta: 'mudanca',
+      destino: 'AD São Paulo / Setor Central',
+      motivo: 'Mudança de domicílio profissional',
+      observacoes: 'Membro com dízimos em dia e recomendação pastoral',
+      solicitanteId: userSecretaria.userId,
+      solicitanteNome: userSecretaria.userName,
+    };
+
+    const resultado = await CartasService.solicitarAutorizacaoCarta(supabase, inputSolicitacao);
+
+    // 1. O pedido é registrado com sucesso
+    assert.equal(resultado.sucesso, true);
+    assert.equal(resultado.jaExistente, false);
+    assert.ok(resultado.pedido?.id);
+
+    // 2. Os dados preenchidos no formulário são aproveitados integralmente
+    assert.equal(resultado.pedido.membro_nome, 'Carlos Eduardo Oliveira');
+    assert.equal(resultado.pedido.membro_cargo, 'Diácono');
+    assert.equal(resultado.pedido.tipo_carta, 'mudanca');
+    assert.equal(resultado.pedido.destino, 'AD São Paulo / Setor Central');
+    assert.ok(resultado.pedido.observacoes.includes('Motivo: Mudança de domicílio profissional'));
+    assert.ok(resultado.pedido.observacoes.includes('Observações: Membro com dízimos em dia'));
+    assert.equal(resultado.pedido.status, 'pendente');
+
+    // 3. Status cadastral do membro NÃO é alterado no momento do pedido (governança preservada)
+    const { data: membro } = await supabase.from('members').select('*').eq('id', memberId1).eq('ministry_id', ministryAlpha).maybeSingle();
+    assert.equal(membro?.status, 'active');
+
+    // 4. Emissão e impressão oficial permanecem rigorosamente bloqueadas
+    const authStatus = await CartasService.verificarAutorizacaoCarta(
+      supabase,
+      ministryAlpha,
+      memberId1,
+      'mudanca',
+      'Carlos Eduardo Oliveira'
+    );
+    assert.equal(authStatus.exigeAutorizacao, true);
+    assert.equal(authStatus.autorizado, false);
+    assert.equal(authStatus.status, 'pendente');
+
+    await assert.rejects(
+      async () => {
+        await CartasService.validarEmissaoOuImpressaoCarta(
+          supabase,
+          ministryAlpha,
+          memberId1,
+          'mudanca',
+          'Carlos Eduardo Oliveira'
+        );
+      },
+      /Emissão bloqueada/
+    );
+  });
+
+  test('10. Prevenção de Duplicidade: Impede cadastrar novo pedido se já houver um pendente em análise', async () => {
+    const pedidoExistente = {
+      id: 'pedido-existente-123',
+      ministry_id: ministryAlpha,
+      member_id: memberId1,
+      membro_nome: 'Carlos Eduardo Oliveira',
+      membro_cargo: 'Diácono',
+      tipo_carta: 'mudanca',
+      destino: 'AD São Paulo',
+      observacoes: 'Aguardando decisão',
+      status: 'pendente',
+    };
+    const supabase = createMockSupabase([pedidoExistente]);
+
+    // Tentativa de registrar novo pedido para o mesmo membro e tipo enquanto já pendente
+    const resDuplicado = await CartasService.solicitarAutorizacaoCarta(supabase, {
+      ministryId: ministryAlpha,
+      memberId: memberId1,
+      membroNome: 'Carlos Eduardo Oliveira',
+      tipoCarta: 'mudanca',
+      solicitanteId: userSecretaria.userId,
+    });
+
+    // Detecta duplicidade, não cria nova linha e devolve a referência do pedido pendente
+    assert.equal(resDuplicado.sucesso, true);
+    assert.equal(resDuplicado.jaExistente, true);
+    assert.equal(resDuplicado.pedido.id, 'pedido-existente-123');
+    assert.ok(resDuplicado.mensagem.includes('pendente de análise'));
+    assert.equal(supabase._pedidos.length, 1); // Nenhuma linha extra inserida
+  });
+
+  test('11. Central de Decisões e Ciclo Completo: Pedido registrado diretamente chega à Presidência e deliberação libera emissão', async () => {
+    const supabase = createMockSupabase([]);
+
+    // 1. Secretaria solicita diretamente
+    const resSolicitacao = await CartasService.solicitarAutorizacaoCarta(supabase, {
+      ministryId: ministryAlpha,
+      memberId: memberId2,
+      membroNome: 'Ana Paula Santos',
+      membroCargo: 'Líder de Louvor',
+      tipoCarta: 'desligamento',
+      observacoes: 'Solicitação pessoal por mudança de confissão',
+      solicitanteId: userSecretaria.userId,
+      solicitanteNome: userSecretaria.userName,
+    });
+    assert.equal(resSolicitacao.sucesso, true);
+
+    // 2. Presidência delibera e autoriza
+    await PresidenciaService.deliberarCartaPedido(supabase, userPresidencia, {
+      pedido_id: resSolicitacao.pedido.id,
+      decisao: 'autorizar',
+    });
+
+    // 3. Após deliberação, a emissão é autorizada com os dados do autorizador
+    const authLiberada = await CartasService.verificarAutorizacaoCarta(
+      supabase,
+      ministryAlpha,
+      memberId2,
+      'desligamento',
+      'Ana Paula Santos'
+    );
+    assert.equal(authLiberada.autorizado, true);
+    assert.equal(authLiberada.status, 'autorizado');
+    assert.equal(authLiberada.autorizadorNome, 'Pr. Carlos Presidente');
+
+    // 4. Validação formal de emissão passa sem lançar exceção
+    const validacao = await CartasService.validarEmissaoOuImpressaoCarta(
+      supabase,
+      ministryAlpha,
+      memberId2,
+      'desligamento',
+      'Ana Paula Santos'
+    );
+    assert.equal(validacao.autorizado, true);
+  });
+
+  test('12. Preservação em Falhas: Lança erro claro sem apagar o formulário em caso de dados inválidos', async () => {
+    const supabase = createMockSupabase([]);
+
+    await assert.rejects(
+      async () => {
+        await CartasService.solicitarAutorizacaoCarta(supabase, {
+          ministryId: '',
+          memberId: memberId1,
+          membroNome: 'Carlos',
+          tipoCarta: 'mudanca',
+          solicitanteId: userSecretaria.userId,
+        });
+      },
+      /O identificador do ministério é obrigatório/
+    );
+
+    await assert.rejects(
+      async () => {
+        await CartasService.solicitarAutorizacaoCarta(supabase, {
+          ministryId: ministryAlpha,
+          memberId: memberId1,
+          membroNome: '',
+          tipoCarta: 'mudanca',
+          solicitanteId: userSecretaria.userId,
+        });
+      },
+      /Os dados do membro destinatário são obrigatórios/
+    );
   });
 });

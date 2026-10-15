@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
 import Tabs from '@/components/Tabs';
 import Section from '@/components/Section';
@@ -9,6 +9,7 @@ import InteractiveCanvas from '@/components/InteractiveCanvas';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { useUserContext } from '@/hooks/useUserContext';
+import { useAuditLog } from '@/hooks/useAuditLog';
 import { createClient } from '@/lib/supabase-client';
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { useMembers } from '@/hooks/useMembers';
@@ -290,6 +291,7 @@ export default function CartasPage() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const userCtx = useUserContext();
+  const { registrarAcao } = useAuditLog();
   const isOperador = !userCtx.loading && ['secretaria_local', 'admin_local', 'operador'].includes(userCtx.nivel || '');
   const { fetchMembers } = useMembers();
   const canvasImageInputRef = useRef<HTMLInputElement>(null);
@@ -456,75 +458,66 @@ export default function CartasPage() {
     mensagem: '',
   });
   const [verificandoAutorizacao, setVerificandoAutorizacao] = useState(false);
+  const [registrandoPedido, setRegistrandoPedido] = useState(false);
 
-  useEffect(() => {
-    let cancel = false;
-    async function checkAuth() {
-      if (!selectedTemplate) {
-        setAutorizacaoStatus({
-          status: 'isento',
-          exigeAutorizacao: false,
-          autorizado: true,
-          mensagem: '',
-        });
-        return;
-      }
-
-      const tipo = selectedTemplate.tipo || selectedTemplate.template_key;
-      if (!CartasService.exigeAutorizacaoPresidencial(tipo)) {
-        setAutorizacaoStatus({
-          status: 'isento',
-          exigeAutorizacao: false,
-          autorizado: true,
-          mensagem: 'Este documento não exige deliberação prévia da Presidência.',
-        });
-        return;
-      }
-
-      const currentMinId = ministryId || userCtx.ministryId;
-      if (!currentMinId || !selectedMemberId) {
-        setAutorizacaoStatus({
-          status: 'nao_solicitado',
-          exigeAutorizacao: true,
-          autorizado: false,
-          mensagem: 'Selecione um membro para verificar a deliberação da Presidência.',
-        });
-        return;
-      }
-
-      setVerificandoAutorizacao(true);
-      try {
-        const res = await CartasService.verificarAutorizacaoCarta(
-          supabase,
-          currentMinId,
-          selectedMemberId,
-          tipo,
-          selectedMember?.name
-        );
-        if (!cancel) {
-          setAutorizacaoStatus(res);
-        }
-      } catch (err: any) {
-        if (!cancel) {
-          setAutorizacaoStatus({
-            status: 'pendente',
-            exigeAutorizacao: true,
-            autorizado: false,
-            mensagem: err?.message || 'Erro ao verificar deliberação da Presidência.',
-          });
-        }
-      } finally {
-        if (!cancel) {
-          setVerificandoAutorizacao(false);
-        }
-      }
+  const checkAuth = useCallback(async () => {
+    if (!selectedTemplate) {
+      setAutorizacaoStatus({
+        status: 'isento',
+        exigeAutorizacao: false,
+        autorizado: true,
+        mensagem: '',
+      });
+      return;
     }
 
+    const tipo = selectedTemplate.tipo || selectedTemplate.template_key;
+    if (!CartasService.exigeAutorizacaoPresidencial(tipo)) {
+      setAutorizacaoStatus({
+        status: 'isento',
+        exigeAutorizacao: false,
+        autorizado: true,
+        mensagem: 'Este documento não exige deliberação prévia da Presidência.',
+      });
+      return;
+    }
+
+    const currentMinId = ministryId || userCtx.ministryId;
+    if (!currentMinId || !selectedMemberId) {
+      setAutorizacaoStatus({
+        status: 'nao_solicitado',
+        exigeAutorizacao: true,
+        autorizado: false,
+        mensagem: 'Selecione um membro para verificar a deliberação da Presidência.',
+      });
+      return;
+    }
+
+    setVerificandoAutorizacao(true);
+    try {
+      const res = await CartasService.verificarAutorizacaoCarta(
+        supabase,
+        currentMinId,
+        selectedMemberId,
+        tipo,
+        selectedMember?.name
+      );
+      setAutorizacaoStatus(res);
+    } catch (err: any) {
+      setAutorizacaoStatus({
+        status: 'pendente',
+        exigeAutorizacao: true,
+        autorizado: false,
+        mensagem: err?.message || 'Erro ao verificar deliberação da Presidência.',
+      });
+    } finally {
+      setVerificandoAutorizacao(false);
+    }
+  }, [selectedTemplate, selectedMemberId, selectedMember?.name, ministryId, userCtx.ministryId, supabase]);
+
+  useEffect(() => {
     checkAuth();
-    return () => {
-      cancel = true;
-    };
-  }, [selectedTemplate, selectedMemberId, selectedMember, ministryId, userCtx.ministryId, supabase]);
+  }, [checkAuth]);
 
   const [congregacoes, setCongregacoes] = useState<Array<{ id: string; nome: string }>>([]);
 
@@ -1735,6 +1728,154 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
         type: 'error',
         autoClose: undefined,
       });
+    }
+  };
+
+  const handleRegistrarPedidoDireto = async () => {
+    if (!selectedMember || !selectedMemberId) {
+      setNotification({
+        isOpen: true,
+        title: 'Membro Obrigatório',
+        message: 'Selecione o membro destinatário antes de registrar o pedido para a Presidência.',
+        type: 'warning',
+        autoClose: 4000,
+      });
+      return;
+    }
+
+    if (!selectedTemplate) {
+      setNotification({
+        isOpen: true,
+        title: 'Modelo Obrigatório',
+        message: 'Selecione o modelo da carta antes de registrar o pedido.',
+        type: 'warning',
+        autoClose: 4000,
+      });
+      return;
+    }
+
+    const effMinistryId = ministryId || userCtx.ministryId;
+    if (!effMinistryId) {
+      setNotification({
+        isOpen: true,
+        title: 'Ministério Não Encontrado',
+        message: 'Não foi possível identificar o ministério ativo.',
+        type: 'error',
+        autoClose: 4000,
+      });
+      return;
+    }
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const userId = userCtx.userId || user?.id;
+    if (!userId) {
+      setNotification({
+        isOpen: true,
+        title: 'Acesso Não Autenticado',
+        message: 'Usuário não autenticado. Faça login novamente.',
+        type: 'error',
+        autoClose: 4000,
+      });
+      return;
+    }
+
+    const tipoRaw = selectedTemplate.tipo || selectedTemplate.template_key;
+    const tipoNormal = CartasService.normalizarTipoCarta(tipoRaw);
+    const tipoLabel =
+      tipoNormal === 'mudanca'
+        ? 'Carta de Mudança'
+        : tipoNormal === 'desligamento'
+        ? 'Carta de Desligamento'
+        : 'Carta Ministerial';
+
+    setRegistrandoPedido(true);
+    try {
+      const res = await CartasService.solicitarAutorizacaoCarta(supabase, {
+        ministryId: effMinistryId,
+        memberId: selectedMember.id,
+        membroNome: selectedMember.name,
+        membroCargo: selectedMember.cargo_ministerial || null,
+        congregacaoId: selectedMember.congregacao_id || (userCtx as any).congregacaoId || null,
+        tipoCarta: tipoNormal,
+        destino: issueFields.destino || null,
+        motivo: issueFields.motivo || null,
+        observacoes: issueFields.observacoes || null,
+        solicitanteId: userId,
+        solicitanteNome: userCtx.nivel === 'administrador' ? 'Administrador' : (user?.user_metadata?.nome || user?.email || 'Secretaria'),
+      });
+
+      // Se já houver um pedido pendente em análise, informa e evita duplicidade
+      if (res.jaExistente) {
+        setAutorizacaoStatus({
+          exigeAutorizacao: true,
+          autorizado: false,
+          status: 'pendente',
+          pedidoId: res.pedido.id,
+          pedido: res.pedido,
+          mensagem: res.mensagem,
+        });
+
+        setNotification({
+          isOpen: true,
+          title: 'Pedido já em Análise',
+          message: res.mensagem,
+          type: 'warning',
+          autoClose: 6000,
+        });
+        return;
+      }
+
+      // Log de Auditoria
+      try {
+        await registrarAcao({
+          acao: 'criar',
+          modulo: 'secretaria',
+          area: 'cartas',
+          tabela_afetada: 'carta_pedidos',
+          registro_id: res.pedido?.id,
+          descricao: `Pedido de ${tipoLabel} registrado diretamente para ${selectedMember.name} (aguardando deliberação presidencial)`,
+          dados_novos: {
+            tipo_carta: tipoNormal,
+            membro_nome: selectedMember.name,
+            destino: issueFields.destino || null,
+            status: 'pendente',
+          },
+          status: 'sucesso',
+        });
+      } catch (auditErr) {
+        console.warn('Falha ao registrar log de auditoria:', auditErr);
+      }
+
+      // Atualiza imediatamente o estado da interface para "Aguardando deliberação da Presidência"
+      setAutorizacaoStatus({
+        exigeAutorizacao: true,
+        autorizado: false,
+        status: 'pendente',
+        pedidoId: res.pedido.id,
+        pedido: res.pedido,
+        mensagem: `O pedido de ${tipoLabel} foi encaminhado e está aguardando deliberação da Presidência na Central de Decisões Institucionais.`,
+      });
+
+      setNotification({
+        isOpen: true,
+        title: 'Pedido Encaminhado à Presidência!',
+        message: `A solicitação de ${tipoLabel} para "${selectedMember.name}" foi registrada diretamente com os dados preenchidos no formulário (destino, motivo e observações). O pedido já está disponível na Central de Decisões da Presidência para deliberação.`,
+        type: 'success',
+        autoClose: 7000,
+      });
+    } catch (err: any) {
+      // Se o registro falhar, mantém os dados preenchidos na tela e apresenta o erro sem resetar o formulário
+      setNotification({
+        isOpen: true,
+        title: 'Erro ao Registrar Pedido',
+        message: err?.message || 'Falha ao registrar pedido de autorização presidencial. Seus dados foram mantidos no formulário.',
+        type: 'error',
+        autoClose: undefined,
+      });
+    } finally {
+      setRegistrandoPedido(false);
     }
   };
 
@@ -3138,16 +3279,8 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                         <p className="text-xs font-bold">Carta de Mudança ou Desligamento?</p>
                       </div>
                       <p className="text-xs text-amber-700 leading-relaxed">
-                        Essas cartas exigem autorização da Sede. Envie um pedido de carta e acompanhe o fluxo.
+                        Essas cartas exigem autorização da Presidência. Preencha os dados abaixo e clique diretamente em <strong>“Registrar Pedido de Carta”</strong> para encaminhar à deliberação presidencial sem sair desta tela.
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => router.push('/secretaria/cartas/pedidos')}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition shadow-sm"
-                      >
-                        <Send className="h-3 w-3" />
-                        <span>Solicitar Carta à Secretaria Geral</span>
-                      </button>
                     </div>
                   )}
 
@@ -3243,7 +3376,7 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                     {autorizacaoStatus.exigeAutorizacao && selectedMemberId && (
                       <div>
                         {autorizacaoStatus.status === 'pendente' && (
-                          <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 space-y-1.5">
+                          <div className="rounded-xl border border-amber-300 bg-amber-50 p-3.5 space-y-2">
                             <div className="flex items-center gap-1.5 text-amber-800 text-xs font-bold">
                               <Clock className="h-4 w-4 shrink-0 text-amber-600" />
                               <span>Aguardando Deliberação da Presidência</span>
@@ -3251,18 +3384,29 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                             <p className="text-[11px] text-amber-700 leading-relaxed">
                               {autorizacaoStatus.mensagem}
                             </p>
-                            <button
-                              type="button"
-                              onClick={() => router.push('/secretaria/cartas/pedidos')}
-                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-900 underline hover:text-amber-950 mt-0.5"
-                            >
-                              Ver pedidos de cartas ministeriais &rarr;
-                            </button>
+                            <div className="flex items-center justify-between pt-1 text-[11px]">
+                              <button
+                                type="button"
+                                onClick={() => checkAuth()}
+                                disabled={verificandoAutorizacao}
+                                className="inline-flex items-center gap-1 font-semibold text-amber-800 hover:text-amber-950 underline disabled:opacity-50"
+                              >
+                                <RotateCcw className={`h-3 w-3 ${verificandoAutorizacao ? 'animate-spin' : ''}`} />
+                                <span>{verificandoAutorizacao ? 'Verificando...' : 'Verificar deliberação'}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => router.push('/secretaria/cartas/pedidos')}
+                                className="inline-flex items-center gap-1 font-semibold text-amber-900 underline hover:text-amber-950"
+                              >
+                                Ver lista de pedidos &rarr;
+                              </button>
+                            </div>
                           </div>
                         )}
 
                         {autorizacaoStatus.status === 'rejeitado' && (
-                          <div className="rounded-xl border border-red-300 bg-red-50 p-3 space-y-1.5">
+                          <div className="rounded-xl border border-red-300 bg-red-50 p-3.5 space-y-2">
                             <div className="flex items-center gap-1.5 text-red-800 text-xs font-bold">
                               <XCircle className="h-4 w-4 shrink-0 text-red-600" />
                               <span>Pedido Indeferido pela Presidência</span>
@@ -3271,15 +3415,33 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                               {autorizacaoStatus.mensagem}
                             </p>
                             {autorizacaoStatus.motivoRejeicao && (
-                              <p className="text-[11px] text-red-800 font-medium bg-red-100/70 rounded px-2 py-1">
+                              <p className="text-[11px] text-red-800 font-medium bg-red-100/70 rounded px-2.5 py-1.5 border border-red-200">
                                 <strong>Justificativa registrada:</strong> {autorizacaoStatus.motivoRejeicao}
                               </p>
                             )}
+                            <button
+                              type="button"
+                              onClick={handleRegistrarPedidoDireto}
+                              disabled={registrandoPedido || !selectedMemberId || !selectedTemplate}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 transition shadow-sm mt-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {registrandoPedido ? (
+                                <>
+                                  <span className="inline-block animate-spin mr-1">⏳</span>
+                                  <span>Encaminhando novo pedido...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Send className="h-3 w-3" />
+                                  <span>Reenviar Pedido com Justificativa Ajustada</span>
+                                </>
+                              )}
+                            </button>
                           </div>
                         )}
 
                         {autorizacaoStatus.status === 'nao_solicitado' && (
-                          <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 space-y-1.5">
+                          <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 space-y-2">
                             <div className="flex items-center gap-1.5 text-amber-800 text-xs font-bold">
                               <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
                               <span>Autorização Presidencial Obrigatória</span>
@@ -3289,17 +3451,27 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                             </p>
                             <button
                               type="button"
-                              onClick={() => router.push('/secretaria/cartas/pedidos')}
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition shadow-sm mt-1"
+                              onClick={handleRegistrarPedidoDireto}
+                              disabled={registrandoPedido || !selectedMemberId || !selectedTemplate}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-amber-700 transition shadow-sm mt-1 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              <Send className="h-3 w-3" />
-                              <span>Registrar Pedido de Carta</span>
+                              {registrandoPedido ? (
+                                <>
+                                  <span className="inline-block animate-spin mr-1">⏳</span>
+                                  <span>Encaminhando à Presidência...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Send className="h-3.5 w-3.5" />
+                                  <span>Registrar Pedido de Carta</span>
+                                </>
+                              )}
                             </button>
                           </div>
                         )}
 
                         {autorizacaoStatus.status === 'autorizado' && (
-                          <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 space-y-1">
+                          <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3.5 space-y-1">
                             <div className="flex items-center gap-1.5 text-emerald-800 text-xs font-bold">
                               <CheckCircle className="h-4 w-4 shrink-0 text-emerald-600" />
                               <span>Autorizado pela Presidência</span>

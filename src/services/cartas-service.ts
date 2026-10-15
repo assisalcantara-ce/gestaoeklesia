@@ -30,6 +30,27 @@ export interface VerificacaoAutorizacaoCarta {
   } | null;
 }
 
+export interface SolicitacaoAutorizacaoCartaInput {
+  ministryId: string;
+  memberId: string;
+  membroNome: string;
+  membroCargo?: string | null;
+  congregacaoId?: string | null;
+  tipoCarta: string;
+  destino?: string | null;
+  motivo?: string | null;
+  observacoes?: string | null;
+  solicitanteId: string;
+  solicitanteNome?: string | null;
+}
+
+export interface SolicitacaoAutorizacaoCartaResult {
+  sucesso: boolean;
+  jaExistente: boolean;
+  pedido: any;
+  mensagem: string;
+}
+
 export class CartasService {
   /**
    * Determina se o tipo de carta exige obrigatoriamente deliberação prévia da Presidência.
@@ -201,6 +222,109 @@ export class CartasService {
       throw new Error(`Emissão bloqueada: ${auth.mensagem}`);
     }
     return auth;
+  }
+
+  /**
+   * Registra diretamente um pedido de autorização de carta ministerial para deliberação da Presidência.
+   * Evita duplicidade se já houver um pedido pendente para o mesmo membro e tipo de carta.
+   * Não altera o status cadastral do membro no momento do registro (apenas após deliberação presidencial).
+   */
+  public static async solicitarAutorizacaoCarta(
+    supabase: any,
+    input: SolicitacaoAutorizacaoCartaInput
+  ): Promise<SolicitacaoAutorizacaoCartaResult> {
+    if (!input.ministryId) {
+      throw new Error('O identificador do ministério é obrigatório para registrar a solicitação.');
+    }
+    if (!input.memberId || !input.membroNome || !input.membroNome.trim()) {
+      throw new Error('Os dados do membro destinatário são obrigatórios para registrar a solicitação.');
+    }
+    if (!input.solicitanteId) {
+      throw new Error('Identificador do solicitante não encontrado.');
+    }
+
+    const normalTipo = this.normalizarTipoCarta(input.tipoCarta);
+    if (!normalTipo) {
+      throw new Error('Tipo de carta inválido para solicitação.');
+    }
+
+    const tipoLabel =
+      normalTipo === 'mudanca'
+        ? 'Carta de Mudança'
+        : normalTipo === 'desligamento'
+        ? 'Carta de Desligamento'
+        : normalTipo === 'transito'
+        ? 'Carta de Trânsito'
+        : 'Carta de Recomendação';
+
+    // 1. Verificação de Duplicidade: impede criar novo pedido se já houver um pendente
+    const { data: pedidoExistente, error: errExistente } = await supabase
+      .from('carta_pedidos')
+      .select('*')
+      .eq('ministry_id', input.ministryId)
+      .eq('member_id', input.memberId)
+      .eq('tipo_carta', normalTipo)
+      .eq('status', 'pendente')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (errExistente) {
+      console.error('Erro ao verificar duplicidade de pedido de carta:', errExistente);
+      throw new Error(`Erro ao verificar pedidos existentes: ${errExistente.message}`);
+    }
+
+    if (pedidoExistente) {
+      return {
+        sucesso: true,
+        jaExistente: true,
+        pedido: pedidoExistente,
+        mensagem: `Já existe um pedido de ${tipoLabel} pendente de análise para ${input.membroNome.trim()} na Central de Decisões da Presidência.`,
+      };
+    }
+
+    // 2. Formatação das observações integrando motivo e observações preenchidas
+    const motivoTrim = (input.motivo || '').trim();
+    const obsTrim = (input.observacoes || '').trim();
+    let observacoesFinal: string | null = null;
+    if (motivoTrim && obsTrim) {
+      observacoesFinal = `Motivo: ${motivoTrim}\nObservações: ${obsTrim}`;
+    } else if (motivoTrim) {
+      observacoesFinal = motivoTrim;
+    } else if (obsTrim) {
+      observacoesFinal = obsTrim;
+    }
+
+    // 3. Inserção do pedido na tabela carta_pedidos
+    const { data: novoPedido, error: insertErr } = await supabase
+      .from('carta_pedidos')
+      .insert({
+        ministry_id: input.ministryId,
+        congregacao_id: input.congregacaoId || null,
+        solicitante_id: input.solicitanteId,
+        solicitante_nome: input.solicitanteNome || 'Secretaria',
+        member_id: input.memberId,
+        membro_nome: input.membroNome.trim(),
+        membro_cargo: (input.membroCargo || '').trim() || null,
+        tipo_carta: normalTipo,
+        destino: (input.destino || '').trim() || null,
+        observacoes: observacoesFinal,
+        status: 'pendente',
+      })
+      .select('*')
+      .single();
+
+    if (insertErr) {
+      console.error('Erro ao inserir pedido de carta:', insertErr);
+      throw new Error(`Falha ao registrar pedido de carta: ${insertErr.message}`);
+    }
+
+    return {
+      sucesso: true,
+      jaExistente: false,
+      pedido: novoPedido,
+      mensagem: `Pedido de ${tipoLabel} encaminhado com sucesso à Presidência!`,
+    };
   }
 
   public static normalizarStatusDb(status: string | null | undefined): string | null {
