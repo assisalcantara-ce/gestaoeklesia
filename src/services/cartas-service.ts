@@ -718,6 +718,41 @@ export class CartasService {
     }
     return { valido: true };
   }
+
+  /**
+   * Exclui um registro de documento emitido (cartas_registros).
+   * Garante validação de parâmetros e isolamento multi-tenant por ministry_id.
+   */
+  public static async excluirCartaEmitida(
+    supabase: any,
+    params: {
+      registroId: string;
+      ministryId: string;
+    }
+  ): Promise<{ sucesso: boolean; id: string }> {
+    const { registroId, ministryId } = params;
+
+    if (!registroId || !ministryId) {
+      throw new Error('ID do registro e ID do ministério são obrigatórios para exclusão.');
+    }
+
+    const { error, data } = await supabase
+      .from('cartas_registros')
+      .delete()
+      .eq('id', registroId)
+      .eq('ministry_id', ministryId)
+      .select('id');
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      throw new Error('Registro não encontrado ou você não tem permissão para excluí-lo.');
+    }
+
+    return { sucesso: true, id: data[0]?.id || registroId };
+  }
 }
 
 export interface EventoHistoricoMembroInput {

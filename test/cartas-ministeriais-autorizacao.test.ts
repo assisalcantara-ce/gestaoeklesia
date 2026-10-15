@@ -36,12 +36,14 @@ describe('Cartas Ministeriais — Autorização Presidencial e Preservação de 
   };
 
   // Mock do Supabase Client para simular o banco com isolamento multi-tenant
-  const createMockSupabase = (initialPedidos: any[] = []) => {
+  const createMockSupabase = (initialPedidos: any[] = [], initialRegistros: any[] = []) => {
     const pedidos = [...initialPedidos];
+    const registros = [...initialRegistros];
 
     return {
       _pedidos: pedidos,
-      from: (table: string) => {
+      _registros: registros,
+      from: (table: string): any => {
         if (table === 'carta_pedidos') {
           return {
             insert: (row: any) => {
@@ -194,6 +196,26 @@ describe('Cartas Ministeriais — Autorização Presidencial e Preservação de 
             select: () => ({
               eq: () => ({
                 eq: () => Promise.resolve({ count: 0, error: null }),
+              }),
+            }),
+          };
+        }
+        if (table === 'cartas_registros') {
+          return {
+            delete: () => ({
+              eq: (col1: string, val1: any) => ({
+                eq: (col2: string, val2: any) => ({
+                  select: async () => {
+                    const idx = registros.findIndex(
+                      (r: any) => r[col1] === val1 && r[col2] === val2
+                    );
+                    if (idx >= 0) {
+                      const removed = registros.splice(idx, 1);
+                      return { data: removed, error: null };
+                    }
+                    return { data: [], error: null };
+                  },
+                }),
               }),
             }),
           };
@@ -1258,6 +1280,70 @@ describe('Cartas Ministeriais — Autorização Presidencial e Preservação de 
     assert.strictEqual(elementoMovido.x, 120);
     assert.strictEqual(elementoMovido.largura, 480);
   });
+
+  test('29. Exclusão de Documento Emitido (CartasService.excluirCartaEmitida): multi-tenant e validações', async () => {
+    const registro1 = {
+      id: 'reg-001',
+      ministry_id: ministryAlpha,
+      template_title: 'Carta de Mudança',
+      template_key: 'mudanca',
+      categoria: 'carta',
+      member_id: memberId1,
+      issued_at: new Date().toISOString(),
+    };
+    const registroBeta = {
+      id: 'reg-002',
+      ministry_id: ministryBeta,
+      template_title: 'Carta de Recomendação',
+      template_key: 'recomendacao',
+      categoria: 'carta',
+      member_id: 'member-beta-1',
+      issued_at: new Date().toISOString(),
+    };
+
+    const supabase = createMockSupabase([], [registro1, registroBeta]);
+
+    // 1. Falha com parâmetros obrigatórios ausentes
+    await assert.rejects(
+      async () => {
+        await CartasService.excluirCartaEmitida(supabase as any, { registroId: '', ministryId: ministryAlpha });
+      },
+      /ID do registro e ID do ministério são obrigatórios/
+    );
+
+    await assert.rejects(
+      async () => {
+        await CartasService.excluirCartaEmitida(supabase as any, { registroId: 'reg-001', ministryId: '' });
+      },
+      /ID do registro e ID do ministério são obrigatórios/
+    );
+
+    // 2. Isolamento multi-tenant: ministério Alpha não consegue excluir documento do ministério Beta
+    await assert.rejects(
+      async () => {
+        await CartasService.excluirCartaEmitida(supabase as any, { registroId: 'reg-002', ministryId: ministryAlpha });
+      },
+      /Registro não encontrado ou você não tem permissão/
+    );
+
+    // 3. Exclusão bem-sucedida pelo ministério proprietário
+    const res = await CartasService.excluirCartaEmitida(supabase as any, {
+      registroId: 'reg-001',
+      ministryId: ministryAlpha,
+    });
+
+    assert.strictEqual(res.sucesso, true);
+    assert.strictEqual(res.id, 'reg-001');
+
+    // 4. Registro já não deve existir para nova exclusão
+    await assert.rejects(
+      async () => {
+        await CartasService.excluirCartaEmitida(supabase as any, { registroId: 'reg-001', ministryId: ministryAlpha });
+      },
+      /Registro não encontrado ou você não tem permissão/
+    );
+  });
 });
+
 
 

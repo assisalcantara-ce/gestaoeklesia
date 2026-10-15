@@ -393,6 +393,7 @@ export default function CartasPage() {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isIssuing, setIsIssuing] = useState(false);
+  const [deletingRecordId, setDeletingRecordId] = useState<string | null>(null);
 
   // Escala responsiva da folha A4 no editor e na pré-visualização
   const [editorScale, setEditorScale] = useState(1);
@@ -1723,7 +1724,86 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
     });
   };
 
+  const handleDeleteRecord = (rec: CartaRegistro) => {
+    const mid = userCtx.ministryId || ministryId;
+    if (!mid) {
+      setNotification({
+        isOpen: true,
+        title: 'Erro',
+        message: 'Ministério não identificado para realizar a exclusão.',
+        type: 'error',
+        autoClose: undefined,
+      });
+      return;
+    }
 
+    const snapshot = (rec.payload_snapshot && typeof rec.payload_snapshot === 'object') ? rec.payload_snapshot as Record<string, any> : {};
+    const membroNome = snapshot['membro.nome'] || snapshot['membro_nome'] || '';
+    const docTitulo = rec.template_title || rec.template_key || (rec.categoria === 'declaracao' ? 'Declaração' : 'Carta');
+
+    setConfirmModal({
+      isOpen: true,
+      title: 'Excluir Carta Emitida',
+      message: `Tem certeza que deseja excluir permanentemente o registro de "${docTitulo}"${membroNome ? ` emitido para "${membroNome}"` : ''}? Esta ação removerá o documento do histórico oficial.`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          setDeletingRecordId(rec.id);
+          await CartasService.excluirCartaEmitida(supabase, {
+            registroId: rec.id,
+            ministryId: mid,
+          });
+
+          // Log de Auditoria
+          try {
+            await registrarAcao({
+              acao: 'deletar',
+              modulo: 'secretaria',
+              area: 'cartas',
+              tabela_afetada: 'cartas_registros',
+              registro_id: rec.id,
+              descricao: `Exclusão do documento emitido "${docTitulo}"${membroNome ? ` para ${membroNome}` : ''}`,
+              dados_anteriores: {
+                titulo: docTitulo,
+                membro_id: rec.member_id,
+                membro_nome: membroNome,
+                categoria: rec.categoria,
+                issued_at: rec.issued_at,
+              },
+              status: 'sucesso',
+            });
+          } catch (auditErr) {
+            console.warn('Falha ao registrar auditoria de exclusão de carta:', auditErr);
+          }
+
+          // Atualiza o estado local imediatamente
+          setRecords((prev) => prev.filter((r) => r.id !== rec.id));
+
+          setNotification({
+            isOpen: true,
+            title: 'Documento Excluído',
+            message: `O registro de "${docTitulo}" foi removido do histórico com sucesso.`,
+            type: 'success',
+            autoClose: 4000,
+          });
+        } catch (err: any) {
+          console.error('Erro ao excluir carta emitida:', err);
+          setNotification({
+            isOpen: true,
+            title: 'Erro ao Excluir',
+            message: err?.message || 'Não foi possível excluir o documento emitido.',
+            type: 'error',
+            autoClose: undefined,
+          });
+        } finally {
+          setDeletingRecordId(null);
+        }
+      },
+    });
+  };
 
   const updateCanvasElement = (id: string, props: Partial<CartaCanvasElement>) => {
     setCanvasContent((prev) => ({
@@ -4491,13 +4571,24 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                               )}
                             </div>
                           </div>
-                          <button
-                            onClick={() => handlePrintHtml(rec.rendered_html || previewHtml, { forceAllowed: true })}
-                            className="rounded-lg bg-gray-100 px-3.5 py-1.5 text-xs font-bold text-gray-700 hover:bg-teal-50 hover:text-teal-700 border border-gray-200 transition flex items-center gap-1.5"
-                          >
-                            <span>🖨️</span>
-                            <span>Reimprimir</span>
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleDeleteRecord(rec)}
+                              disabled={deletingRecordId === rec.id}
+                              className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100 border border-red-200 transition flex items-center gap-1.5 disabled:opacity-50"
+                              title="Excluir documento emitido"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                              <span>{deletingRecordId === rec.id ? 'Excluindo...' : 'Excluir'}</span>
+                            </button>
+                            <button
+                              onClick={() => handlePrintHtml(rec.rendered_html || previewHtml, { forceAllowed: true })}
+                              className="rounded-lg bg-gray-100 px-3.5 py-1.5 text-xs font-bold text-gray-700 hover:bg-teal-50 hover:text-teal-700 border border-gray-200 transition flex items-center gap-1.5"
+                            >
+                              <span>🖨️</span>
+                              <span>Reimprimir</span>
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
