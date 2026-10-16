@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'node:crypto'
 import { createServerClient } from '@/lib/supabase-server'
-import { resolveTenantAuth } from '@/lib/tenant-auth'
+import { resolveTenantAuth, isMasterUsuarioMinisterio } from '@/lib/tenant-auth'
 import { authTenantErrorResponse } from '@/lib/api-errors'
 import { isSecretariaLocal } from '@/lib/access-control'
 
@@ -27,11 +27,12 @@ async function ensureBucket(supabaseAdmin: any) {
 export async function POST(request: NextRequest) {
   try {
     const context = await resolveTenantAuth(request)
-    const { ministryId, nivel } = context
+    const { ministryId, userId, admin, isOwner, nivel } = context
 
-    if (isSecretariaLocal(nivel)) {
+    const isMaster = isOwner || await isMasterUsuarioMinisterio(admin, userId, ministryId)
+    if (!isMaster || isSecretariaLocal(nivel)) {
       return NextResponse.json(
-        { error: 'Acesso negado: Usuários da Secretaria Local não possuem permissão para gerenciar modelos de cartas.' },
+        { error: 'Acesso negado: Somente o perfil MASTER possui permissão para gerenciar modelos de cartas.' },
         { status: 403 }
       )
     }

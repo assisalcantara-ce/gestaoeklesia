@@ -39,6 +39,7 @@ export const NAVIGATION_STRUCTURE: NavigationGroup[] = [
           { id: 'config-geral', label: 'Geral', icon: '⚙️', path: '/configuracoes' },
           { id: 'config-cartoes', label: 'Cartões', icon: '🎫', path: '/configuracoes/cartoes' },
           { id: 'certificados', label: 'Certificados', icon: '🎓', path: '/configuracoes/certificados', modulo: 'configuracoes' },
+          { id: 'config-cartas', label: 'Cartas e Declarações', icon: '📜', path: '/configuracoes/cartas', modulo: 'configuracoes' },
           { id: 'ativar-fluxo', label: 'Ativar Fluxo', icon: '🔄', path: '/secretaria/ativar-fluxo' },
           { id: 'usuarios', label: 'Usuários', icon: '👤', path: '/usuarios', modulo: 'usuarios' },
         ]

@@ -22,6 +22,7 @@ export interface UserContext {
   ministryId: string | null;
   userId: string | null;
   isAdmin: boolean;
+  isMaster: boolean;
   /** Verifica se o usuário tem acesso de leitura a um módulo */
   podeAcessar: (modulo: string) => boolean;
   /** Verifica se o usuário tem acesso de escrita a um módulo */
@@ -39,6 +40,7 @@ export function useUserContext(): UserContext {
   const [supervisaoId, setSupervisaoId] = useState<string | null>(null);
   const [ministryId, setMinistryId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [isMaster, setIsMaster] = useState<boolean>(false);
 
   const lastFetchedUserId = useRef<string | null>(null);
 
@@ -56,6 +58,7 @@ export function useUserContext(): UserContext {
           setSupervisaoId(null);
           setMinistryId(null);
           setUserId(null);
+          setIsMaster(false);
           setLoading(false);
         }
         lastFetchedUserId.current = null;
@@ -89,6 +92,18 @@ export function useUserContext(): UserContext {
           setCongregacaoId(mu.congregacao_id ?? null);
           setSupervisaoId(mu.supervisao_id ?? null);
           setMinistryId(mu.ministry_id ?? null);
+
+          let masterResolved = String(mu.role || '').toLowerCase() === 'master';
+          if (!masterResolved && mu.ministry_id) {
+            const { data: ministry } = await supabase
+              .from('ministries')
+              .select('id')
+              .eq('id', mu.ministry_id)
+              .eq('user_id', user.id)
+              .maybeSingle();
+            masterResolved = Boolean(ministry);
+          }
+          setIsMaster(masterResolved);
         } else {
           // Fallback: dono do ministry
           const { data: ministry } = await supabase
@@ -104,8 +119,10 @@ export function useUserContext(): UserContext {
             setCongregacaoId(null);
             setSupervisaoId(null);
             setMinistryId(ministry.id);
+            setIsMaster(true);
           } else {
             setNivel(null);
+            setIsMaster(false);
           }
         }
 
@@ -129,5 +146,5 @@ export function useUserContext(): UserContext {
   const podeEscrever = (modulo: string) =>
     nivel ? temAcessoEscrita(nivel, modulo) : false;
 
-  return { loading, nivel, congregacaoId, supervisaoId, ministryId, userId, isAdmin, podeAcessar, podeEscrever };
+  return { loading, nivel, congregacaoId, supervisaoId, ministryId, userId, isAdmin, isMaster, podeAcessar, podeEscrever };
 }

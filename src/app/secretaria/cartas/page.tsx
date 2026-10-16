@@ -5,7 +5,6 @@ import PageLayout from '@/components/PageLayout';
 import Tabs from '@/components/Tabs';
 import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
-import InteractiveCanvas from '@/components/InteractiveCanvas';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { useUserContext } from '@/hooks/useUserContext';
@@ -18,55 +17,25 @@ import type {
   Member,
   TemplateCategoria,
   TemplateTipo,
-  TemplateScope,
   CartaCanvasElement,
   CartaCanvasData,
   CartaTemplate,
   CartaRegistro,
 } from '@/types/supabase';
 import {
-  AlignCenter,
-  AlignLeft,
-  AlignRight,
-  ArrowDownToLine,
-  ArrowUpToLine,
-  Bold,
-  ChevronDown,
-  ChevronUp,
-  Copy,
-  Eraser,
   FileCheck,
-  Image,
-  Italic,
-  Lock,
-  Minus,
-  Paintbrush,
-  Plus,
   Printer,
   RotateCcw,
-  Save,
-  Shield,
-  Square,
   Trash2,
-  Type,
-  Underline,
-  Unlock,
-  Upload,
   Send,
   AlertTriangle,
   CheckCircle,
   Clock,
   XCircle,
-  FileText,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { CartasService, type VerificacaoAutorizacaoCarta } from '@/services/cartas-service';
 import { isSecretariaLocal } from '@/lib/access-control';
-import {
-  buildCartaTemplateExportJson,
-  formatCartaTemplateJson,
-  copyTextToClipboard,
-} from '@/lib/cartas-export-json';
 
 const CANVAS_A4 = {
   width: 794,
@@ -113,91 +82,8 @@ const createDefaultCanvas = (text = 'Escreva o conteudo da carta aqui.'): CartaC
   elements: [createCanvasTextElement(text)],
 });
 
-const CANVAS_FONTES = [
-  'Arial',
-  'Calibri',
-  'Georgia',
-  'Times New Roman',
-  'Verdana',
-  'Trebuchet MS',
-];
-
-const CANVAS_ELEMENT_LABELS: Record<CartaCanvasElement['tipo'], string> = {
-  texto: 'Texto',
-  linha: 'Linha',
-  logo: 'Logo',
-  imagem: 'Imagem',
-  qrcode: 'QR Code',
-  'foto-membro': 'Foto do Membro',
-  chapa: 'Chapa',
-  forma: 'Forma / Retângulo',
-};
-
-const PLACEHOLDER_GROUPS = [
-  {
-    title: 'Igreja',
-    items: [
-      { key: 'igreja.nome', label: 'Nome da igreja' },
-      { key: 'igreja.endereco', label: 'Endereco' },
-      { key: 'igreja.cnpj', label: 'CNPJ' },
-      { key: 'igreja.telefone', label: 'Telefone' },
-      { key: 'igreja.email', label: 'Email' },
-      { key: 'igreja.responsavel', label: 'Responsavel' },
-    ],
-  },
-  {
-    title: 'Membro',
-    items: [
-      { key: 'membro.nome', label: 'Nome' },
-      { key: 'membro.cpf', label: 'CPF' },
-      { key: 'membro.rg', label: 'RG' },
-      { key: 'membro.email', label: 'Email' },
-      { key: 'membro.telefone', label: 'Telefone' },
-      { key: 'membro.matricula', label: 'Matricula' },
-      { key: 'membro.cargo', label: 'Cargo ministerial' },
-      { key: 'membro.congregacao', label: 'Congregacao' },
-    ],
-  },
-  {
-    title: 'Carta',
-    items: [
-      { key: 'carta.destino', label: 'Destino' },
-      { key: 'carta.motivo', label: 'Motivo' },
-      { key: 'carta.observacoes', label: 'Observacoes' },
-    ],
-  },
-  {
-    title: 'Data',
-    items: [
-      { key: 'data.hoje', label: 'Data (curta)' },
-      { key: 'data.extenso', label: 'Data por extenso' },
-    ],
-  },
-  {
-    title: 'Assinatura',
-    items: [
-      { key: 'pastor.responsavel', label: 'Assinatura responsavel' },
-    ],
-  },
-];
-
-const PLACEHOLDER_LABELS = PLACEHOLDER_GROUPS.reduce<Record<string, string>>((acc, group) => {
-  group.items.forEach((item) => {
-    acc[item.key] = `${group.title}: ${item.label}`;
-  });
-  return acc;
-}, {});
 
 
-
-const normalizeTemplateKey = (value: string) =>
-  value
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
 
 const formatDateExtenso = (date: Date) =>
   new Intl.DateTimeFormat('pt-BR', {
@@ -263,15 +149,6 @@ const serializeCanvasContent = (canvas: CartaCanvasData) => ({
   canvas,
 });
 
-const getCanvasPreviewText = (texto: string) => {
-  if (!texto) return 'Texto';
-  return texto
-    .replace(/{{\s*([a-zA-Z0-9_.]+)\s*}}/g, (_match, key) => {
-      const label = PLACEHOLDER_LABELS[key];
-      return label ? `[${label}]` : `{{${key}}}`;
-    })
-    .replace(/\n/g, '<br />');
-};
 
 const sanitizeHtmlText = (text: string) => {
   return text
@@ -316,66 +193,13 @@ export default function CartasPage() {
     }
   }, [userCtx.loading, userCtx.nivel, router]);
 
-  const canvasImageInputRef = useRef<HTMLInputElement>(null);
-  const canvasBackgroundInputRef = useRef<HTMLInputElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  const handleToggleTextInlineFormat = (tag: 'b' | 'i' | 'u') => {
-    if (!selectedCanvasElement) return;
-    const textarea = textareaRef.current;
-    if (textarea && textarea.selectionStart !== undefined && textarea.selectionEnd !== undefined && textarea.selectionStart !== textarea.selectionEnd) {
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const originalText = selectedCanvasElement.texto || '';
-      const selectedText = originalText.substring(start, end);
-      const openTag = `<${tag}>`;
-      const closeTag = `</${tag}>`;
-
-      let newText = '';
-      if (selectedText.startsWith(openTag) && selectedText.endsWith(closeTag)) {
-        newText = originalText.substring(0, start) + selectedText.substring(openTag.length, selectedText.length - closeTag.length) + originalText.substring(end);
-      } else {
-        newText = originalText.substring(0, start) + openTag + selectedText + closeTag + originalText.substring(end);
-      }
-
-      updateCanvasElement(selectedCanvasElement.id, { texto: newText });
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.focus();
-          textareaRef.current.setSelectionRange(start, start + openTag.length + selectedText.length + closeTag.length);
-        }
-      }, 50);
-      return;
-    }
-
-    // Se nenhum trecho estiver selecionado, alterna a formatação do bloco inteiro
-    if (tag === 'b') updateCanvasElement(selectedCanvasElement.id, { negrito: !selectedCanvasElement.negrito });
-    if (tag === 'i') updateCanvasElement(selectedCanvasElement.id, { italico: !selectedCanvasElement.italico });
-    if (tag === 'u') updateCanvasElement(selectedCanvasElement.id, { sublinhado: !selectedCanvasElement.sublinhado });
-  };
-
-  const [activeTab, setActiveTab] = useState('modelos');
+  const [activeTab, setActiveTab] = useState('emitir');
   const [templates, setTemplates] = useState<CartaTemplate[]>([]);
-  const [systemTemplates, setSystemTemplates] = useState<Record<string, CartaTemplate>>({});
   const [selectedTemplate, setSelectedTemplate] = useState<CartaTemplate | null>(null);
-  const [draftTitle, setDraftTitle] = useState('');
-  const [draftKey, setDraftKey] = useState('');
-  const [draftTipo, setDraftTipo] = useState<TemplateTipo>('custom');
-  const [isDraftReady, setIsDraftReady] = useState(false);
-  const [showNewModal, setShowNewModal] = useState(false);
-  const [activeSidebarTab, setActiveSidebarTab] = useState<'elementos' | 'variaveis' | 'camadas'>('elementos');
-  const lastSelectedTemplateRef = useRef<CartaTemplate | null>(null);
-  const lastSavedSnapshotRef = useRef<string>('');
   const [canvasContent, setCanvasContent] = useState<CartaCanvasData>(() => createDefaultCanvas());
-  const [categoriaFilter, setCategoriaFilter] = useState<'todas' | 'carta' | 'declaracao'>('todas');
   const [emitirCategoria, setEmitirCategoria] = useState<'todas' | 'carta' | 'declaracao'>('todas');
   const [historicoCategoria, setHistoricoCategoria] = useState<'todas' | 'carta' | 'declaracao'>('todas');
   const [historicoBusca, setHistoricoBusca] = useState('');
-  const [draftCategoria, setDraftCategoria] = useState<TemplateCategoria>('carta');
-  const [selectedCanvasElement, setSelectedCanvasElement] = useState<CartaCanvasElement | null>(null);
-  const [selectedCanvasElements, setSelectedCanvasElements] = useState<CartaCanvasElement[]>([]);
-  const [canvasImageTargetId, setCanvasImageTargetId] = useState<string | null>(null);
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [records, setRecords] = useState<CartaRegistro[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState<string>('');
@@ -396,58 +220,11 @@ export default function CartasPage() {
     motivo: '',
     observacoes: '',
   });
-  const [isSaving, setIsSaving] = useState(false);
   const [isIssuing, setIsIssuing] = useState(false);
   const [deletingRecordId, setDeletingRecordId] = useState<string | null>(null);
 
-  // Escala responsiva da folha A4 no editor e na pré-visualização
-  const [editorScale, setEditorScale] = useState(1);
-  const [editorZoomMode, setEditorZoomMode] = useState<'auto' | '100%' | '75%' | '50%'>('auto');
-  const canvasContainerRef = useRef<HTMLDivElement>(null);
-
   const [previewScale, setPreviewScale] = useState(1);
   const previewContainerRef = useRef<HTMLDivElement>(null);
-
-  // Estado e ref para botão Copiar JSON
-  const [copiedJson, setCopiedJson] = useState(false);
-  const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (copyTimeoutRef.current) {
-        clearTimeout(copyTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    const updateEditorScale = () => {
-      if (!canvasContainerRef.current) return;
-      const containerWidth = canvasContainerRef.current.clientWidth;
-      if (!containerWidth) return;
-
-      if (editorZoomMode === '100%') {
-        setEditorScale(1);
-      } else if (editorZoomMode === '75%') {
-        setEditorScale(0.75);
-      } else if (editorZoomMode === '50%') {
-        setEditorScale(0.5);
-      } else {
-        const padding = 24;
-        const availableWidth = containerWidth - padding;
-        if (availableWidth < CANVAS_A4.width) {
-          const fit = Math.max(0.35, Math.min(1, availableWidth / CANVAS_A4.width));
-          setEditorScale(Math.round(fit * 100) / 100);
-        } else {
-          setEditorScale(1);
-        }
-      }
-    };
-
-    updateEditorScale();
-    window.addEventListener('resize', updateEditorScale);
-    return () => window.removeEventListener('resize', updateEditorScale);
-  }, [editorZoomMode, canvasContent.width]);
 
   useEffect(() => {
     const updatePreviewScale = () => {
@@ -469,18 +246,6 @@ export default function CartasPage() {
     return () => window.removeEventListener('resize', updatePreviewScale);
   }, [canvasContent.width]);
 
-  // Verificação de alterações não salvas no modelo ativo
-  const currentSnapshot = useMemo(() => {
-    return JSON.stringify({
-      title: draftTitle,
-      canvas: canvasContent,
-    });
-  }, [draftTitle, canvasContent]);
-
-  const isDirty = useMemo(() => {
-    if (!lastSavedSnapshotRef.current) return false;
-    return currentSnapshot !== lastSavedSnapshotRef.current;
-  }, [currentSnapshot]);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -668,13 +433,12 @@ export default function CartasPage() {
   const pedidosPendentesCount = pedidosRecebidos.filter(p => p.status === 'pendente').length;
 
   const tabs = [
+    { id: 'emitir', label: 'Emitir', icon: '📄' },
     {
       id: 'pedidos',
-      label: pedidosPendentesCount > 0 ? `Pedidos (${pedidosPendentesCount})` : 'Pedidos Recebidos',
+      label: pedidosPendentesCount > 0 ? `Pedidos (${pedidosPendentesCount})` : 'Pedidos',
       icon: '📬',
     },
-    { id: 'modelos', label: 'Modelos', icon: '🧩' },
-    { id: 'emitir', label: 'Emitir', icon: '📄' },
     { id: 'historico', label: 'Histórico', icon: '🗂️' },
   ];
 
@@ -1366,25 +1130,18 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
     });
 
     setTemplates(list);
-    setSystemTemplates(systemMap);
 
-    const desiredKey =
-      selectedTemplate?.template_key ||
-      normalizeTemplateKey(draftKey || draftTitle || '');
+    const desiredKey = selectedTemplate?.template_key || null;
 
     const preferred = desiredKey
       ? list.find((t) => t.template_key === desiredKey) || null
       : null;
 
     if (preferred) {
-      // Forçar nova referência de objeto para disparar o useEffect de canvasContent
       setSelectedTemplate({ ...preferred });
     } else if (!selectedTemplate && list.length > 0) {
       const first = list[0];
       setSelectedTemplate({ ...first });
-      setDraftTitle(first.title || '');
-      setDraftKey(first.template_key || '');
-      setDraftTipo(first.tipo || 'custom');
     }
   };
 
@@ -1445,20 +1202,9 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
     if (!selectedTemplate) return;
     const canvas = parseTemplateToCanvas(selectedTemplate.content_json);
     setCanvasContent(canvas);
-    setSelectedCanvasElement(null);
-    setSelectedCanvasElements([]);
-    const title = selectedTemplate.title || '';
-    setDraftTitle(title);
-    setDraftKey(selectedTemplate.template_key || '');
-    setDraftTipo(selectedTemplate.tipo || 'custom');
-    lastSavedSnapshotRef.current = JSON.stringify({
-      title,
-      canvas,
-    });
   }, [selectedTemplate?.id, selectedTemplate?.template_key, selectedTemplate?.content_json]);
 
   const handleSelectTemplate = (template: CartaTemplate) => {
-    setIsDraftReady(false);
     // Se for um modelo de sistema nativo, forçar sempre o layout nativo atualizado
     const sysNative = DEFAULT_SYSTEM_TEMPLATES.find((s) => s.template_key === template.template_key);
     if (sysNative && template.scope === 'system') {
@@ -1468,313 +1214,9 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
     setSelectedTemplate({ ...template });
   };
 
-  const handleCategoryFilterChange = (newCat: 'todas' | 'carta' | 'declaracao') => {
-    setCategoriaFilter(newCat);
-    if (newCat === 'todas') return;
 
-    // Se o modelo selecionado atualmente não pertence à categoria escolhida, selecionar o primeiro compatível
-    const currentCat = selectedTemplate?.categoria || 'carta';
-    if (currentCat !== newCat) {
-      const firstMatch = templates.find((t) => (t.categoria || 'carta') === newCat);
-      if (firstMatch) {
-        handleSelectTemplate(firstMatch);
-      }
-    }
-  };
 
-  const handleNewTemplate = () => {
-    lastSelectedTemplateRef.current = selectedTemplate;
-    setDraftTitle('');
-    setDraftKey('');
-    setDraftTipo('custom');
-    setDraftCategoria('carta');
-    setShowNewModal(true);
-  };
 
-  const handleCancelNewTemplate = () => {
-    setShowNewModal(false);
-    setDraftTitle('');
-    setDraftKey('');
-    setDraftCategoria('carta');
-  };
-
-  const handleCreateDraft = () => {
-    if (!draftTitle.trim()) {
-      setNotification({
-        isOpen: true,
-        title: 'Aviso',
-        message: 'Informe um titulo valido para o modelo.',
-        type: 'warning',
-        autoClose: 3000,
-      });
-      return;
-    }
-    const key = normalizeTemplateKey(draftTitle);
-    const newCanvas = createDefaultCanvas();
-    setDraftKey(key);
-    setSelectedTemplate(null);
-    setIsDraftReady(true);
-    setCanvasContent(newCanvas);
-    setSelectedCanvasElement(null);
-    setSelectedCanvasElements([]);
-    lastSavedSnapshotRef.current = JSON.stringify({
-      title: draftTitle,
-      canvas: newCanvas,
-    });
-    setShowNewModal(false);
-  };
-
-  const handleCopyJson = async () => {
-    try {
-      const inferredCategoria: TemplateCategoria =
-        selectedTemplate?.categoria ||
-        draftCategoria ||
-        (['membro_ativo', 'batismo', 'cargo', 'apresentacao_crianca'].includes(draftTipo) ? 'declaracao' : 'carta');
-
-      const exportData = buildCartaTemplateExportJson({
-        title: draftTitle || selectedTemplate?.title,
-        templateKey: draftKey || selectedTemplate?.template_key,
-        tipo: draftTipo || selectedTemplate?.tipo,
-        categoria: inferredCategoria,
-        canvasContent,
-      });
-
-      const formattedJson = formatCartaTemplateJson(exportData);
-      const success = await copyTextToClipboard(formattedJson);
-
-      if (success) {
-        setCopiedJson(true);
-        if (copyTimeoutRef.current) {
-          clearTimeout(copyTimeoutRef.current);
-        }
-        copyTimeoutRef.current = setTimeout(() => {
-          setCopiedJson(false);
-        }, 3000);
-      } else {
-        // Fallback interativo caso APIs de clipboard estejam bloqueadas no navegador
-        prompt('Copie o JSON abaixo:', formattedJson);
-      }
-    } catch (err) {
-      console.error('Erro ao copiar JSON do modelo:', err);
-    }
-  };
-
-  const handleSaveTemplate = async () => {
-    let targetMinistryId = ministryId;
-    if (!targetMinistryId) {
-      targetMinistryId = await fetchMinData();
-      if (targetMinistryId) {
-        setMinistryId(targetMinistryId);
-      }
-    }
-
-    if (!targetMinistryId) {
-      setNotification({
-        isOpen: true,
-        title: 'Aviso',
-        message: 'Ministério não encontrado para salvar o modelo.',
-        type: 'warning',
-        autoClose: 3000,
-      });
-      return;
-    }
-
-    const baseKey = normalizeTemplateKey(draftKey || draftTitle);
-    if (!draftTitle || !baseKey) {
-      setNotification({
-        isOpen: true,
-        title: 'Aviso',
-        message: 'Informe um titulo valido para o modelo.',
-        type: 'warning',
-        autoClose: 3000,
-      });
-      return;
-    }
-
-    const isCreatingNew = !selectedTemplate;
-
-    const existingTenantKeys = new Set(
-      templates.filter((tpl) => tpl.scope === 'tenant').map((tpl) => tpl.template_key)
-    );
-    const existingSystemKeys = new Set(Object.keys(systemTemplates));
-
-    const buildUniqueKey = (key: string) => {
-      let candidate = key;
-      if (!existingTenantKeys.has(candidate) && !existingSystemKeys.has(candidate)) return candidate;
-      candidate = `${key}-personalizado`;
-      let counter = 2;
-      while (existingTenantKeys.has(candidate) || existingSystemKeys.has(candidate)) {
-        candidate = `${key}-personalizado-${counter}`;
-        counter += 1;
-      }
-      return candidate;
-    };
-
-    const finalKey = isCreatingNew ? buildUniqueKey(baseKey) : baseKey;
-
-    const inferredCategoria: TemplateCategoria =
-      selectedTemplate?.categoria ||
-      draftCategoria ||
-      (['membro_ativo', 'batismo', 'cargo', 'apresentacao_crianca'].includes(draftTipo) ? 'declaracao' : 'carta');
-
-    setIsSaving(true);
-    try {
-      const payload = {
-        ministry_id: targetMinistryId,
-        template_key: finalKey,
-        title: draftTitle,
-        tipo: draftTipo || 'custom',
-        categoria: inferredCategoria,
-        scope: 'tenant' as TemplateScope,
-        content_json: serializeCanvasContent(canvasContent),
-        is_active: true,
-        updated_at: new Date().toISOString(),
-      };
-
-      // Verificar se já existe um modelo no banco para este tenant com a mesma chave
-      const { data: existingTenantDb } = await supabase
-        .from('cartas_templates')
-        .select('id')
-        .eq('ministry_id', targetMinistryId)
-        .eq('template_key', finalKey)
-        .maybeSingle();
-
-      const tenantTargetId =
-        selectedTemplate?.scope === 'tenant'
-          ? selectedTemplate.id
-          : existingTenantDb?.id ||
-            templates.find((tpl) => tpl.scope === 'tenant' && tpl.template_key === finalKey)?.id ||
-            null;
-
-      const { error } = tenantTargetId
-        ? await supabase.from('cartas_templates').update(payload).eq('id', tenantTargetId)
-        : await supabase.from('cartas_templates').insert(payload);
-
-      if (error) throw error;
-
-      lastSavedSnapshotRef.current = JSON.stringify({
-        title: draftTitle,
-        canvas: canvasContent,
-      });
-
-      setNotification({
-        isOpen: true,
-        title: 'Sucesso',
-        message: 'Modelo salvo com sucesso!',
-        type: 'success',
-        autoClose: undefined,
-      });
-
-      if (typeof window !== 'undefined') {
-        const container = document.getElementById('page-scroll-container');
-        if (container) {
-          container.scrollTo({ top: 0, behavior: 'smooth' });
-        } else {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-      }
-
-      setDraftKey(finalKey);
-      await loadTemplates();
-    } catch (err: any) {
-      setNotification({
-        isOpen: true,
-        title: 'Erro',
-        message: err?.message || 'Erro ao salvar modelo',
-        type: 'error',
-        autoClose: undefined,
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleRestoreNativeTemplate = (templateKey: string) => {
-    if (!ministryId) return;
-    const sysNative = DEFAULT_SYSTEM_TEMPLATES.find((s) => s.template_key === templateKey);
-    if (!sysNative) return;
-
-    setConfirmModal({
-      isOpen: true,
-      title: 'Restaurar Modelo Nativo',
-      message: `Deseja restaurar a "${sysNative.title}" para o modelo nativo padrão do sistema? Suas alterações salvas para este modelo serão descartadas.`,
-      confirmText: 'Restaurar Padrão',
-      cancelText: 'Cancelar',
-      variant: 'warning',
-      onConfirm: async () => {
-        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-        try {
-          setIsSaving(true);
-          await supabase
-            .from('cartas_templates')
-            .delete()
-            .eq('ministry_id', ministryId)
-            .eq('template_key', templateKey);
-
-          setNotification({
-            isOpen: true,
-            title: 'Modelo Restaurado',
-            message: `O modelo "${sysNative.title}" foi restaurado para o padrão nativo original com sucesso.`,
-            type: 'success',
-            autoClose: 4000,
-          });
-
-          setSelectedTemplate({ ...sysNative });
-          await loadTemplates();
-        } catch (err: any) {
-          setNotification({
-            isOpen: true,
-            title: 'Erro',
-            message: err?.message || 'Erro ao restaurar modelo nativo',
-            type: 'error',
-            autoClose: undefined,
-          });
-        } finally {
-          setIsSaving(false);
-        }
-      },
-    });
-  };
-
-  const handleDeleteTenantTemplate = (templateId: string, title: string) => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Excluir Modelo de Carta',
-      message: `Tem certeza que deseja excluir permanentemente o modelo "${title}"? Esta ação não poderá ser desfeita.`,
-      confirmText: 'Excluir Modelo',
-      cancelText: 'Cancelar',
-      variant: 'danger',
-      onConfirm: async () => {
-        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-        try {
-          setIsSaving(true);
-          const { error } = await supabase.from('cartas_templates').delete().eq('id', templateId);
-          if (error) throw error;
-
-          setNotification({
-            isOpen: true,
-            title: 'Modelo Excluído',
-            message: `O modelo "${title}" foi excluído com sucesso.`,
-            type: 'success',
-            autoClose: 3000,
-          });
-
-          setSelectedTemplate(null);
-          await loadTemplates();
-        } catch (err: any) {
-          setNotification({
-            isOpen: true,
-            title: 'Erro',
-            message: err?.message || 'Erro ao excluir modelo',
-            type: 'error',
-            autoClose: undefined,
-          });
-        } finally {
-          setIsSaving(false);
-        }
-      },
-    });
-  };
 
   const handleDeleteRecord = (rec: CartaRegistro) => {
     const mid = userCtx.ministryId || ministryId;
@@ -1857,261 +1299,6 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
     });
   };
 
-  const updateCanvasElement = (id: string, props: Partial<CartaCanvasElement>) => {
-    setCanvasContent((prev) => ({
-      ...prev,
-      elements: prev.elements.map((el) => (el.id === id ? { ...el, ...props } : el)),
-    }));
-    setSelectedCanvasElement((prev) => (prev && prev.id === id ? { ...prev, ...props } : prev));
-    setSelectedCanvasElements((prev) =>
-      prev.map((el) => (el.id === id ? { ...el, ...props } : el))
-    );
-  };
-
-  const updateMultipleCanvasElements = (
-    updates: Array<{ id: string; propriedades: Partial<CartaCanvasElement> }>
-  ) => {
-    setCanvasContent((prev) => ({
-      ...prev,
-      elements: prev.elements.map((el) => {
-        const found = updates.find((u) => u.id === el.id);
-        return found ? { ...el, ...found.propriedades } : el;
-      }),
-    }));
-  };
-
-  const addCanvasElements = (newElements: CartaCanvasElement[]) => {
-    setCanvasContent((prev) => ({
-      ...prev,
-      elements: [...prev.elements, ...newElements],
-    }));
-  };
-
-  const removeCanvasElement = (id: string) => {
-    setCanvasContent((prev) => ({
-      ...prev,
-      elements: prev.elements.filter((el) => el.id !== id),
-    }));
-    setSelectedCanvasElements((prev) => prev.filter((el) => el.id !== id));
-    if (selectedCanvasElement?.id === id) {
-      setSelectedCanvasElement(null);
-    }
-  };
-
-  const moveLayerUp = (id: string) => {
-    setCanvasContent((prev) => {
-      const idx = prev.elements.findIndex((el) => el.id === id);
-      if (idx < 0 || idx >= prev.elements.length - 1) return prev;
-      const copy = [...prev.elements];
-      const temp = copy[idx];
-      copy[idx] = copy[idx + 1];
-      copy[idx + 1] = temp;
-      return { ...prev, elements: copy };
-    });
-  };
-
-  const moveLayerDown = (id: string) => {
-    setCanvasContent((prev) => {
-      const idx = prev.elements.findIndex((el) => el.id === id);
-      if (idx <= 0) return prev;
-      const copy = [...prev.elements];
-      const temp = copy[idx];
-      copy[idx] = copy[idx - 1];
-      copy[idx - 1] = temp;
-      return { ...prev, elements: copy };
-    });
-  };
-
-  const bringToFront = (id: string) => {
-    setCanvasContent((prev) => {
-      const idx = prev.elements.findIndex((el) => el.id === id);
-      if (idx < 0 || idx === prev.elements.length - 1) return prev;
-      const target = prev.elements[idx];
-      const filtered = prev.elements.filter((el) => el.id !== id);
-      return { ...prev, elements: [...filtered, target] };
-    });
-  };
-
-  const sendToBack = (id: string) => {
-    setCanvasContent((prev) => {
-      const idx = prev.elements.findIndex((el) => el.id === id);
-      if (idx <= 0) return prev;
-      const target = prev.elements[idx];
-      const filtered = prev.elements.filter((el) => el.id !== id);
-      return { ...prev, elements: [target, ...filtered] };
-    });
-  };
-
-  const duplicateCanvasElement = (element: CartaCanvasElement) => {
-    const offset = 16;
-    const clone: CartaCanvasElement = {
-      ...element,
-      id: createElementId(),
-      locked: false,
-      x: Math.min(element.x + offset, canvasContent.width - element.largura),
-      y: Math.min(element.y + offset, canvasContent.height - element.altura),
-    };
-    addCanvasElements([clone]);
-    setSelectedCanvasElement(clone);
-    setSelectedCanvasElements([clone]);
-  };
-
-  const toggleCanvasLock = (element: CartaCanvasElement) => {
-    updateCanvasElement(element.id, { locked: !element.locked });
-  };
-
-  const addCanvasElement = (
-    tipo: CartaCanvasElement['tipo'],
-    overrides: Partial<CartaCanvasElement> = {}
-  ) => {
-    const isText = tipo === 'texto';
-    const isLine = tipo === 'linha';
-    const isForma = tipo === 'forma';
-    const base: CartaCanvasElement = {
-      id: createElementId(),
-      tipo,
-      x: 48,
-      y: 48,
-      largura: isLine ? 320 : isText ? 360 : isForma ? 240 : 200,
-      altura: isLine ? 3 : isText ? 48 : isForma ? 160 : 140,
-      fontSize: isText ? 16 : 12,
-      fonte: 'Calibri',
-      cor: isLine ? '#111827' : '#111827',
-      backgroundColor: isForma ? '#f3f4f6' : undefined,
-      borderColor: isForma ? '#374151' : undefined,
-      borderWidth: isForma ? 1 : undefined,
-      borderStyle: isForma ? 'solid' : undefined,
-      borderRadius: isForma ? 4 : 0,
-      alinhamento: 'left' as const,
-      negrito: false,
-      italico: false,
-      sublinhado: false,
-      texto: isText ? 'Digite o texto aqui' : isLine ? '' : undefined,
-      imagemUrl: tipo === 'logo' ? (configIgreja.logo || '') : undefined,
-      locked: false,
-      visivel: true,
-      ...overrides,
-    };
-
-    addCanvasElements([base]);
-    setSelectedCanvasElement(base);
-    setSelectedCanvasElements([base]);
-  };
-
-
-
-  const handleInsertPlaceholder = (key: string) => {
-    if (!selectedCanvasElement || selectedCanvasElement.tipo !== 'texto') {
-      setNotification({
-        isOpen: true,
-        title: 'Aviso',
-        message: 'Selecione um elemento de texto no canvas para inserir o placeholder.',
-        type: 'warning',
-        autoClose: 3000,
-      });
-      return;
-    }
-    if (selectedCanvasElement.locked) {
-      setNotification({
-        isOpen: true,
-        title: 'Aviso',
-        message: 'Desbloqueie o elemento para editar o texto.',
-        type: 'warning',
-        autoClose: 3000,
-      });
-      return;
-    }
-    const currentText = selectedCanvasElement.texto || '';
-    updateCanvasElement(selectedCanvasElement.id, { texto: `${currentText}{{${key}}}` });
-  };
-
-  const getAccessTokenOrThrow = async () => {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    if (error || !token) throw new Error('Nao autenticado');
-    return token;
-  };
-
-  const uploadImageFile = async (file: File) => {
-    const token = await getAccessTokenOrThrow();
-    const form = new FormData();
-    form.append('file', file);
-    const response = await fetch('/api/v1/cartas/uploads', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Falha no upload');
-    return data.url as string;
-  };
-
-  const handleCanvasImageUpload = async (file: File, targetId?: string) => {
-    // 1. Validação prévia de formato e tamanho (máx. 2 MB, JPG, PNG ou WebP)
-    const validacao = CartasService.validarArquivoImagemCarta(file);
-    if (!validacao.valido) {
-      setNotification({
-        isOpen: true,
-        title: 'Arquivo Inválido',
-        message: validacao.erro || 'Arquivo de imagem inválido.',
-        type: 'warning',
-        autoClose: 5000,
-      });
-      return;
-    }
-
-    // 2. Prevenção de envios concorrentes
-    if (isUploadingImage) return;
-
-    setIsUploadingImage(true);
-    try {
-      const url = await uploadImageFile(file);
-      if (targetId) {
-        updateCanvasElement(targetId, { imagemUrl: url });
-        setNotification({
-          isOpen: true,
-          title: 'Imagem Atualizada',
-          message: 'A imagem foi enviada com sucesso e aplicada ao elemento.',
-          type: 'success',
-          autoClose: 3500,
-        });
-      } else {
-        addCanvasElement('imagem', { imagemUrl: url, largura: 260, altura: 180 });
-        setNotification({
-          isOpen: true,
-          title: 'Imagem Inserida',
-          message: 'Novo elemento de imagem adicionado ao documento.',
-          type: 'success',
-          autoClose: 3500,
-        });
-      }
-    } catch (err: any) {
-      setNotification({
-        isOpen: true,
-        title: 'Falha no Upload',
-        message: err?.message || 'Não foi possível enviar a imagem. As alterações do documento foram preservadas.',
-        type: 'error',
-        autoClose: 5000,
-      });
-    } finally {
-      setIsUploadingImage(false);
-    }
-  };
-
-  const handleCanvasBackgroundUpload = async (file: File) => {
-    try {
-      const url = await uploadImageFile(file);
-      setCanvasContent((prev) => ({ ...prev, backgroundUrl: url }));
-    } catch (err: any) {
-      setNotification({
-        isOpen: true,
-        title: 'Erro',
-        message: err?.message || 'Erro ao enviar background',
-        type: 'error',
-        autoClose: undefined,
-      });
-    }
-  };
 
   const handleRegistrarPedidoDireto = async () => {
     if (!selectedMember || !selectedMemberId) {
@@ -2649,11 +1836,23 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
             </div>
             <div className="grid w-full max-w-xl grid-cols-1 gap-3 sm:grid-cols-3">
               <div
-                className="rounded-xl border border-white/70 bg-white/80 p-3 text-center shadow-sm backdrop-blur motion-safe:animate-rise-in"
+                className="rounded-xl border border-white/70 bg-white/80 p-3 text-center shadow-sm backdrop-blur motion-safe:animate-rise-in flex flex-col justify-between"
                 style={{ animationDelay: '0.05s' }}
               >
-                <p className="text-[11px] uppercase tracking-[0.2em] text-gray-400">Modelos</p>
-                <p className="text-lg font-semibold text-[#123b63]">{templates.length}</p>
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-gray-400">Modelos</p>
+                  <p className="text-lg font-semibold text-[#123b63]">{templates.length}</p>
+                </div>
+                {userCtx.isMaster && (
+                  <button
+                    type="button"
+                    onClick={() => router.push('/configuracoes/cartas')}
+                    className="mt-1 text-[10px] text-teal-700 hover:text-teal-900 font-bold underline"
+                    title="Gerenciar modelos de cartas e declarações em Configurações (exclusivo MASTER)"
+                  >
+                    Gerenciar (Configurações) →
+                  </button>
+                )}
               </div>
               <div
                 className="rounded-xl border border-white/70 bg-white/80 p-3 text-center shadow-sm backdrop-blur motion-safe:animate-rise-in"
@@ -2676,1450 +1875,6 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
         <div className="rounded-2xl border border-white/70 bg-white/80 shadow-xl/10 backdrop-blur">
           <div className="p-4 md:p-6">
             <Tabs tabs={visibleTabs} activeTab={activeTab} onTabChange={setActiveTab}>
-        {activeTab === 'pedidos' && (
-          <Section icon="📬" title="Pedidos de Cartas Recebidos">
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-2 border-b border-gray-100">
-                <div>
-                  <h3 className="text-base font-bold text-gray-800">Solicitações das Congregações</h3>
-                  <p className="text-xs text-gray-500">
-                    Analise e aprove os pedidos de cartas ministeriais encaminhados pelas secretarias locais.
-                  </p>
-                </div>
-                <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-200 text-xs font-semibold">
-                  {(['pendente', 'todos', 'autorizado', 'rejeitado'] as const).map((st) => (
-                    <button
-                      key={st}
-                      type="button"
-                      onClick={() => setPedidosFiltroStatus(st)}
-                      className={`px-3 py-1.5 rounded-lg transition capitalize ${
-                        pedidosFiltroStatus === st
-                          ? 'bg-white text-teal-800 shadow-sm border border-gray-200 font-bold'
-                          : 'text-gray-600 hover:text-gray-900'
-                      }`}
-                    >
-                      {st === 'todos'
-                        ? 'Todos'
-                        : st === 'pendente'
-                        ? `Pendentes (${pedidosPendentesCount})`
-                        : st === 'autorizado'
-                        ? 'Autorizados'
-                        : 'Rejeitados'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {loadingPedidos ? (
-                <div className="py-12 text-center text-gray-400 text-sm">Carregando solicitações...</div>
-              ) : (
-                (() => {
-                  const filtered = pedidosRecebidos.filter((p) => {
-                    if (pedidosFiltroStatus === 'todos') return true;
-                    return p.status === pedidosFiltroStatus;
-                  });
-
-                  if (filtered.length === 0) {
-                    return (
-                      <div className="py-16 text-center text-gray-400">
-                        <FileCheck size={40} className="mx-auto mb-2 opacity-40" />
-                        <p className="text-sm">Nenhum pedido encontrado com o filtro selecionado.</p>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div className="grid gap-3">
-                      {filtered.map((pedido) => {
-                        const exigePresidencia = CartasService.exigeAutorizacaoPresidencial(pedido.tipo_carta);
-                        return (
-                          <div
-                            key={pedido.id}
-                            className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4"
-                          >
-                            <div className="space-y-1.5 flex-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-bold text-gray-800 text-base">{pedido.membro_nome}</span>
-                                {pedido.membro_cargo && (
-                                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
-                                    {pedido.membro_cargo}
-                                  </span>
-                                )}
-                                <span
-                                  className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${
-                                    pedido.status === 'pendente'
-                                      ? 'bg-amber-50 text-amber-700 border-amber-300'
-                                      : pedido.status === 'autorizado'
-                                      ? 'bg-green-50 text-green-700 border-green-300'
-                                      : 'bg-red-50 text-red-700 border-red-300'
-                                  }`}
-                                >
-                                  {pedido.status === 'pendente'
-                                    ? 'Pendente'
-                                    : pedido.status === 'autorizado'
-                                    ? 'Autorizado'
-                                    : 'Rejeitado'}
-                                </span>
-                              </div>
-                              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
-                                <span>
-                                  Tipo:{' '}
-                                  <strong>
-                                    {pedido.tipo_carta === 'mudanca'
-                                      ? 'Carta de Mudança'
-                                      : pedido.tipo_carta === 'desligamento'
-                                      ? 'Carta de Desligamento'
-                                      : pedido.tipo_carta === 'transito'
-                                      ? 'Carta de Trânsito'
-                                      : 'Carta de Recomendação'}
-                                  </strong>
-                                </span>
-                                {pedido.destino && <span>Destino: <strong>{pedido.destino}</strong></span>}
-                                <span>Data: <strong>{new Date(pedido.created_at).toLocaleDateString('pt-BR')}</strong></span>
-                                {pedido.solicitante_nome && <span>Solicitado por: <strong>{pedido.solicitante_nome}</strong></span>}
-                              </div>
-                              {pedido.observacoes && (
-                                <p className="text-xs text-gray-500 italic bg-gray-50 rounded-lg p-2 border border-gray-100">
-                                  "{pedido.observacoes}"
-                                </p>
-                              )}
-                              {pedido.status === 'rejeitado' && pedido.motivo_rejeicao && (
-                                <p className="text-xs text-red-600 bg-red-50 rounded-lg p-2 border border-red-100">
-                                  <strong>Motivo da rejeição:</strong> {pedido.motivo_rejeicao}
-                                </p>
-                              )}
-                              {pedido.status === 'autorizado' && (
-                                <p className="text-xs text-green-700">
-                                  Autorizado por {pedido.autorizador_nome || 'Secretaria'} em{' '}
-                                  {pedido.data_autorizacao
-                                    ? new Date(pedido.data_autorizacao).toLocaleDateString('pt-BR')
-                                    : '—'}
-                                </p>
-                              )}
-                            </div>
-
-                            <div className="flex items-center gap-2 shrink-0">
-                              {pedido.status === 'pendente' && (
-                                exigePresidencia ? (
-                                  <div className="flex flex-col items-end gap-1">
-                                    <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 font-medium">
-                                      <Clock size={12} /> Exige deliberação da Presidência
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => router.push('/presidencia/decisoes')}
-                                      className="text-xs text-blue-600 hover:text-blue-800 underline font-medium"
-                                    >
-                                      Abrir Central de Decisões →
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => { setPedidoParaAvaliar(pedido); setMotivoRejeicaoPedido(''); }}
-                                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-xs font-semibold transition"
-                                    >
-                                      <XCircle size={13} /> Rejeitar
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleAutorizarPedido(pedido)}
-                                      disabled={avaliandoPedido}
-                                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition disabled:opacity-50"
-                                    >
-                                      <CheckCircle size={13} /> Autorizar
-                                    </button>
-                                  </div>
-                                )
-                              )}
-                              {pedido.status === 'autorizado' && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (pedido.member_id) setSelectedMemberId(pedido.member_id);
-                                    setActiveTab('emitir');
-                                  }}
-                                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-semibold transition"
-                                >
-                                  <FileCheck size={13} /> Emitir Carta Oficial
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })()
-              )}
-            </div>
-          </Section>
-        )}
-
-        {activeTab === 'modelos' && (
-          <Section icon="🧩" title="Modelos de Documentos">
-            {/* Cabeçalho da Seção de Modelos com Botão de Novo Modelo */}
-            <div className="mb-6 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-2 border-b border-gray-100">
-                <div>
-                  <h3 className="text-base font-bold text-gray-800">Modelos de Documentos</h3>
-                  <p className="text-xs text-gray-500">
-                    Gerencie os modelos de cartas ministeriais e declarações oficiais do ministério.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleNewTemplate}
-                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl transition shadow-sm self-start sm:self-auto"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  <span>Novo Modelo</span>
-                </button>
-              </div>
-
-              {/* Segmented Control de Categoria */}
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50/80 p-1.5">
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => handleCategoryFilterChange('todas')}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
-                      categoriaFilter === 'todas'
-                        ? 'bg-white text-teal-800 shadow-sm border border-gray-200'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    Todos ({templates.length})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleCategoryFilterChange('carta')}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                      categoriaFilter === 'carta'
-                        ? 'bg-white text-blue-800 shadow-sm border border-blue-200'
-                        : 'text-gray-600 hover:text-blue-800'
-                    }`}
-                  >
-                    <span>📜</span>
-                    <span>Cartas ({templates.filter((t) => (t.categoria || 'carta') === 'carta').length})</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleCategoryFilterChange('declaracao')}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                      categoriaFilter === 'declaracao'
-                        ? 'bg-white text-emerald-800 shadow-sm border border-emerald-200'
-                        : 'text-gray-600 hover:text-emerald-800'
-                    }`}
-                  >
-                    <span>📄</span>
-                    <span>Declarações ({templates.filter((t) => t.categoria === 'declaracao').length})</span>
-                  </button>
-                </div>
-                <div className="text-xs text-gray-500 font-medium px-2">
-                  Exibindo {templates.filter((t) => categoriaFilter === 'todas' || (t.categoria || 'carta') === categoriaFilter).length} modelo(s)
-                </div>
-              </div>
-
-              {/* Card Institucional: Modelo Selecionado */}
-              <div className="rounded-2xl border border-white/80 bg-white/90 p-4 shadow-sm backdrop-blur">
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                  {/* Seletor Principal */}
-                  <div className="flex-1 space-y-1.5 min-w-[280px]">
-                    <div className="flex items-center gap-2">
-                      <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                        Modelo Ativo
-                      </label>
-                      {selectedTemplate && (
-                        <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide ${
-                            selectedTemplate.categoria === 'declaracao'
-                              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                              : 'bg-blue-50 text-blue-800 border border-blue-200'
-                          }`}
-                        >
-                          {selectedTemplate.categoria === 'declaracao' ? '📄 DECLARAÇÃO OFICIAL' : '📜 CARTA MINISTERIAL'}
-                        </span>
-                      )}
-                    </div>
-                    <select
-                      value={selectedTemplate?.id || ''}
-                      onChange={(e) => {
-                        const tpl = templates.find((t) => t.id === e.target.value);
-                        if (tpl) handleSelectTemplate(tpl);
-                      }}
-                      className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 shadow-sm"
-                    >
-                      <option value="" disabled>Selecione um modelo para editar</option>
-                      {templates
-                        .filter((t) => categoriaFilter === 'todas' || (t.categoria || 'carta') === categoriaFilter)
-                        .map((tpl) => (
-                          <option key={tpl.id} value={tpl.id}>
-                            {tpl.categoria === 'declaracao' ? '📄 [Declaração] ' : '📜 [Carta] '}{tpl.title}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-
-                  {/* Ações Secundárias Agrupadas */}
-                  {selectedTemplate && (
-                    <div className="flex flex-wrap items-center gap-2 self-end lg:self-center">
-                      {DEFAULT_SYSTEM_TEMPLATES.some((s) => s.template_key === selectedTemplate.template_key) ? (
-                        <button
-                          type="button"
-                          onClick={() => handleRestoreNativeTemplate(selectedTemplate.template_key)}
-                          disabled={isSaving}
-                          className="text-xs px-3 py-2 rounded-xl font-medium transition flex items-center gap-1.5 bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200"
-                          title="Restaurar este modelo para o padrão nativo do sistema"
-                        >
-                          <RotateCcw className="h-3.5 w-3.5 text-amber-600" />
-                          <span>Restaurar Nativo</span>
-                        </button>
-                      ) : (
-                        selectedTemplate.scope === 'tenant' && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteTenantTemplate(selectedTemplate.id, selectedTemplate.title)}
-                            disabled={isSaving}
-                            className="text-xs px-3 py-2 rounded-xl font-medium transition flex items-center gap-1.5 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
-                            title="Excluir este modelo"
-                          >
-                            <Trash2 className="h-3.5 w-3.5 text-red-600" />
-                            <span>Excluir</span>
-                          </button>
-                        )
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Visualização de Edição Direta do Modelo */}
-            {selectedTemplate || isDraftReady ? (
-              <div className="space-y-4">
-                {/* ESTRUTURA DE 3 COLUNAS */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                  
-                  {/* COLUNA 1 (3 cols): PAINEL LATERAL ESQUERDO COM ABAS COMPACTAS */}
-                  <div className="lg:col-span-3 space-y-3">
-                    {/* Navegação de Abas do Painel Esquerdo */}
-                    <div className="flex bg-gray-100/80 p-1 rounded-xl border border-gray-200 gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setActiveSidebarTab('elementos')}
-                        className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 ${
-                          activeSidebarTab === 'elementos'
-                            ? 'bg-white text-teal-800 shadow-sm'
-                            : 'text-gray-600 hover:text-gray-900'
-                        }`}
-                      >
-                        <span>➕ Elementos</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setActiveSidebarTab('variaveis')}
-                        className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 ${
-                          activeSidebarTab === 'variaveis'
-                            ? 'bg-white text-teal-800 shadow-sm'
-                            : 'text-gray-600 hover:text-gray-900'
-                        }`}
-                      >
-                        <span>{'{x}'} Variáveis</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setActiveSidebarTab('camadas')}
-                        className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 relative ${
-                          activeSidebarTab === 'camadas'
-                            ? 'bg-white text-teal-800 shadow-sm'
-                            : 'text-gray-600 hover:text-gray-900'
-                        }`}
-                      >
-                        <span>🥞 Camadas</span>
-                        {canvasContent.elements.length > 0 && (
-                          <span className="text-[10px] bg-teal-100 text-teal-800 font-bold px-1.5 py-0.2 rounded-full">
-                            {canvasContent.elements.length}
-                          </span>
-                        )}
-                      </button>
-                    </div>
-
-                    {/* ABA 1: Adicionar Elementos */}
-                    {activeSidebarTab === 'elementos' && (
-                      <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-lg/10 backdrop-blur space-y-3">
-                        <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-100 pb-2">
-                          Inserir no Canvas
-                        </h3>
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => addCanvasElement('texto')}
-                            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-teal-50 hover:border-teal-300 transition shadow-sm"
-                          >
-                            <Type className="h-4 w-4 text-teal-600" />
-                            <span>Texto</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => addCanvasElement('linha')}
-                            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-teal-50 hover:border-teal-300 transition shadow-sm"
-                          >
-                            <Minus className="h-4 w-4 text-teal-600" />
-                            <span>Linha</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => addCanvasElement('logo')}
-                            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-teal-50 hover:border-teal-300 transition shadow-sm"
-                          >
-                            <Shield className="h-4 w-4 text-teal-600" />
-                            <span>Logo</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => addCanvasElement('imagem')}
-                            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-teal-50 hover:border-teal-300 transition shadow-sm"
-                          >
-                            <Image className="h-4 w-4 text-teal-600" />
-                            <span>Imagem</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => addCanvasElement('forma')}
-                            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-teal-50 hover:border-teal-300 transition shadow-sm"
-                          >
-                            <Square className="h-4 w-4 text-teal-600" />
-                            <span>Forma</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => addCanvasElement('qrcode')}
-                            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-teal-50 hover:border-teal-300 transition shadow-sm"
-                          >
-                            <span className="text-sm">📱</span>
-                            <span>QR Code</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCanvasImageTargetId(null);
-                              canvasImageInputRef.current?.click();
-                            }}
-                            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-teal-50 hover:border-teal-300 transition shadow-sm"
-                          >
-                            <Upload className="h-4 w-4 text-teal-600" />
-                            <span>Upload</span>
-                          </button>
-                        </div>
-
-                        <div className="pt-2 border-t border-gray-100 flex flex-col gap-2">
-                          <button
-                            type="button"
-                            onClick={() => canvasBackgroundInputRef.current?.click()}
-                            className="w-full flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 transition shadow-sm"
-                          >
-                            <Paintbrush className="h-3.5 w-3.5 text-teal-600" />
-                            <span>Definir Imagem de Fundo</span>
-                          </button>
-
-                          {canvasContent.backgroundUrl && (
-                            <button
-                              type="button"
-                              onClick={() => setCanvasContent((prev) => ({ ...prev, backgroundUrl: '' }))}
-                              className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100 transition"
-                            >
-                              <Eraser className="h-3.5 w-3.5" />
-                              <span>Remover Fundo</span>
-                            </button>
-                          )}
-                        </div>
-
-                        <input
-                          ref={canvasImageInputRef}
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            const targetId = canvasImageTargetId ?? undefined;
-                            e.currentTarget.value = '';
-                            setCanvasImageTargetId(null);
-                            if (file) {
-                              handleCanvasImageUpload(file, targetId);
-                            }
-                          }}
-                        />
-                        <input
-                          ref={canvasBackgroundInputRef}
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              handleCanvasBackgroundUpload(file);
-                            }
-                            e.currentTarget.value = '';
-                          }}
-                        />
-                      </div>
-                    )}
-
-                    {/* ABA 2: Placeholders (Variáveis) */}
-                    {activeSidebarTab === 'variaveis' && (
-                      <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-lg/10 backdrop-blur space-y-3">
-                        <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-100 pb-2">
-                          Variáveis Dinâmicas
-                        </h3>
-                        <p className="text-[11px] text-gray-500">
-                          Selecione um elemento de texto e clique no botão para inserir a variável.
-                        </p>
-                        <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-                          {PLACEHOLDER_GROUPS.map((group) => (
-                            <div key={group.title}>
-                              <p className="text-[11px] font-bold text-teal-800 mb-1">{group.title}</p>
-                              <div className="flex flex-wrap gap-1.5">
-                                {group.items.map((item) => (
-                                  <button
-                                    key={item.key}
-                                    onClick={() => handleInsertPlaceholder(item.key)}
-                                    className="text-[11px] px-2.5 py-1 rounded-full bg-gray-100 hover:bg-teal-100 hover:text-teal-800 text-gray-700 transition font-medium border border-gray-200"
-                                  >
-                                    {item.label}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* ABA 3: CAMADAS (Organização de elementos do canvas) */}
-                    {activeSidebarTab === 'camadas' && (
-                      <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-lg/10 backdrop-blur space-y-3">
-                        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                          <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                            Lista de Camadas
-                          </h3>
-                          <span className="text-[10px] text-gray-400 font-semibold">
-                            Frente no topo
-                          </span>
-                        </div>
-                        
-                        {canvasContent.elements.length === 0 ? (
-                          <div className="py-8 text-center text-gray-400 space-y-1">
-                            <p className="text-xs">Nenhuma camada criada.</p>
-                            <p className="text-[10px]">Adicione um elemento na aba "Elementos".</p>
-                          </div>
-                        ) : (
-                          /* Exibe as camadas invertidas (último elemento do array = camada da frente = topo da lista) */
-                          <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
-                            {canvasContent.elements.slice().reverse().map((el) => {
-                              const isSelected = selectedCanvasElement?.id === el.id;
-                              let labelResumido = CANVAS_ELEMENT_LABELS[el.tipo] || 'Elemento';
-                              if (el.tipo === 'texto' && el.texto) {
-                                labelResumido = el.texto.replace(/<[^>]*>?/gm, '').slice(0, 22) || 'Texto';
-                              }
-
-                              const renderIcon = () => {
-                                switch (el.tipo) {
-                                  case 'texto': return <Type className="h-3.5 w-3.5 text-teal-600" />;
-                                  case 'linha': return <Minus className="h-3.5 w-3.5 text-teal-600" />;
-                                  case 'logo': return <Shield className="h-3.5 w-3.5 text-teal-600" />;
-                                  case 'imagem': return <Image className="h-3.5 w-3.5 text-teal-600" />;
-                                  case 'qrcode': return <span className="text-xs">📱</span>;
-                                  default: return <Type className="h-3.5 w-3.5 text-teal-600" />;
-                                }
-                              };
-
-                              return (
-                                <div
-                                  key={el.id}
-                                  onClick={() => {
-                                    setSelectedCanvasElement(el);
-                                    setSelectedCanvasElements([el]);
-                                  }}
-                                  className={`flex items-center justify-between p-2.5 rounded-xl text-xs cursor-pointer transition border ${
-                                    isSelected
-                                      ? 'bg-teal-600 text-white font-bold border-teal-700 shadow-sm'
-                                      : 'bg-white text-gray-700 border-gray-200 hover:bg-teal-50/50'
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-2 truncate">
-                                    <span className={`p-1 rounded-md ${isSelected ? 'bg-teal-700 text-white' : 'bg-gray-100'}`}>
-                                      {renderIcon()}
-                                    </span>
-                                    <span className="truncate">{labelResumido}</span>
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        bringToFront(el.id);
-                                      }}
-                                      title="Trazer para a Frente Absoluta"
-                                      className={`p-1 rounded hover:bg-black/10 transition ${isSelected ? 'text-white' : 'text-gray-500'}`}
-                                    >
-                                      <ArrowUpToLine className="h-3 w-3" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        moveLayerUp(el.id);
-                                      }}
-                                      title="Subir uma Camada"
-                                      className={`p-1 rounded hover:bg-black/10 transition ${isSelected ? 'text-white' : 'text-gray-500'}`}
-                                    >
-                                      <ChevronUp className="h-3 w-3" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        moveLayerDown(el.id);
-                                      }}
-                                      title="Descer uma Camada"
-                                      className={`p-1 rounded hover:bg-black/10 transition ${isSelected ? 'text-white' : 'text-gray-500'}`}
-                                    >
-                                      <ChevronDown className="h-3 w-3" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        sendToBack(el.id);
-                                      }}
-                                      title="Enviar para o Fundo Absoluto"
-                                      className={`p-1 rounded hover:bg-black/10 transition ${isSelected ? 'text-white' : 'text-gray-500'}`}
-                                    >
-                                      <ArrowDownToLine className="h-3 w-3" />
-                                    </button>
-                                    {el.locked && <Lock className="h-3 w-3 opacity-80 ml-1" />}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                  </div>
-
-                  {/* COLUNA 2 (6 cols): CANVAS CENTRAL */}
-                  <div className="lg:col-span-6 space-y-4">
-                    {/* Barra de Dimensões A4 e Escala do Papel */}
-                    <div className="rounded-2xl border border-gray-300 bg-gray-100 p-4 shadow-inner space-y-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-2.5">
-                        <div className="flex items-center gap-1.5 text-xs text-gray-700 font-semibold">
-                          <FileText className="h-4 w-4 text-teal-600 shrink-0" />
-                          <span>Papel A4 Retrato</span>
-                          <span className="text-[11px] font-normal text-gray-500">
-                            (210 × 297 mm — {CANVAS_A4.width} × {CANVAS_A4.height} px)
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-0.5 shadow-xs">
-                          <button
-                            type="button"
-                            onClick={() => setEditorZoomMode('auto')}
-                            className={`px-2 py-0.5 rounded text-[11px] font-semibold transition ${
-                              editorZoomMode === 'auto'
-                                ? 'bg-teal-600 text-white shadow-xs'
-                                : 'text-gray-600 hover:bg-gray-100'
-                            }`}
-                            title="Ajustar automaticamente à largura da tela"
-                          >
-                            Ajustar ({Math.round(editorScale * 100)}%)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditorZoomMode('100%')}
-                            className={`px-2 py-0.5 rounded text-[11px] font-semibold transition ${
-                              editorZoomMode === '100%'
-                                ? 'bg-teal-600 text-white shadow-xs'
-                                : 'text-gray-600 hover:bg-gray-100'
-                            }`}
-                          >
-                            100%
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditorZoomMode('75%')}
-                            className={`px-2 py-0.5 rounded text-[11px] font-semibold transition ${
-                              editorZoomMode === '75%'
-                                ? 'bg-teal-600 text-white shadow-xs'
-                                : 'text-gray-600 hover:bg-gray-100'
-                            }`}
-                          >
-                            75%
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditorZoomMode('50%')}
-                            className={`px-2 py-0.5 rounded text-[11px] font-semibold transition ${
-                              editorZoomMode === '50%'
-                                ? 'bg-teal-600 text-white shadow-xs'
-                                : 'text-gray-600 hover:bg-gray-100'
-                            }`}
-                          >
-                            50%
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Área Principal de Renderização do Canvas */}
-                      <div
-                        ref={canvasContainerRef}
-                        className="max-h-[820px] overflow-auto flex justify-center py-1"
-                      >
-                        <div
-                          style={{
-                            width: `${canvasContent.width * editorScale}px`,
-                            height: `${canvasContent.height * editorScale}px`,
-                            position: 'relative',
-                            flexShrink: 0,
-                            transition: 'width 0.15s ease, height 0.15s ease',
-                          }}
-                        >
-                          <div
-                            style={{
-                              transform: `scale(${editorScale})`,
-                              transformOrigin: 'top left',
-                              width: `${canvasContent.width}px`,
-                              height: `${canvasContent.height}px`,
-                            }}
-                          >
-                            <InteractiveCanvas
-                              elementos={canvasContent.elements}
-                              elementoSelecionado={selectedCanvasElement}
-                              elementosSelecionados={selectedCanvasElements}
-                              getPreviewText={getCanvasPreviewText}
-                              onElementoSelecionado={setSelectedCanvasElement}
-                              onElementosSelecionados={setSelectedCanvasElements}
-                              onElementoAtualizado={(id, props) => updateCanvasElement(id, props)}
-                              onMultiplosElementosAtualizados={updateMultipleCanvasElements}
-                              onElementosAdicionados={addCanvasElements}
-                              onElementoRemovido={removeCanvasElement}
-                              backgroundUrl={canvasContent.backgroundUrl}
-                              showGrid
-                              gridSize={24}
-                              larguraCanvas={canvasContent.width}
-                              alturaCanvas={canvasContent.height}
-                              scale={editorScale}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* COLUNA 3 (3 cols): PAINEL DE PROPRIEDADES COM AÇÕES CONSOLIDADAS */}
-                  <div className="lg:col-span-3 space-y-4">
-                    <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-lg/10 backdrop-blur space-y-4">
-                      <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                        <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                          Propriedades
-                        </h3>
-                        {selectedCanvasElement && (
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => duplicateCanvasElement(selectedCanvasElement)}
-                              title="Duplicar Elemento"
-                              className="p-1 text-gray-500 hover:text-teal-700 hover:bg-teal-50 rounded transition"
-                            >
-                              <Copy className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => toggleCanvasLock(selectedCanvasElement)}
-                              title={selectedCanvasElement.locked ? 'Desbloquear Elemento' : 'Bloquear Elemento'}
-                              className={`p-1 rounded transition ${
-                                selectedCanvasElement.locked
-                                  ? 'text-amber-700 bg-amber-50'
-                                  : 'text-gray-500 hover:text-gray-700'
-                              }`}
-                            >
-                              {selectedCanvasElement.locked ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => removeCanvasElement(selectedCanvasElement.id)}
-                              title="Excluir Elemento"
-                              className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      {!selectedCanvasElement ? (
-                        <div className="p-6 text-center text-gray-400 space-y-2">
-                          <p className="text-xs font-semibold text-gray-500">Nenhum elemento selecionado.</p>
-                          <p className="text-[11px]">Clique em um elemento no canvas ou na lista de Camadas para editar suas propriedades.</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-4 text-xs">
-                          {/* Tipo e Ações */}
-                          <div className="flex items-center justify-between bg-gray-50 p-2 rounded-lg border border-gray-100">
-                            <div>
-                              <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">TIPO DE ELEMENTO</span>
-                              <p className="font-bold text-teal-900">{CANVAS_ELEMENT_LABELS[selectedCanvasElement.tipo]}</p>
-                            </div>
-                            <div className="flex gap-1">
-                              <button
-                                type="button"
-                                onClick={() => duplicateCanvasElement(selectedCanvasElement)}
-                                className="px-2 py-1 bg-white text-gray-700 border border-gray-200 rounded text-[10px] font-bold hover:bg-gray-50 transition"
-                              >
-                                Duplicar
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => removeCanvasElement(selectedCanvasElement.id)}
-                                className="px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded text-[10px] font-bold hover:bg-red-100 transition"
-                              >
-                                Excluir
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Ordem da Camada / Nível z-index */}
-                          <div>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">ORDEM DA CAMADA</span>
-                            <div className="grid grid-cols-2 gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => bringToFront(selectedCanvasElement.id)}
-                                className="flex items-center justify-center gap-1 py-1.5 px-2 bg-gray-50 hover:bg-teal-50 text-gray-700 hover:text-teal-800 border border-gray-200 rounded-lg text-[11px] font-semibold transition"
-                                title="Mover para a frente de todos os elementos"
-                              >
-                                <ArrowUpToLine className="h-3.5 w-3.5 text-teal-600" />
-                                <span>Para Frente</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => sendToBack(selectedCanvasElement.id)}
-                                className="flex items-center justify-center gap-1 py-1.5 px-2 bg-gray-50 hover:bg-teal-50 text-gray-700 hover:text-teal-800 border border-gray-200 rounded-lg text-[11px] font-semibold transition"
-                                title="Mover para trás de todos os elementos"
-                              >
-                                <ArrowDownToLine className="h-3.5 w-3.5 text-teal-600" />
-                                <span>Para o Fundo</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => moveLayerUp(selectedCanvasElement.id)}
-                                className="flex items-center justify-center gap-1 py-1.5 px-2 bg-gray-50 hover:bg-teal-50 text-gray-700 hover:text-teal-800 border border-gray-200 rounded-lg text-[11px] font-semibold transition"
-                                title="Avançar 1 nível para cima"
-                              >
-                                <ChevronUp className="h-3.5 w-3.5 text-teal-600" />
-                                <span>Avançar</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => moveLayerDown(selectedCanvasElement.id)}
-                                className="flex items-center justify-center gap-1 py-1.5 px-2 bg-gray-50 hover:bg-teal-50 text-gray-700 hover:text-teal-800 border border-gray-200 rounded-lg text-[11px] font-semibold transition"
-                                title="Recuar 1 nível para baixo"
-                              >
-                                <ChevronDown className="h-3.5 w-3.5 text-teal-600" />
-                                <span>Recuar</span>
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Posição e Dimensões */}
-                          <div>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">POSIÇÃO E TAMANHO</span>
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <label className="text-[10px] font-semibold text-gray-500">Largura (W)</label>
-                                <input
-                                  type="number"
-                                  value={selectedCanvasElement.largura}
-                                  onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { largura: Number(e.target.value) || 0 })}
-                                  className="w-full rounded border border-gray-200 px-2 py-1"
-                                  disabled={selectedCanvasElement.locked}
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[10px] font-semibold text-gray-500">Altura (H)</label>
-                                <input
-                                  type="number"
-                                  value={selectedCanvasElement.altura}
-                                  onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { altura: Number(e.target.value) || 0 })}
-                                  className="w-full rounded border border-gray-200 px-2 py-1"
-                                  disabled={selectedCanvasElement.locked}
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[10px] font-semibold text-gray-500">Posição X</label>
-                                <input
-                                  type="number"
-                                  value={selectedCanvasElement.x}
-                                  onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { x: Number(e.target.value) || 0 })}
-                                  className="w-full rounded border border-gray-200 px-2 py-1"
-                                  disabled={selectedCanvasElement.locked}
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[10px] font-semibold text-gray-500">Posição Y</label>
-                                <input
-                                  type="number"
-                                  value={selectedCanvasElement.y}
-                                  onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { y: Number(e.target.value) || 0 })}
-                                  className="w-full rounded border border-gray-200 px-2 py-1"
-                                  disabled={selectedCanvasElement.locked}
-                                />
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Especificidades do Tipo Texto */}
-                          {selectedCanvasElement.tipo === 'texto' && (
-                            <>
-                              <div>
-                                <div className="flex items-center justify-between mb-1">
-                                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
-                                    TAMANHO DA FONTE (PX)
-                                  </label>
-                                  <input
-                                    type="number"
-                                    min={8}
-                                    max={120}
-                                    value={selectedCanvasElement.fontSize || 14}
-                                    onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { fontSize: Number(e.target.value) || 14 })}
-                                    className="w-14 text-right rounded border border-gray-200 px-1.5 py-0.5 text-xs font-bold text-teal-900 focus:border-teal-500 focus:outline-none"
-                                    disabled={selectedCanvasElement.locked}
-                                  />
-                                </div>
-                                <input
-                                  type="range"
-                                  min={8}
-                                  max={72}
-                                  value={selectedCanvasElement.fontSize || 14}
-                                  onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { fontSize: Number(e.target.value) || 14 })}
-                                  className="w-full accent-teal-600 cursor-pointer"
-                                  disabled={selectedCanvasElement.locked}
-                                />
-                              </div>
-
-                              <div>
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">FONTE</label>
-                                <select
-                                  value={selectedCanvasElement.fonte || 'Calibri'}
-                                  onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { fonte: e.target.value })}
-                                  className="w-full rounded border border-gray-200 px-2 py-1 bg-white"
-                                  disabled={selectedCanvasElement.locked}
-                                >
-                                  {CANVAS_FONTES.map((font) => (
-                                    <option key={font} value={font}>{font}</option>
-                                  ))}
-                                </select>
-                              </div>
-
-                              <div>
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">FORMATAÇÃO E COR</label>
-                                <div className="flex flex-wrap items-center gap-1.5 rounded border border-gray-200 bg-white p-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleToggleTextInlineFormat('b')}
-                                    className={`p-1 rounded ${selectedCanvasElement.negrito ? 'bg-teal-100 text-teal-800 font-bold' : 'text-gray-600'}`}
-                                    disabled={selectedCanvasElement.locked}
-                                    title="Negrito no trecho selecionado ou bloco"
-                                  >
-                                    <Bold className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleToggleTextInlineFormat('i')}
-                                    className={`p-1 rounded ${selectedCanvasElement.italico ? 'bg-teal-100 text-teal-800' : 'text-gray-600'}`}
-                                    disabled={selectedCanvasElement.locked}
-                                    title="Itálico no trecho selecionado ou bloco"
-                                  >
-                                    <Italic className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleToggleTextInlineFormat('u')}
-                                    className={`p-1 rounded ${selectedCanvasElement.sublinhado ? 'bg-teal-100 text-teal-800' : 'text-gray-600'}`}
-                                    disabled={selectedCanvasElement.locked}
-                                    title="Sublinhado no trecho selecionado ou bloco"
-                                  >
-                                    <Underline className="h-3.5 w-3.5" />
-                                  </button>
-                                  <div className="h-4 w-px bg-gray-200 mx-0.5" />
-                                  {(['left', 'center', 'right'] as const).map((align) => (
-                                    <button
-                                      key={align}
-                                      type="button"
-                                      onClick={() => updateCanvasElement(selectedCanvasElement.id, { alinhamento: align })}
-                                      className={`p-1 rounded ${selectedCanvasElement.alinhamento === align ? 'bg-teal-100 text-teal-800' : 'text-gray-600'}`}
-                                      disabled={selectedCanvasElement.locked}
-                                    >
-                                      {align === 'left' ? <AlignLeft className="h-3.5 w-3.5" /> : align === 'center' ? <AlignCenter className="h-3.5 w-3.5" /> : <AlignRight className="h-3.5 w-3.5" />}
-                                    </button>
-                                  ))}
-                                  <div className="h-4 w-px bg-gray-200 mx-0.5" />
-                                  {/* Amostra de Cor Visível e Clicável */}
-                                  <label
-                                    className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-gray-200 bg-gray-50 hover:bg-gray-100 cursor-pointer"
-                                    title="Alterar Cor do Texto"
-                                  >
-                                    <span
-                                      className="w-3.5 h-3.5 rounded-full border border-gray-300 shadow-inner inline-block"
-                                      style={{ backgroundColor: selectedCanvasElement.cor || '#111827' }}
-                                    />
-                                    <input
-                                      type="color"
-                                      value={selectedCanvasElement.cor || '#111827'}
-                                      onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { cor: e.target.value })}
-                                      className="w-0 h-0 opacity-0 absolute"
-                                      disabled={selectedCanvasElement.locked}
-                                    />
-                                  </label>
-                                </div>
-                              </div>
-
-                              <div>
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">CONTEÚDO</label>
-                                <textarea
-                                  ref={textareaRef}
-                                  rows={4}
-                                  value={selectedCanvasElement.texto || ''}
-                                  onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { texto: e.target.value })}
-                                  className="w-full rounded border border-gray-200 p-2 text-xs focus:border-teal-500 focus:outline-none font-mono"
-                                  disabled={selectedCanvasElement.locked}
-                                />
-                              </div>
-                            </>
-                          )}
-
-                          {/* Especificidades do Tipo Linha */}
-                          {selectedCanvasElement.tipo === 'linha' && (
-                            <div className="space-y-3">
-                              <div>
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">ESPESSURA DA LINHA</label>
-                                <input
-                                  type="range"
-                                  min={1}
-                                  max={12}
-                                  value={selectedCanvasElement.altura}
-                                  onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { altura: Number(e.target.value) || 2 })}
-                                  className="w-full accent-teal-600"
-                                  disabled={selectedCanvasElement.locked}
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">COR DA LINHA</label>
-                                <input
-                                  type="color"
-                                  value={selectedCanvasElement.cor || '#111827'}
-                                  onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { cor: e.target.value })}
-                                  className="h-8 w-full rounded border border-gray-200 cursor-pointer"
-                                  disabled={selectedCanvasElement.locked}
-                                />
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Especificidades do Tipo Forma / Retângulo */}
-                          {selectedCanvasElement.tipo === 'forma' && (
-                            <div className="space-y-3 border-t border-gray-100 pt-3">
-                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">PROPRIEDADES DA FORMA</span>
-                              
-                              {/* Cor de Fundo / Preenchimento */}
-                              <div>
-                                <label className="text-[10px] font-semibold text-gray-500 block mb-1">Cor de Preenchimento</label>
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="color"
-                                    value={selectedCanvasElement.backgroundColor || '#f3f4f6'}
-                                    onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { backgroundColor: e.target.value })}
-                                    className="h-7 w-10 rounded border border-gray-200 cursor-pointer p-0.5"
-                                    disabled={selectedCanvasElement.locked}
-                                  />
-                                  <input
-                                    type="text"
-                                    value={selectedCanvasElement.backgroundColor || '#f3f4f6'}
-                                    onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { backgroundColor: e.target.value })}
-                                    className="flex-1 rounded border border-gray-200 px-2 py-1 text-xs uppercase"
-                                    disabled={selectedCanvasElement.locked}
-                                  />
-                                </div>
-                              </div>
-
-                              {/* Cor do Contorno */}
-                              <div>
-                                <label className="text-[10px] font-semibold text-gray-500 block mb-1">Cor do Contorno (Borda)</label>
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="color"
-                                    value={selectedCanvasElement.borderColor || '#374151'}
-                                    onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { borderColor: e.target.value })}
-                                    className="h-7 w-10 rounded border border-gray-200 cursor-pointer p-0.5"
-                                    disabled={selectedCanvasElement.locked}
-                                  />
-                                  <input
-                                    type="text"
-                                    value={selectedCanvasElement.borderColor || '#374151'}
-                                    onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { borderColor: e.target.value })}
-                                    className="flex-1 rounded border border-gray-200 px-2 py-1 text-xs uppercase"
-                                    disabled={selectedCanvasElement.locked}
-                                  />
-                                </div>
-                              </div>
-
-                              {/* Espessura e Estilo da Borda */}
-                              <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                  <label className="text-[10px] font-semibold text-gray-500 block mb-1">Espessura (px)</label>
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    max={30}
-                                    value={selectedCanvasElement.borderWidth ?? 1}
-                                    onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { borderWidth: Number(e.target.value) || 0 })}
-                                    className="w-full rounded border border-gray-200 px-2 py-1 text-xs"
-                                    disabled={selectedCanvasElement.locked}
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-[10px] font-semibold text-gray-500 block mb-1">Estilo do Contorno</label>
-                                  <select
-                                    value={selectedCanvasElement.borderStyle || 'solid'}
-                                    onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { borderStyle: e.target.value as any })}
-                                    className="w-full rounded border border-gray-200 px-2 py-1 text-xs bg-white"
-                                    disabled={selectedCanvasElement.locked}
-                                  >
-                                    <option value="solid">Sólido</option>
-                                    <option value="dashed">Tracejado</option>
-                                    <option value="dotted">Pontilhado</option>
-                                  </select>
-                                </div>
-                              </div>
-
-                              {/* Arredondamento dos Cantos */}
-                              <div>
-                                <div className="flex items-center justify-between mb-1">
-                                  <label className="text-[10px] font-semibold text-gray-500">Arredondamento dos Cantos (px)</label>
-                                  <span className="text-xs font-bold text-teal-800">{selectedCanvasElement.borderRadius || 0}px</span>
-                                </div>
-                                <input
-                                  type="range"
-                                  min={0}
-                                  max={100}
-                                  value={selectedCanvasElement.borderRadius || 0}
-                                  onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { borderRadius: Number(e.target.value) || 0 })}
-                                  className="w-full accent-teal-600"
-                                  disabled={selectedCanvasElement.locked}
-                                />
-                              </div>
-
-                              {/* Transparência */}
-                              <div>
-                                <div className="flex items-center justify-between mb-1">
-                                  <label className="text-[10px] font-semibold text-gray-500">Opacidade / Transparência</label>
-                                  <span className="text-xs font-bold text-teal-800">{Math.round((selectedCanvasElement.transparencia ?? 1) * 100)}%</span>
-                                </div>
-                                <input
-                                  type="range"
-                                  min={0.1}
-                                  max={1}
-                                  step={0.05}
-                                  value={selectedCanvasElement.transparencia ?? 1}
-                                  onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { transparencia: Number(e.target.value) })}
-                                  className="w-full accent-teal-600"
-                                  disabled={selectedCanvasElement.locked}
-                                />
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Especificidades do Tipo Imagem */}
-                          {selectedCanvasElement.tipo === 'imagem' && (
-                            <div className="space-y-3 border-t border-gray-100 pt-3">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                                  Origem da Imagem
-                                </span>
-                                {isUploadingImage && (
-                                  <span className="text-[11px] font-medium text-teal-600 flex items-center gap-1">
-                                    <RotateCcw className="h-3 w-3 animate-spin" />
-                                    Enviando...
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Pré-visualização da imagem atual e botão de remoção rápida */}
-                              {selectedCanvasElement.imagemUrl ? (
-                                <div className="space-y-2">
-                                  <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-2.5 flex items-center gap-3">
-                                    <div className="h-14 w-14 rounded-lg border border-gray-200 bg-white overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
-                                      <img
-                                        src={selectedCanvasElement.imagemUrl}
-                                        alt="Pré-visualização da imagem"
-                                        className="h-full w-full object-contain"
-                                        onError={(e) => {
-                                          (e.currentTarget as HTMLImageElement).style.display = 'none';
-                                        }}
-                                      />
-                                    </div>
-                                    <div className="flex-1 min-w-0 space-y-0.5">
-                                      <p
-                                        className="text-[11px] font-medium text-gray-700 truncate"
-                                        title={selectedCanvasElement.imagemUrl}
-                                      >
-                                        {selectedCanvasElement.imagemUrl.split('/').pop() || 'Imagem do elemento'}
-                                      </p>
-                                      <p className="text-[10px] text-gray-400">
-                                        Dimensões: {selectedCanvasElement.largura} × {selectedCanvasElement.altura} px
-                                      </p>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => updateCanvasElement(selectedCanvasElement.id, { imagemUrl: '' })}
-                                      disabled={selectedCanvasElement.locked || isUploadingImage}
-                                      className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
-                                      title="Remover imagem do elemento (sem excluir o elemento)"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </button>
-                                  </div>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => updateCanvasElement(selectedCanvasElement.id, { imagemUrl: '' })}
-                                    disabled={selectedCanvasElement.locked || isUploadingImage}
-                                    className="text-[11px] font-semibold text-red-600 hover:text-red-700 underline inline-flex items-center gap-1 disabled:opacity-50"
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                    <span>Remover imagem</span>
-                                  </button>
-                                </div>
-                              ) : null}
-
-                              {/* Botão de Envio de Imagem do Computador */}
-                              <div>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (isUploadingImage || selectedCanvasElement.locked) return;
-                                    setCanvasImageTargetId(selectedCanvasElement.id);
-                                    canvasImageInputRef.current?.click();
-                                  }}
-                                  disabled={selectedCanvasElement.locked || isUploadingImage}
-                                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-teal-200 bg-teal-50/70 hover:bg-teal-100/80 px-3 py-2 text-xs font-semibold text-teal-800 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  {isUploadingImage ? (
-                                    <>
-                                      <RotateCcw className="h-3.5 w-3.5 animate-spin text-teal-700" />
-                                      <span>Enviando imagem...</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Upload className="h-3.5 w-3.5 text-teal-700" />
-                                      <span>
-                                        {selectedCanvasElement.imagemUrl
-                                          ? 'Substituir imagem do computador'
-                                          : 'Enviar imagem do computador'}
-                                      </span>
-                                    </>
-                                  )}
-                                </button>
-                                <p className="text-[10px] text-gray-400 text-center mt-1">
-                                  Formatos aceitos: JPG, PNG e WebP (máx. 2 MB)
-                                </p>
-                              </div>
-
-                              {/* Campo de URL Externa (Preservado) */}
-                              <div className="space-y-1 pt-1">
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
-                                  OU INFORME UMA URL EXTERNA
-                                </label>
-                                <input
-                                  type="text"
-                                  value={selectedCanvasElement.imagemUrl || ''}
-                                  onChange={(e) => updateCanvasElement(selectedCanvasElement.id, { imagemUrl: e.target.value })}
-                                  className="w-full rounded-lg border border-gray-200 p-2 text-xs focus:border-teal-500 focus:outline-none"
-                                  placeholder="https://..."
-                                  disabled={selectedCanvasElement.locked || isUploadingImage}
-                                />
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Especificidades do Tipo Logo */}
-                          {selectedCanvasElement.tipo === 'logo' && (
-                            <div className="space-y-3 border-t border-gray-100 pt-3">
-                              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                                Logo Institucional
-                              </span>
-                              <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-2.5 flex items-center gap-3">
-                                <div className="h-14 w-14 rounded-lg border border-gray-200 bg-white overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
-                                  {configIgreja.logo || selectedCanvasElement.imagemUrl ? (
-                                    <img
-                                      src={configIgreja.logo || selectedCanvasElement.imagemUrl}
-                                      alt="Logo da Igreja"
-                                      className="h-full w-full object-contain"
-                                      style={{ opacity: selectedCanvasElement.transparencia ?? 1 }}
-                                    />
-                                  ) : (
-                                    <span className="text-2xl">🏛️</span>
-                                  )}
-                                </div>
-                                <div className="flex-1 min-w-0 space-y-0.5">
-                                  <p className="text-[11px] font-semibold text-gray-700">Logo Dinâmico da Igreja</p>
-                                  <p className="text-[10px] text-gray-400">
-                                    Origem dinâmica vinculada às configurações institucionais do ministério.
-                                  </p>
-                                  <p className="text-[10px] text-gray-400">
-                                    Dimensões: {selectedCanvasElement.largura} × {selectedCanvasElement.altura} px
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Controle de Transparência para Imagem e Logo */}
-                          {(selectedCanvasElement.tipo === 'imagem' || selectedCanvasElement.tipo === 'logo') && (
-                            <div className="space-y-2 border-t border-gray-100 pt-3">
-                              <div className="flex items-center justify-between">
-                                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                                  Transparência
-                                </label>
-                                <span className="text-xs font-bold text-teal-800 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full">
-                                  {Math.round((selectedCanvasElement.transparencia ?? 1) * 100)}%
-                                </span>
-                              </div>
-                              <div className="space-y-1">
-                                <input
-                                  type="range"
-                                  min={0}
-                                  max={1}
-                                  step={0.01}
-                                  value={selectedCanvasElement.transparencia ?? 1}
-                                  onChange={(e) =>
-                                    updateCanvasElement(selectedCanvasElement.id, {
-                                      transparencia: Number(e.target.value),
-                                    })
-                                  }
-                                  className="w-full accent-teal-600 cursor-pointer"
-                                  disabled={selectedCanvasElement.locked}
-                                  title="Ajuste a transparência: 0% = totalmente transparente; 100% = totalmente opaco"
-                                />
-                                <div className="flex justify-between text-[9px] text-gray-400 font-medium">
-                                  <span>0% (Transparente)</span>
-                                  <span>100% (Opaco)</span>
-                                </div>
-                              </div>
-                              <p className="text-[10px] text-gray-400 pt-0.5 leading-relaxed">
-                                {selectedCanvasElement.tipo === 'logo'
-                                  ? 'Ajuste a transparência para aplicar o logo institucional como marca-d’água discreta atrás dos textos.'
-                                  : 'Ajuste a transparência para usar esta imagem como marca-d’água ou elemento gráfico sutil no documento.'}
-                              </p>
-                            </div>
-                          )}
-
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* Barra Institucional de Salvamento com Status */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl border border-gray-200 bg-white/95 shadow-sm backdrop-blur">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
-                        isDirty
-                          ? 'bg-amber-50 text-amber-800 border border-amber-300'
-                          : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                      }`}
-                    >
-                      <span className={`w-2 h-2 rounded-full ${isDirty ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
-                      {isDirty ? 'Alterações não salvas' : 'Modelo atualizado'}
-                    </span>
-                    {selectedTemplate?.scope === 'system' && (
-                      <span className="text-[11px] text-gray-500 font-medium">
-                        (Modelo nativo — salvar criará sua versão personalizada)
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {copiedJson && (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
-                        JSON copiado com sucesso
-                      </span>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={handleCopyJson}
-                      title="Copiar JSON completo do modelo atualmente aberto no editor"
-                      className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 border shadow-sm ${
-                        copiedJson
-                          ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
-                          : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <Copy className="h-4 w-4 text-gray-500" />
-                      <span>{copiedJson ? 'Copiado!' : 'Copiar JSON'}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleSaveTemplate}
-                      disabled={isSaving || (!isDirty && !isDraftReady)}
-                      className={`px-6 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm ${
-                        isSaving || (!isDirty && !isDraftReady)
-                          ? 'bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-300'
-                          : 'bg-teal-600 hover:bg-teal-700 text-white shadow-md'
-                      }`}
-                    >
-                      <Save className="h-4 w-4" />
-                      <span>
-                        {isSaving
-                          ? 'Salvando Modelo...'
-                          : selectedTemplate?.scope === 'system'
-                          ? 'Salvar como Modelo Personalizado'
-                          : 'Salvar Modelo'}
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* Estado Vazio quando não há nenhum modelo cadastrado/selecionado */
-              <div className="rounded-2xl border border-dashed border-gray-300 bg-white/80 p-12 text-center space-y-3">
-                <div className="w-12 h-12 rounded-full bg-teal-50 text-teal-600 flex items-center justify-center mx-auto text-xl font-bold">
-                  🧩
-                </div>
-                <h4 className="text-base font-bold text-gray-800">Nenhum modelo selecionado</h4>
-                <p className="text-xs text-gray-500 max-w-md mx-auto">
-                  Selecione um modelo no seletor acima ou clique em <span className="font-semibold text-teal-700">+ Novo Modelo</span> para criar um novo documento personalizado.
-                </p>
-                <button
-                  type="button"
-                  onClick={handleNewTemplate}
-                  className="mt-2 inline-flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white text-xs font-bold rounded-xl hover:bg-teal-700 transition shadow-sm"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  <span>Novo Modelo</span>
-                </button>
-              </div>
-            )}
-          </Section>
-        )}
-
         {activeTab === 'emitir' && (
           <Section icon="📄" title="Emitir Documento">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -4531,6 +2286,187 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
           </Section>
         )}
 
+        {activeTab === 'pedidos' && (
+          <Section icon="📬" title="Pedidos de Cartas Recebidos">
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-2 border-b border-gray-100">
+                <div>
+                  <h3 className="text-base font-bold text-gray-800">Solicitações das Congregações</h3>
+                  <p className="text-xs text-gray-500">
+                    Analise e aprove os pedidos de cartas ministeriais encaminhados pelas secretarias locais.
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-200 text-xs font-semibold">
+                  {(['pendente', 'todos', 'autorizado', 'rejeitado'] as const).map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => setPedidosFiltroStatus(st)}
+                      className={`px-3 py-1.5 rounded-lg transition capitalize ${
+                        pedidosFiltroStatus === st
+                          ? 'bg-white text-teal-800 shadow-sm border border-gray-200 font-bold'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      {st === 'todos'
+                        ? 'Todos'
+                        : st === 'pendente'
+                        ? `Pendentes (${pedidosPendentesCount})`
+                        : st === 'autorizado'
+                        ? 'Autorizados'
+                        : 'Rejeitados'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {loadingPedidos ? (
+                <div className="py-12 text-center text-gray-400 text-sm">Carregando solicitações...</div>
+              ) : (
+                (() => {
+                  const filtered = pedidosRecebidos.filter((p) => {
+                    if (pedidosFiltroStatus === 'todos') return true;
+                    return p.status === pedidosFiltroStatus;
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="py-16 text-center text-gray-400">
+                        <FileCheck size={40} className="mx-auto mb-2 opacity-40" />
+                        <p className="text-sm">Nenhum pedido encontrado com o filtro selecionado.</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="grid gap-3">
+                      {filtered.map((pedido) => {
+                        const exigePresidencia = CartasService.exigeAutorizacaoPresidencial(pedido.tipo_carta);
+                        return (
+                          <div
+                            key={pedido.id}
+                            className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4"
+                          >
+                            <div className="space-y-1.5 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-gray-800 text-base">{pedido.membro_nome}</span>
+                                {pedido.membro_cargo && (
+                                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
+                                    {pedido.membro_cargo}
+                                  </span>
+                                )}
+                                <span
+                                  className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${
+                                    pedido.status === 'pendente'
+                                      ? 'bg-amber-50 text-amber-700 border-amber-300'
+                                      : pedido.status === 'autorizado'
+                                      ? 'bg-green-50 text-green-700 border-green-300'
+                                      : 'bg-red-50 text-red-700 border-red-300'
+                                  }`}
+                                >
+                                  {pedido.status === 'pendente'
+                                    ? 'Pendente'
+                                    : pedido.status === 'autorizado'
+                                    ? 'Autorizado'
+                                    : 'Rejeitado'}
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+                                <span>
+                                  Tipo:{' '}
+                                  <strong>
+                                    {pedido.tipo_carta === 'mudanca'
+                                      ? 'Carta de Mudança'
+                                      : pedido.tipo_carta === 'desligamento'
+                                      ? 'Carta de Desligamento'
+                                      : pedido.tipo_carta === 'transito'
+                                      ? 'Carta de Trânsito'
+                                      : 'Carta de Recomendação'}
+                                  </strong>
+                                </span>
+                                {pedido.destino && <span>Destino: <strong>{pedido.destino}</strong></span>}
+                                <span>Data: <strong>{new Date(pedido.created_at).toLocaleDateString('pt-BR')}</strong></span>
+                                {pedido.solicitante_nome && <span>Solicitado por: <strong>{pedido.solicitante_nome}</strong></span>}
+                              </div>
+                              {pedido.observacoes && (
+                                <p className="text-xs text-gray-500 italic bg-gray-50 rounded-lg p-2 border border-gray-100">
+                                  "{pedido.observacoes}"
+                                </p>
+                              )}
+                              {pedido.status === 'rejeitado' && pedido.motivo_rejeicao && (
+                                <p className="text-xs text-red-600 bg-red-50 rounded-lg p-2 border border-red-100">
+                                  <strong>Motivo da rejeição:</strong> {pedido.motivo_rejeicao}
+                                </p>
+                              )}
+                              {pedido.status === 'autorizado' && (
+                                <p className="text-xs text-green-700">
+                                  Autorizado por {pedido.autorizador_nome || 'Secretaria'} em{' '}
+                                  {pedido.data_autorizacao
+                                    ? new Date(pedido.data_autorizacao).toLocaleDateString('pt-BR')
+                                    : '—'}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              {pedido.status === 'pendente' && (
+                                exigePresidencia ? (
+                                  <div className="flex flex-col items-end gap-1">
+                                    <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 font-medium">
+                                      <Clock size={12} /> Exige deliberação da Presidência
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => router.push('/presidencia/decisoes')}
+                                      className="text-xs text-blue-600 hover:text-blue-800 underline font-medium"
+                                    >
+                                      Abrir Central de Decisões →
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => { setPedidoParaAvaliar(pedido); setMotivoRejeicaoPedido(''); }}
+                                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-xs font-semibold transition"
+                                    >
+                                      <XCircle size={13} /> Rejeitar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAutorizarPedido(pedido)}
+                                      disabled={avaliandoPedido}
+                                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition disabled:opacity-50"
+                                    >
+                                      <CheckCircle size={13} /> Autorizar
+                                    </button>
+                                  </div>
+                                )
+                              )}
+                              {pedido.status === 'autorizado' && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (pedido.member_id) setSelectedMemberId(pedido.member_id);
+                                    setActiveTab('emitir');
+                                  }}
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-semibold transition"
+                                >
+                                  <FileCheck size={13} /> Emitir Carta Oficial
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()
+              )}
+            </div>
+          </Section>
+        )}
+
         {activeTab === 'historico' && (
           <Section icon="🗂️" title="Histórico de Documentos Emitidos">
             <div className="space-y-4">
@@ -4689,101 +2625,7 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
         </div>
       </div>
 
-      {/* Modal Compacto de Criar Novo Modelo */}
-      {showNewModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4 border border-gray-100 animate-in fade-in zoom-in duration-150">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
-                <span>🧩</span> Criar Novo Modelo de Documento
-              </h3>
-              <button
-                type="button"
-                onClick={handleCancelNewTemplate}
-                className="text-gray-400 hover:text-gray-600 font-bold text-sm px-2 py-1 rounded"
-              >
-                ✕
-              </button>
-            </div>
 
-            {/* Seletor de Categoria do Novo Modelo */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                Categoria do Documento
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setDraftCategoria('carta')}
-                  className={`p-3 rounded-xl border text-left transition flex items-start gap-2.5 ${
-                    draftCategoria === 'carta'
-                      ? 'border-blue-500 bg-blue-50/70 text-blue-900 ring-2 ring-blue-500/20'
-                      : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-700'
-                  }`}
-                >
-                  <span className="text-lg">📜</span>
-                  <div>
-                    <p className="text-xs font-bold">Carta</p>
-                    <p className="text-[11px] text-gray-500">Recomendação, mudança, etc.</p>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDraftCategoria('declaracao')}
-                  className={`p-3 rounded-xl border text-left transition flex items-start gap-2.5 ${
-                    draftCategoria === 'declaracao'
-                      ? 'border-emerald-500 bg-emerald-50/70 text-emerald-900 ring-2 ring-emerald-500/20'
-                      : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-700'
-                  }`}
-                >
-                  <span className="text-lg">📄</span>
-                  <div>
-                    <p className="text-xs font-bold">Declaração</p>
-                    <p className="text-[11px] text-gray-500">Membro ativo, batismo, cargo</p>
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Nome do Modelo
-              </label>
-              <input
-                type="text"
-                autoFocus
-                value={draftTitle}
-                onChange={(e) => setDraftTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleCreateDraft();
-                  }
-                }}
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-                placeholder={draftCategoria === 'declaracao' ? 'Ex: Declaração de Membro Ativo' : 'Ex: Carta de Mudança de Membro'}
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
-              <button
-                type="button"
-                onClick={handleCancelNewTemplate}
-                className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleCreateDraft}
-                className="rounded-lg bg-teal-600 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-700 shadow-sm transition"
-              >
-                Criar e Abrir Editor
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {/* Modal de Confirmação Personalizado */}
       {confirmModal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
