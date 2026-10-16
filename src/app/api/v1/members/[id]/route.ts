@@ -205,7 +205,25 @@ export async function PUT(
     }
 
     const isExistingInactive = existing.status === 'inactive' || existing.status === 'inativo'
+    const isExistingActive = existing.status === 'active' || existing.status === 'ativo'
     const isReativacao = isExistingInactive && dbNovoStatus === 'active'
+    const isInativacao = isExistingActive && dbNovoStatus === 'inactive'
+
+    // Impedir reativação indevida se já estiver ativo
+    if ((body.acao === 'reativar' || body.motivo_reativacao) && isExistingActive && dbNovoStatus === 'active') {
+      return NextResponse.json(
+        { error: 'Membro já se encontra ativo no cadastro.', code: 'ALREADY_ACTIVE' },
+        { status: 400 }
+      )
+    }
+
+    // Impedir inativação indevida se já estiver inativo
+    if ((body.acao === 'inativar' || body.motivo_inativacao) && isExistingInactive && dbNovoStatus === 'inactive') {
+      return NextResponse.json(
+        { error: 'Membro já se encontra inativo no cadastro.', code: 'ALREADY_INACTIVE' },
+        { status: 400 }
+      )
+    }
 
     if (isReativacao) {
       const historicoAtual = Array.isArray(existingCustomFields.historico_processos)
@@ -216,9 +234,10 @@ export async function PUT(
 
       const nowIso = new Date().toISOString()
       const reativacaoEventId = `reativ_${Date.now()}_${Math.random().toString(16).slice(2)}`
+      const motivoReativacao = (body.motivo_reativacao || body.motivo || '').trim() || 'Reativação cadastral no rol de membros'
       const eventoReativacao = {
         id: reativacaoEventId,
-        processo_id: reativacaoEventId,
+        processo_id: body.processo_id || reativacaoEventId,
         ministry_id: ministryId,
         member_id: id,
         tipo_evento: 'reativacao',
@@ -227,7 +246,7 @@ export async function PUT(
         data_hora: nowIso,
         status_anterior: existing.status,
         status_resultante: 'active',
-        motivo: body.motivo_reativacao || body.motivo || 'Reativação cadastral no rol de membros',
+        motivo: motivoReativacao,
         observacoes: body.observacoes || null,
         responsavel: 'Administração',
         usuario_id: context.userId || null,
@@ -238,8 +257,49 @@ export async function PUT(
       const nextHistorico = [...historicoAtual, eventoReativacao]
       mergedCustomFields.historico_processos = nextHistorico
       mergedCustomFields.historicoProcessos = nextHistorico
+    } else if (isInativacao) {
+      const historicoAtual = Array.isArray(existingCustomFields.historico_processos)
+        ? [...existingCustomFields.historico_processos]
+        : Array.isArray(existingCustomFields.historicoProcessos)
+        ? [...existingCustomFields.historicoProcessos]
+        : []
+
+      // Verificar idempotência: se o evento de carta/processo já foi registrado, não duplicar
+      const jaRegistrado = historicoAtual.some((h) => {
+        if (body.processo_id && h.processo_id === body.processo_id) return true
+        if (body.documento_id && h.documento_id === body.documento_id) return true
+        return false
+      })
+
+      if (!jaRegistrado) {
+        const nowIso = new Date().toISOString()
+        const inativacaoEventId = `inativ_${Date.now()}_${Math.random().toString(16).slice(2)}`
+        const motivoInativacao = (body.motivo_inativacao || body.motivo || '').trim() || 'Inativação administrativa de membro'
+        const eventoInativacao = {
+          id: inativacaoEventId,
+          processo_id: body.processo_id || inativacaoEventId,
+          ministry_id: ministryId,
+          member_id: id,
+          tipo_evento: 'inativacao',
+          tipo_documento: 'Inativação Cadastral',
+          data: nowIso.slice(0, 10),
+          data_hora: nowIso,
+          status_anterior: existing.status,
+          status_resultante: 'inactive',
+          motivo: motivoInativacao,
+          observacoes: body.observacoes || null,
+          responsavel: 'Administração',
+          usuario_id: context.userId || null,
+          descricao: `Membro inativado no cadastro: ${motivoInativacao}. Documentos e histórico preservados.`,
+          criado_em: nowIso,
+        }
+
+        const nextHistorico = [...historicoAtual, eventoInativacao]
+        mergedCustomFields.historico_processos = nextHistorico
+        mergedCustomFields.historicoProcessos = nextHistorico
+      }
     } else {
-      // Se não for reativação, garante preservação do histórico existente caso o payload não o tenha enviado
+      // Se não for transição de status, garante preservação do histórico existente caso o payload não o tenha enviado
       if (!incomingCustomFields.historico_processos && existingCustomFields.historico_processos) {
         mergedCustomFields.historico_processos = existingCustomFields.historico_processos
       }
@@ -328,14 +388,14 @@ export async function DELETE(
   try {
     const context = await resolveTenantAuth(request)
     if (context.nivel === 'auxiliar_secretaria') {
-      return NextResponse.json({ error: 'Auxiliar de Secretaria não possui permissão para excluir membros.' }, { status: 403 })
+      return NextResponse.json({ error: 'Auxiliar de Secretaria não possui permissão para inativar membros.' }, { status: 403 })
     }
     const { supabase, ministryId } = context
     const congregacaoIds = await getAccessibleCongregacaoIds(context)
 
     let existingQuery = supabase
       .from('members')
-      .select('id, name, matricula, cargo_ministerial, tipo_cadastro, status, congregacao_id')
+      .select('id, name, matricula, cargo_ministerial, tipo_cadastro, status, congregacao_id, custom_fields')
       .eq('id', id)
       .eq('ministry_id', ministryId)
 
@@ -346,40 +406,98 @@ export async function DELETE(
       return NextResponse.json({ error: 'Membro nao encontrado' }, { status: 404 })
     }
 
-    let deleteQuery = supabase
+    if (existing.status === 'inactive' || existing.status === 'inativo') {
+      return NextResponse.json(
+        { error: 'Membro já se encontra inativo no cadastro.', code: 'ALREADY_INACTIVE' },
+        { status: 400 }
+      )
+    }
+
+    let body: any = {}
+    try {
+      body = await request.json()
+    } catch {
+      // Body pode ser vazio em chamadas DELETE tradicionais
+    }
+
+    const motivoInativacao = (body?.motivo_inativacao || body?.motivo || '').trim() || 'Inativação administrativa de membro'
+
+    const existingCf = (existing.custom_fields && typeof existing.custom_fields === 'object')
+      ? { ...existing.custom_fields }
+      : {}
+
+    const historicoAtual = Array.isArray(existingCf.historico_processos)
+      ? [...existingCf.historico_processos]
+      : Array.isArray(existingCf.historicoProcessos)
+      ? [...existingCf.historicoProcessos]
+      : []
+
+    const nowIso = new Date().toISOString()
+    const inativacaoEventId = `inativ_${Date.now()}_${Math.random().toString(16).slice(2)}`
+    const eventoInativacao = {
+      id: inativacaoEventId,
+      processo_id: body.processo_id || inativacaoEventId,
+      ministry_id: ministryId,
+      member_id: id,
+      tipo_evento: 'inativacao',
+      tipo_documento: 'Inativação Cadastral',
+      data: nowIso.slice(0, 10),
+      data_hora: nowIso,
+      status_anterior: existing.status,
+      status_resultante: 'inactive',
+      motivo: motivoInativacao,
+      observacoes: body.observacoes || null,
+      responsavel: 'Administração',
+      usuario_id: context.userId || null,
+      descricao: `Membro inativado no cadastro: ${motivoInativacao}. Documentos e histórico preservados.`,
+      criado_em: nowIso,
+    }
+
+    const nextHistorico = [...historicoAtual, eventoInativacao]
+    const updatedCf = {
+      ...existingCf,
+      historico_processos: nextHistorico,
+      historicoProcessos: nextHistorico,
+    }
+
+    let inactivateQuery = supabase
       .from('members')
-      .delete()
+      .update({
+        status: 'inactive',
+        custom_fields: updatedCf,
+        updated_at: nowIso,
+      })
       .eq('id', id)
       .eq('ministry_id', ministryId)
 
-    deleteQuery = applyMemberCongregacaoScope(deleteQuery, congregacaoIds)
-    const { error } = await deleteQuery
+    inactivateQuery = applyMemberCongregacaoScope(inactivateQuery, congregacaoIds)
+    const { error: updateError } = await inactivateQuery
 
-    if (error) {
+    if (updateError) {
       await logServerAudit(context.admin, {
         ministryId,
         userId: context.userId,
-        acao: 'deletar',
+        acao: 'atualizar_status',
         modulo: 'membros',
         area: 'cadastro',
         tabelaAfetada: 'members',
         registroId: id,
-        descricao: `Falha ao excluir membro: ${existing.name || id}`,
+        descricao: `Falha ao inativar membro: ${existing.name || id}`,
         status: 'erro',
-        mensagemErro: error.message,
+        mensagemErro: updateError.message,
       })
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return NextResponse.json({ error: updateError.message }, { status: 400 })
     }
 
     await logServerAudit(context.admin, {
       ministryId,
       userId: context.userId,
-      acao: 'deletar',
+      acao: 'atualizar_status',
       modulo: 'membros',
       area: 'cadastro',
       tabelaAfetada: 'members',
       registroId: id,
-      descricao: `Membro excluído: ${existing.name || 'Sem nome'} (Matrícula: ${existing.matricula || '-'})`,
+      descricao: `Membro inativado: ${existing.name || 'Sem nome'} (Matrícula: ${existing.matricula || '-'}). Motivo: ${motivoInativacao}`,
       dadosAnteriores: {
         nome: existing.name,
         matricula: existing.matricula,
@@ -387,10 +505,20 @@ export async function DELETE(
         tipo_cadastro: existing.tipo_cadastro,
         status: existing.status,
       },
+      dadosNovos: {
+        status: 'inactive',
+        motivo: motivoInativacao,
+      },
       status: 'sucesso',
     })
 
-    return NextResponse.json({ success: true, deleted_id: id })
+    return NextResponse.json({
+      success: true,
+      inactivated_id: id,
+      deleted_id: id, // Mantido para compatibilidade com clientes legados
+      status: 'inactive',
+      message: `Membro "${existing.name}" foi inativado com sucesso. Histórico e vínculos preservados.`,
+    })
   } catch (error) {
     const authResponse = authTenantErrorResponse(error)
     if (authResponse) return authResponse

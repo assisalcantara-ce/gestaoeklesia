@@ -62,6 +62,11 @@ import {
 import { useRouter } from 'next/navigation';
 import { CartasService, type VerificacaoAutorizacaoCarta } from '@/services/cartas-service';
 import { isSecretariaLocal } from '@/lib/access-control';
+import {
+  buildCartaTemplateExportJson,
+  formatCartaTemplateJson,
+  copyTextToClipboard,
+} from '@/lib/cartas-export-json';
 
 const CANVAS_A4 = {
   width: 794,
@@ -402,6 +407,18 @@ export default function CartasPage() {
 
   const [previewScale, setPreviewScale] = useState(1);
   const previewContainerRef = useRef<HTMLDivElement>(null);
+
+  // Estado e ref para botão Copiar JSON
+  const [copiedJson, setCopiedJson] = useState(false);
+  const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const updateEditorScale = () => {
@@ -1505,6 +1522,41 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
       canvas: newCanvas,
     });
     setShowNewModal(false);
+  };
+
+  const handleCopyJson = async () => {
+    try {
+      const inferredCategoria: TemplateCategoria =
+        selectedTemplate?.categoria ||
+        draftCategoria ||
+        (['membro_ativo', 'batismo', 'cargo', 'apresentacao_crianca'].includes(draftTipo) ? 'declaracao' : 'carta');
+
+      const exportData = buildCartaTemplateExportJson({
+        title: draftTitle || selectedTemplate?.title,
+        templateKey: draftKey || selectedTemplate?.template_key,
+        tipo: draftTipo || selectedTemplate?.tipo,
+        categoria: inferredCategoria,
+        canvasContent,
+      });
+
+      const formattedJson = formatCartaTemplateJson(exportData);
+      const success = await copyTextToClipboard(formattedJson);
+
+      if (success) {
+        setCopiedJson(true);
+        if (copyTimeoutRef.current) {
+          clearTimeout(copyTimeoutRef.current);
+        }
+        copyTimeoutRef.current = setTimeout(() => {
+          setCopiedJson(false);
+        }, 3000);
+      } else {
+        // Fallback interativo caso APIs de clipboard estejam bloqueadas no navegador
+        prompt('Copie o JSON abaixo:', formattedJson);
+      }
+    } catch (err) {
+      console.error('Erro ao copiar JSON do modelo:', err);
+    }
   };
 
   const handleSaveTemplate = async () => {
@@ -4002,6 +4054,27 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {copiedJson && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
+                        JSON copiado com sucesso
+                      </span>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleCopyJson}
+                      title="Copiar JSON completo do modelo atualmente aberto no editor"
+                      className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 border shadow-sm ${
+                        copiedJson
+                          ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                          : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <Copy className="h-4 w-4 text-gray-500" />
+                      <span>{copiedJson ? 'Copiado!' : 'Copiar JSON'}</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={handleSaveTemplate}

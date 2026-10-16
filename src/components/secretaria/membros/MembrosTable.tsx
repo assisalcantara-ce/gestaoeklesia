@@ -30,6 +30,8 @@ export interface MembrosTableProps {
   abrirEdicao: (membro: any) => void;
   abrirDocumentosMembro: (membro: any) => Promise<void>;
   abrirConfirmacaoDeletar: (membro: any) => void;
+  abrirConfirmacaoInativar?: (membro: any) => void;
+  abrirConfirmacaoReativar?: (membro: any) => void;
   ensureTemplatesSnapshot: () => Promise<any>;
   hasActiveTemplate: (tipo: string, templates: any) => boolean;
   getMensagemSemTemplate: (tipo: string) => string;
@@ -59,6 +61,8 @@ export default function MembrosTable({
   abrirEdicao,
   abrirDocumentosMembro,
   abrirConfirmacaoDeletar,
+  abrirConfirmacaoInativar,
+  abrirConfirmacaoReativar,
   ensureTemplatesSnapshot,
   hasActiveTemplate,
   getMensagemSemTemplate,
@@ -518,20 +522,41 @@ export default function MembrosTable({
                                 </button>
                               )}
 
-                              {/* Excluir (Dentro do menu) */}
+                              {/* Inativar / Reativar Membro */}
                               {!isSupervisor && !isAuxiliar && (
-                                <button
-                                  onClick={() => {
-                                    setActiveMenuId(null);
-                                    abrirConfirmacaoDeletar(membro);
-                                  }}
-                                  className="w-full px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 hover:text-rose-700 flex items-center gap-2 cursor-pointer border-t border-slate-100"
-                                >
-                                  <svg className="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                  </svg>
-                                  <span>Excluir Membro</span>
-                                </button>
+                                (membro.status === 'ativo' || membro.status === 'active') ? (
+                                  <button
+                                    onClick={() => {
+                                      setActiveMenuId(null);
+                                      if (abrirConfirmacaoInativar) {
+                                        abrirConfirmacaoInativar(membro);
+                                      } else {
+                                        abrirConfirmacaoDeletar(membro);
+                                      }
+                                    }}
+                                    className="w-full px-3.5 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50 hover:text-amber-800 flex items-center gap-2 cursor-pointer border-t border-slate-100 transition"
+                                    title="Inativar membro (preserva histórico e vínculos)"
+                                  >
+                                    <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                    </svg>
+                                    <span>Inativar Membro</span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      setActiveMenuId(null);
+                                      abrirConfirmacaoReativar?.(membro);
+                                    }}
+                                    className="w-full px-3.5 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 flex items-center gap-2 cursor-pointer border-t border-slate-100 transition"
+                                    title="Reativar membro no rol de membros ativos"
+                                  >
+                                    <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <span>Reativar Membro</span>
+                                  </button>
+                                )
                               )}
                             </div>
                           </>

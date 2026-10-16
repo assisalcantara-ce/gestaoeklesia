@@ -299,7 +299,7 @@ export function useMembros() {
   const isSupervisor = userCtx.nivel === 'supervisor';
   const isAuxiliar = userCtx.nivel === 'auxiliar_secretaria';
 
-  const { fetchMembers, createMember, updateMember, deleteMember, error: membersError } = useMembers();
+  const { fetchMembers, createMember, updateMember, inactivateMember, reactivateMember, error: membersError } = useMembers();
 
   // ── Estado: membros ──────────────────────────────────────────────────────────
   const [membros, setMembros] = useState<Membro[]>([]);
@@ -345,7 +345,11 @@ export function useMembros() {
 
   // ── Estado: modais ───────────────────────────────────────────────────────────
   const [membroEditando, setMembroEditando] = useState<Membro | null>(null);
-  const [membroDeletando, setMembroDeletando] = useState<Membro | null>(null);
+  const [membroInativando, setMembroInativando] = useState<Membro | null>(null);
+  const [membroReativando, setMembroReativando] = useState<Membro | null>(null);
+  // Alias de retrocompatibilidade
+  const membroDeletando = membroInativando;
+  const setMembroDeletando = setMembroInativando;
   const [membroImprimindo, setMembroImprimindo] = useState<Membro | null>(null);
   const [membroImprimindoCartao, setMembroImprimindoCartao] = useState<Membro | null>(null);
   const [ultimoCadastro, setUltimoCadastro] = useState<Membro | null>(null);
@@ -997,28 +1001,75 @@ export function useMembros() {
     }
   };
 
-  const deletarMembro = async () => {
-    if (!membroDeletando) return;
+  const inativarMembro = async (motivo?: string) => {
+    const alvo = membroInativando || membroDeletando;
+    if (!alvo) return;
     try {
-      await deleteMember(membroDeletando.id);
+      await inactivateMember(alvo.id, motivo);
       await carregarMembrosPagina();
       void carregarOverviewEContagem();
       setNotification({
         isOpen: true,
-        title: 'Sucesso',
-        message: `Membro "${membroDeletando.nome}" foi deletado com sucesso!`,
+        title: 'Membro Inativado',
+        message: `O membro "${alvo.nome}" foi inativado com sucesso. Todos os vínculos e histórico foram preservados integralmente.`,
         type: 'success',
       });
-      setMembroDeletando(null);
+      setMembroInativando(null);
     } catch (e) {
-      console.error('Erro ao deletar membro (API):', e);
+      console.error('Erro ao inativar membro (API):', e);
       setNotification({
         isOpen: true,
-        title: 'Erro',
-        message: e instanceof Error ? e.message : 'Erro ao deletar membro',
+        title: 'Erro ao Inativar',
+        message: e instanceof Error ? e.message : 'Erro ao inativar membro',
         type: 'error',
       });
     }
+  };
+
+  const reativarMembro = async (motivo?: string) => {
+    if (!membroReativando) return;
+    const alvo = membroReativando;
+    try {
+      await reactivateMember(alvo.id, motivo);
+      await carregarMembrosPagina();
+      void carregarOverviewEContagem();
+      setNotification({
+        isOpen: true,
+        title: 'Membro Reativado',
+        message: `O membro "${alvo.nome}" foi reativado com sucesso no rol de membros ativos!`,
+        type: 'success',
+      });
+      setMembroReativando(null);
+    } catch (e) {
+      console.error('Erro ao reativar membro (API):', e);
+      setNotification({
+        isOpen: true,
+        title: 'Erro ao Reativar',
+        message: e instanceof Error ? e.message : 'Erro ao reativar membro',
+        type: 'error',
+      });
+    }
+  };
+
+  const abrirConfirmacaoInativar = (membro: Membro) => {
+    setMembroInativando(membro);
+  };
+
+  const cancelarInativar = () => {
+    setMembroInativando(null);
+  };
+
+  const abrirConfirmacaoReativar = (membro: Membro) => {
+    setMembroReativando(membro);
+  };
+
+  const cancelarReativar = () => {
+    setMembroReativando(null);
+  };
+
+  // Mantido para compatibilidade com outros componentes
+  const deletarMembro = async () => {
+    await inativarMembro('Inativação cadastral');
   };
 
   // ─── Documentos / carteirinha ─────────────────────────────────────────────────
@@ -1429,6 +1480,8 @@ export function useMembros() {
 
     // Estado: modais
     membroEditando,
+    membroInativando,
+    membroReativando,
     membroDeletando,
     membroImprimindo,
     setMembroImprimindo,
@@ -1497,6 +1550,12 @@ export function useMembros() {
 
     // Ações CRUD
     salvarMembro,
+    inativarMembro,
+    reativarMembro,
+    abrirConfirmacaoInativar,
+    cancelarInativar,
+    abrirConfirmacaoReativar,
+    cancelarReativar,
     deletarMembro,
     abrirNovoCadastro,
     abrirEdicao,

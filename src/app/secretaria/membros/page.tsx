@@ -3,6 +3,7 @@ import NotificationModal from '@/components/NotificationModal';
 import MembrosOverview from '@/components/MembrosOverview';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import ConfirmDeleteModal from '@/components/secretaria/membros/ConfirmDeleteModal';
+import ConfirmReativarModal from '@/components/secretaria/membros/ConfirmReativarModal';
 import MembroCarteirinhaModal from '@/components/secretaria/membros/MembroCarteirinhaModal';
 import MembrosToolbar from '@/components/secretaria/membros/MembrosToolbar';
 import MembrosTable from '@/components/secretaria/membros/MembrosTable';
@@ -67,6 +68,8 @@ export default function MembrosPage() {
 
     // Estado: modais
     membroEditando,
+    membroInativando,
+    membroReativando,
     membroDeletando,
     membroImprimindo,
     setMembroImprimindo,
@@ -129,12 +132,16 @@ export default function MembrosPage() {
 
     // Ações CRUD
     salvarMembro,
-    deletarMembro,
+    inativarMembro,
+    reativarMembro,
+    abrirConfirmacaoInativar,
+    cancelarInativar,
+    abrirConfirmacaoReativar,
+    cancelarReativar,
     abrirNovoCadastro,
     abrirEdicao,
     abrirDocumentosMembro,
     abrirConfirmacaoDeletar,
-    cancelarDeletar,
     fecharFormulario,
 
     // Ações PDF
@@ -171,12 +178,20 @@ export default function MembrosPage() {
         showButton={notification.showButton !== undefined ? notification.showButton : true}
       />
 
-      {/* Modal de Confirmação de Deleção */}
+      {/* Modal de Confirmação de Inativação (substitui exclusão física) */}
       <ConfirmDeleteModal
-        isOpen={!!membroDeletando}
-        membro={membroDeletando}
-        onConfirm={deletarMembro}
-        onCancel={cancelarDeletar}
+        isOpen={!!(membroInativando || membroDeletando)}
+        membro={membroInativando || membroDeletando}
+        onConfirm={inativarMembro}
+        onCancel={cancelarInativar}
+      />
+
+      {/* Modal de Confirmação de Reativação */}
+      <ConfirmReativarModal
+        isOpen={!!membroReativando}
+        membro={membroReativando}
+        onConfirm={reativarMembro}
+        onCancel={cancelarReativar}
       />
 
       {/* Modal de Crop de Foto */}
@@ -425,6 +440,8 @@ export default function MembrosPage() {
                 abrirHistoricoMembro={setMembroHistorico}
                 abrirDocumentosMembro={abrirDocumentosMembro}
                 abrirConfirmacaoDeletar={abrirConfirmacaoDeletar}
+                abrirConfirmacaoInativar={abrirConfirmacaoInativar}
+                abrirConfirmacaoReativar={abrirConfirmacaoReativar}
                 ensureTemplatesSnapshot={ensureTemplatesSnapshot}
                 hasActiveTemplate={hasActiveTemplate}
                 getMensagemSemTemplate={getMensagemSemTemplate}

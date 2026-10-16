@@ -224,9 +224,9 @@ export function useMembers() {
     []
   )
 
-  // Deletar membro
-  const deleteMember = useCallback(
-    async (id: string) => {
+  // Inativar membro (substitui exclusão física)
+  const inactivateMember = useCallback(
+    async (id: string, motivo?: string) => {
       try {
         setLoading(true)
         setError(null)
@@ -236,16 +236,20 @@ export function useMembers() {
         const response = await fetch(`/api/v1/members/${id}`, {
           method: 'DELETE',
           headers: {
+            'Content-Type': 'application/json',
             Authorization: `Bearer ${accessToken}`,
           },
+          body: JSON.stringify({ motivo: motivo || 'Inativação administrativa de membro' }),
         })
 
         if (!response.ok) {
           const errorData = await response.json()
-          throw new Error(errorData.error || 'Erro ao deletar membro')
+          throw new Error(errorData.error || 'Erro ao inativar membro')
         }
 
-        setMembers((prev) => prev.filter((member) => member.id !== id))
+        setMembers((prev) =>
+          prev.map((member) => (member.id === id ? { ...member, status: 'inactive' } : member))
+        )
 
         return true
       } catch (err) {
@@ -257,6 +261,58 @@ export function useMembers() {
       }
     },
     []
+  )
+
+  // Reativar membro
+  const reactivateMember = useCallback(
+    async (id: string, motivo?: string) => {
+      try {
+        setLoading(true)
+        setError(null)
+
+        const accessToken = await getAccessTokenOrThrow()
+
+        const response = await fetch(`/api/v1/members/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            status: 'active',
+            acao: 'reativar',
+            motivo_reativacao: motivo || 'Reativação no rol de membros ativos',
+          }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Erro ao reativar membro')
+        }
+
+        const updated = await response.json()
+        setMembers((prev) =>
+          prev.map((member) => (member.id === id ? { ...member, status: 'active' } : member))
+        )
+
+        return updated
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Erro desconhecido'
+        setError(message)
+        throw err
+      } finally {
+        setLoading(false)
+      }
+    },
+    []
+  )
+
+  // Deletar membro (compatibilidade legada: executa inativação segura)
+  const deleteMember = useCallback(
+    async (id: string, motivo?: string) => {
+      return inactivateMember(id, motivo)
+    },
+    [inactivateMember]
   )
 
   // Limpar erro
@@ -273,6 +329,8 @@ export function useMembers() {
     getMember,
     createMember,
     updateMember,
+    inactivateMember,
+    reactivateMember,
     deleteMember,
   }
 }
