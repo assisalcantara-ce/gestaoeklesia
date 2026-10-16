@@ -18,8 +18,10 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true, data: data || [] });
-  } catch (error) {
-    return authTenantErrorResponse(error);
+  } catch (error: any) {
+    const authResponse = authTenantErrorResponse(error);
+    if (authResponse) return authResponse;
+    return NextResponse.json({ error: error?.message || 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -93,8 +95,10 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true, data: result.data });
-  } catch (error) {
-    return authTenantErrorResponse(error);
+  } catch (error: any) {
+    const authResponse = authTenantErrorResponse(error);
+    if (authResponse) return authResponse;
+    return NextResponse.json({ error: error?.message || 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -132,7 +136,9 @@ export async function DELETE(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true, message: 'Modelo excluído/restaurado com sucesso' });
-  } catch (error) {
-    return authTenantErrorResponse(error);
+  } catch (error: any) {
+    const authResponse = authTenantErrorResponse(error);
+    if (authResponse) return authResponse;
+    return NextResponse.json({ error: error?.message || 'Internal server error' }, { status: 500 });
   }
 }
