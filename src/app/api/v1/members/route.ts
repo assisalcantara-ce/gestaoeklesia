@@ -13,6 +13,7 @@ import { normalizePayloadToUppercase } from '@/lib/uppercase-normalizer'
 import { authTenantErrorResponse } from '@/lib/api-errors'
 import { MemberMatriculaService } from '@/lib/services/member-matricula-service'
 import { logServerAudit } from '@/lib/audit-logger'
+import { normalizeMemberStatus, type MemberDbStatus } from '@/lib/member-status'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
@@ -114,12 +115,7 @@ export async function GET(request: NextRequest) {
 
     // Aplicar filtros
     if (statusParam && statusParam.toUpperCase() !== 'TODOS') {
-      const normalizedStatus =
-        statusParam.toLowerCase() === 'ativo' || statusParam.toLowerCase() === 'active'
-          ? 'active'
-          : statusParam.toLowerCase() === 'inativo' || statusParam.toLowerCase() === 'inactive'
-            ? 'inactive'
-            : statusParam.toLowerCase()
+      const normalizedStatus = normalizeMemberStatus(statusParam, false) || statusParam.toLowerCase()
       query = query.eq('status', normalizedStatus)
     }
 
@@ -328,6 +324,22 @@ export async function POST(request: NextRequest) {
       { matriculaInformada: normalizedBody.matricula }
     );
 
+    // Validar e normalizar status para conformidade com a constraint members_status_check
+    let statusFinal: MemberDbStatus = 'active'
+    if (normalizedBody.status !== undefined && normalizedBody.status !== null && normalizedBody.status !== '') {
+      const normalized = normalizeMemberStatus(normalizedBody.status, false)
+      if (!normalized) {
+        return NextResponse.json(
+          {
+            error: `Status "${normalizedBody.status}" é inválido. Valores aceitos: active (ativo), inactive (inativo), deceased (falecido), transferred (transferido).`,
+            code: 'INVALID_STATUS',
+          },
+          { status: 400 }
+        )
+      }
+      statusFinal = normalized
+    }
+
     // Inserir membro
     const { data, error } = await supabase
       .from('members')
@@ -399,7 +411,7 @@ export async function POST(request: NextRequest) {
           is_dizimista: normalizedBody.is_dizimista ?? false,
           member_since: normalizedBody.member_since || new Date(),
           role: normalizedBody.role || null,
-          status: normalizedBody.status || 'active',
+          status: statusFinal,
           custom_fields: normalizedBody.custom_fields || {},
           observacoes: normalizedBody.observacoes || null,
         },

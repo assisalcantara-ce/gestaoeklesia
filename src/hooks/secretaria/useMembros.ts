@@ -10,6 +10,8 @@ import { getMensagemSemTemplate } from '@/lib/cartoes-utils';
 import { createClient } from '@/lib/supabase-client';
 import { loadTemplatesForCurrentUser } from '@/lib/cartoes-templates-sync';
 import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
+import { formatPhone, formatCep } from '@/lib/mascaras';
+import { dbStatusToUi, uiStatusToDb } from '@/lib/member-status';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -185,8 +187,6 @@ const normalizeEscolaridade = (value: any): string => {
   return clean;
 };
 
-const dbStatusToUi = (status: any): Membro['status'] =>
-  status === 'active' ? 'ativo' : 'inativo';
 
 const gerarUniqueId = (): string => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -734,7 +734,7 @@ export function useMembros() {
     setMembroEditando(membro);
     setDadosPessoais({
       matricula: membro.matricula || '',
-      cpf: membro.cpf || '',
+      cpf: formatCpf(membro.cpf || ''),
       tipoCadastro: membro.tipoCadastro || 'ministro',
       nome: membro.nome || '',
       dataNascimento: membro.dataNascimento || '',
@@ -743,7 +743,7 @@ export function useMembros() {
       escolaridade: normalizeEscolaridade(membro.escolaridade || ''),
       estadoCivil: normalizeEstadoCivil(membro.estadoCivil || ''),
       nomeConjuge: membro.nomeConjuge || '',
-      cpfConjuge: membro.cpfConjuge || '',
+      cpfConjuge: formatCpf(membro.cpfConjuge || ''),
       dataNascimentoConjuge: membro.dataNascimentoConjuge || '',
       nomePai: membro.nomePai || '',
       nomeMae: membro.nomeMae || '',
@@ -756,8 +756,8 @@ export function useMembros() {
       campo: membro.campo || '',
       congregacao: membro.congregacao || '',
       email: membro.email || '',
-      celular: membro.celular || '',
-      whatsapp: membro.whatsapp || '',
+      celular: formatPhone(membro.celular || ''),
+      whatsapp: formatPhone(membro.whatsapp || ''),
       profissao: membro.profissao || '',
       tituloEleitoral: membro.tituloEleitoral || '',
       zonaEleitoral: membro.zonaEleitoral || '',
@@ -765,7 +765,7 @@ export function useMembros() {
       observacoes: membro.observacoes || '',
     });
     setEnderecoData({
-      cep: membro.cep || '',
+      cep: formatCep(membro.cep || ''),
       logradouro: membro.logradouro || '',
       numero: membro.numero || '',
       bairro: membro.bairro || '',
@@ -963,7 +963,7 @@ export function useMembros() {
         data_consagracao: dadosMinisteriais.dataConsagracao || null,
         data_emissao: dadosMinisteriais.dataEmissao || null,
         data_validade_credencial: dadosMinisteriais.dataValidadeCredencial || null,
-        status: membroEditando ? membroEditando.status : 'ativo',
+        status: membroEditando ? uiStatusToDb(membroEditando.status) : 'active',
         role: dadosPessoais.tipoCadastro,
         observacoes: u(dadosPessoais.observacoes),
         custom_fields,

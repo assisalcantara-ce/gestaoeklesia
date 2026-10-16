@@ -367,8 +367,13 @@ export default function MissoesPage() {
   };
 
   const loadMembers = async (mid: string) => {
-    const { data } = await supabase.from('members').select('id, nome').eq('ministry_id', mid).eq('status', 'ativo').order('nome', { ascending: true });
-    setMembers(data || []);
+    const { data } = await supabase
+      .from('members')
+      .select('id, name')
+      .eq('ministry_id', mid)
+      .in('status', ['active', 'ativo'])
+      .order('name', { ascending: true });
+    setMembers((data || []).map((m: any) => ({ id: m.id, nome: m.name || '' })));
   };
 
   // ── Memos de estatísticas ─────────────────────────────────────────────────

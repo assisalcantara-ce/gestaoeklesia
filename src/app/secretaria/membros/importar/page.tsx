@@ -9,6 +9,7 @@ import { ArrowLeft, Download, UploadCloud, AlertTriangle, CheckCircle2, FileText
 import { useUserContext } from '@/hooks/useUserContext';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
+import { normalizeMemberStatus } from '@/lib/member-status';
 
 interface RowError {
   line: number;
@@ -637,10 +638,7 @@ export default function ImportarMembrosPage() {
         const formattedEmissao = parseLegacyDate(row.data['data_emissao']);
         const formattedValidade = parseLegacyDate(row.data['data_validade_credencial']);
 
-        let status = 'active';
-        const rawStatus = (row.data['status'] || '').toLowerCase();
-        if (rawStatus.includes('inativ')) status = 'inactive';
-        else if (rawStatus.includes('exclui')) status = 'inactive';
+        const status = normalizeMemberStatus(row.data['status'], true) || 'active';
 
         const matricula = (row.data['matricula'] || '').trim() || null;
         const uniqueId = (row.data['unique_id'] || '').trim() || null;

@@ -2,6 +2,7 @@ import { getAccessibleCongregacaoIds, resolveTenantAuth } from '@/lib/tenant-aut
 import { normalizePayloadToUppercase } from '@/lib/uppercase-normalizer'
 import { authTenantErrorResponse } from '@/lib/api-errors'
 import { logServerAudit } from '@/lib/audit-logger'
+import { normalizeMemberStatus, type MemberDbStatus } from '@/lib/member-status'
 import { NextRequest, NextResponse } from 'next/server'
 
 function buildMemberPayload(normalizedBody: Record<string, any>) {
@@ -65,13 +66,8 @@ function buildMemberPayload(normalizedBody: Record<string, any>) {
     data_validade_credencial: normalizedBody.data_validade_credencial ?? null,
     ...('foto_url' in normalizedBody ? { foto_url: normalizedBody.foto_url ?? null } : {}),
     member_since: normalizedBody.member_since ?? undefined,
-    status: normalizedBody.status
-      ? ((s: string) => {
-          const lower = s.toLowerCase();
-          if (lower === 'ativo' || lower === 'active') return 'active';
-          if (lower === 'inativo' || lower === 'inactive') return 'inactive';
-          return lower;
-        })(String(normalizedBody.status))
+    status: normalizedBody.status !== undefined && normalizedBody.status !== null
+      ? (normalizeMemberStatus(normalizedBody.status, false) ?? undefined)
       : undefined,
     custom_fields: normalizedBody.custom_fields ?? undefined,
     observacoes: normalizedBody.observacoes ?? null,
@@ -193,11 +189,20 @@ export async function PUT(
       ...incomingCustomFields,
     }
 
-    // Reativação futura: se o membro era inativo e agora está sendo alterado para ativo
-    const rawStatus = normalizedBody.status ? String(normalizedBody.status).toLowerCase() : null
-    const dbNovoStatus = rawStatus
-      ? (rawStatus === 'ativo' || rawStatus === 'active' ? 'active' : 'inactive')
-      : null
+    // Validar e normalizar status se fornecido
+    let dbNovoStatus: MemberDbStatus | null = null
+    if (normalizedBody.status !== undefined && normalizedBody.status !== null && normalizedBody.status !== '') {
+      dbNovoStatus = normalizeMemberStatus(normalizedBody.status, false)
+      if (!dbNovoStatus) {
+        return NextResponse.json(
+          {
+            error: `Status "${normalizedBody.status}" é inválido. Valores aceitos: active (ativo), inactive (inativo), deceased (falecido), transferred (transferido).`,
+            code: 'INVALID_STATUS',
+          },
+          { status: 400 }
+        )
+      }
+    }
 
     const isExistingInactive = existing.status === 'inactive' || existing.status === 'inativo'
     const isReativacao = isExistingInactive && dbNovoStatus === 'active'

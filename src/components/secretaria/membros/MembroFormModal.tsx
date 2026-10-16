@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase-client';
 import EditorFotoMinisterial from './EditorFotoMinisterial';
+import { formatCpf, formatCep, formatPhone } from '@/lib/mascaras';
 
 export interface MembroFormModalProps {
   showForm: boolean;
@@ -185,8 +186,9 @@ export default function MembroFormModal({
   }, [setDadosPessoais]);
 
   const handleCpfConjugeChange = (val: string) => {
-    setDadosPessoais((prev: any) => ({ ...prev, cpfConjuge: val }));
-    const clean = val.replace(/\D/g, '');
+    const formatted = formatCpf(val);
+    setDadosPessoais((prev: any) => ({ ...prev, cpfConjuge: formatted }));
+    const clean = formatted.replace(/\D/g, '');
     if (clean.length !== 11) {
       setConjugeMsg(null);
       ultimoCpfBuscadoRef.current = '';
@@ -431,9 +433,10 @@ export default function MembroFormModal({
                     </label>
                     <input
                       type="text"
-                      placeholder="Somente Números"
-                      value={dadosPessoais.cpf || ''}
-                      onChange={(e) => setDadosPessoais((prev: any) => ({ ...prev, cpf: e.target.value }))}
+                      placeholder="000.000.000-00"
+                      value={formatCpf(dadosPessoais.cpf || '')}
+                      onChange={(e) => setDadosPessoais((prev: any) => ({ ...prev, cpf: formatCpf(e.target.value) }))}
+                      maxLength={14}
                       className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
                     />
                   </div>
@@ -580,9 +583,10 @@ export default function MembroFormModal({
                       <div className="relative">
                         <input
                           type="text"
-                          placeholder="Somente Números"
-                          value={dadosPessoais.cpfConjuge || ''}
+                          placeholder="000.000.000-00"
+                          value={formatCpf(dadosPessoais.cpfConjuge || '')}
                           onChange={(e) => handleCpfConjugeChange(e.target.value)}
+                          maxLength={14}
                           className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition pr-9"
                         />
                         {buscandoConjuge ? (
@@ -993,8 +997,9 @@ export default function MembroFormModal({
                     <div className="flex gap-2 max-w-sm">
                       <input
                         type="text"
-                        value={enderecoData.cep || ''}
-                        onChange={(e) => setEnderecoData((prev: any) => ({ ...prev, cep: e.target.value }))}
+                        value={formatCep(enderecoData.cep || '')}
+                        onChange={(e) => setEnderecoData((prev: any) => ({ ...prev, cep: formatCep(e.target.value) }))}
+                        maxLength={9}
                         placeholder="00000-000"
                         className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
                       />
@@ -1124,8 +1129,9 @@ export default function MembroFormModal({
                     <input
                       type="text"
                       placeholder="(00) 00000-0000"
-                      value={dadosPessoais.celular || ''}
-                      onChange={(e) => setDadosPessoais((prev: any) => ({ ...prev, celular: e.target.value }))}
+                      value={formatPhone(dadosPessoais.celular || '')}
+                      onChange={(e) => setDadosPessoais((prev: any) => ({ ...prev, celular: formatPhone(e.target.value) }))}
+                      maxLength={15}
                       className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
                     />
                   </div>
@@ -1135,8 +1141,9 @@ export default function MembroFormModal({
                       <input
                         type="text"
                         placeholder="(00) 00000-0000"
-                        value={dadosPessoais.whatsapp || ''}
-                        onChange={(e) => setDadosPessoais((prev: any) => ({ ...prev, whatsapp: e.target.value }))}
+                        value={formatPhone(dadosPessoais.whatsapp || '')}
+                        onChange={(e) => setDadosPessoais((prev: any) => ({ ...prev, whatsapp: formatPhone(e.target.value) }))}
+                        maxLength={15}
                         className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
                       />
                       <button

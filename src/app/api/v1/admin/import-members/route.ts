@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-guard'
+import { normalizeMemberStatus } from '@/lib/member-status'
 
 // Colunas obrigatórias no CSV
 const REQUIRED_COLS = ['name'] as const
@@ -258,6 +259,9 @@ export async function POST(request: NextRequest) {
         if (!tiposValidos.includes(String(record.tipo_cadastro).toLowerCase())) {
           record.tipo_cadastro = 'membro'
         }
+
+        // Garantir status válido (conforme members_status_check: 'active', 'inactive', 'deceased', 'transferred')
+        record.status = normalizeMemberStatus(record.status, true) || 'active'
 
         // Ministros são automaticamente dizimistas
         if (record.tipo_cadastro === 'ministro') record.is_dizimista = true

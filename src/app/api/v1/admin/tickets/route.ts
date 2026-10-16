@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
   try {
     const result = await requireAdmin(request, { requiredModule: 'suporte' })
     if (!result.ok) return result.response
-    const { supabaseAdmin: supabase } = result.ctx
+    const { supabaseAdmin: supabase, user } = result.ctx
     const body = await request.json()
 
     // Validar campos obrigatórios
@@ -122,12 +122,55 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Resolver user_id do solicitante (proprietário do ministério ou usuário vinculado)
+    // com fallback seguro para o admin autenticado (evita null value in column user_id)
+    let resolvedUserId: string | null = body.user_id || null
+
+    if (!resolvedUserId) {
+      // 1. Tentar obter o user_id do proprietário do ministério
+      const { data: ministry } = await supabase
+        .from('ministries')
+        .select('user_id')
+        .eq('id', body.ministry_id)
+        .maybeSingle()
+
+      if (ministry?.user_id) {
+        resolvedUserId = ministry.user_id
+      }
+    }
+
+    if (!resolvedUserId) {
+      // 2. Tentar obter qualquer usuário vinculado ao ministério
+      const { data: ministryUser } = await supabase
+        .from('ministry_users')
+        .select('user_id')
+        .eq('ministry_id', body.ministry_id)
+        .limit(1)
+        .maybeSingle()
+
+      if (ministryUser?.user_id) {
+        resolvedUserId = ministryUser.user_id
+      }
+    }
+
+    if (!resolvedUserId) {
+      // 3. Fallback: usuário autenticado no painel admin
+      resolvedUserId = user?.id || null
+    }
+
+    if (!resolvedUserId) {
+      return NextResponse.json(
+        { error: 'Não foi possível identificar o usuário responsável pelo ticket.' },
+        { status: 400 }
+      )
+    }
+
     // Criar ticket
     const { data: ticket, error } = await supabase
       .from('support_tickets')
       .insert([{
         ministry_id: body.ministry_id,
-        user_id: body.user_id || null,
+        user_id: resolvedUserId,
         subject: body.subject,
         description: body.description,
         category: body.category,
