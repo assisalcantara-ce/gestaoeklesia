@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { authenticatedFetch } from '@/lib/api-client'
@@ -12,7 +12,7 @@ import type { SupportTicket, SupportTicketMessage, SupportTicketLanding } from '
 import { temAcessoAdmin } from '@/lib/access-control'
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard'
 import DashboardEmptyState from '@/components/dashboard/DashboardEmptyState'
-import { LifeBuoy, Clock, MessageSquare, AlertTriangle, CheckCircle2, Search, Plus, MoreVertical, X, Send, Trash2 } from 'lucide-react'
+import { LifeBuoy, Clock, MessageSquare, AlertTriangle, CheckCircle2, Search, Plus, MoreVertical, X, Send, Trash2, Building2, Check, Loader2 } from 'lucide-react'
 
 export default function SuportePage() {
   const { isLoading, isAuthenticated, adminUser } = useAdminAuth()
@@ -105,6 +105,135 @@ export default function SuportePage() {
     category: 'technical',
     priority: 'medium',
   })
+
+  // Autocomplete de Busca Dinâmica de Tenants / Ministérios
+  const [tenantSearchQuery, setTenantSearchQuery] = useState('')
+  const [tenantSearchResults, setTenantSearchResults] = useState<{
+    id: string
+    name: string
+    slug?: string | null
+    cnpj_cpf?: string | null
+    address_city?: string | null
+    address_state?: string | null
+    subscription_status?: string | null
+    plan?: string | null
+  }[]>([])
+  const [selectedTenant, setSelectedTenant] = useState<{
+    id: string
+    name: string
+    slug?: string | null
+    cnpj_cpf?: string | null
+    address_city?: string | null
+    address_state?: string | null
+    subscription_status?: string | null
+    plan?: string | null
+  } | null>(null)
+  const [isSearchingTenants, setIsSearchingTenants] = useState(false)
+  const [isTenantDropdownOpen, setIsTenantDropdownOpen] = useState(false)
+  const [tenantSearchError, setTenantSearchError] = useState('')
+  const tenantSearchRef = useRef<HTMLDivElement>(null)
+
+  // Consulta dinâmica de tenants com debounce de 300ms e mínimo de 3 caracteres
+  useEffect(() => {
+    if (selectedTenant && tenantSearchQuery.trim() === selectedTenant.name.trim()) {
+      return
+    }
+
+    const trimmed = tenantSearchQuery.trim()
+
+    if (trimmed.length < 3) {
+      setTenantSearchResults([])
+      setIsSearchingTenants(false)
+      setTenantSearchError('')
+      setIsTenantDropdownOpen(false)
+      return
+    }
+
+    setIsSearchingTenants(true)
+    setTenantSearchError('')
+    setIsTenantDropdownOpen(true)
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await authenticatedFetch(
+          `/api/v1/admin/ministries/search?q=${encodeURIComponent(trimmed)}`
+        )
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}))
+          throw new Error(errData.error || 'Erro ao consultar ministérios')
+        }
+        const data = await res.json()
+        setTenantSearchResults(data.data || [])
+      } catch (err: any) {
+        console.error('Falha na busca dinâmica de ministérios:', err)
+        setTenantSearchError(err.message || 'Falha ao buscar ministérios')
+        setTenantSearchResults([])
+      } finally {
+        setIsSearchingTenants(false)
+      }
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [tenantSearchQuery, selectedTenant])
+
+  // Fechar dropdown de busca ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        tenantSearchRef.current &&
+        !tenantSearchRef.current.contains(event.target as Node)
+      ) {
+        setIsTenantDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const handleSelectTenant = (tenant: {
+    id: string
+    name: string
+    slug?: string | null
+    cnpj_cpf?: string | null
+    address_city?: string | null
+    address_state?: string | null
+    subscription_status?: string | null
+    plan?: string | null
+  }) => {
+    setSelectedTenant(tenant)
+    setFormData((prev) => ({ ...prev, ministry_id: tenant.id }))
+    setTenantSearchQuery(tenant.name)
+    setIsTenantDropdownOpen(false)
+    setTenantSearchResults([])
+    setTenantSearchError('')
+    setError('')
+  }
+
+  const handleClearTenant = () => {
+    setSelectedTenant(null)
+    setFormData((prev) => ({ ...prev, ministry_id: '' }))
+    setTenantSearchQuery('')
+    setTenantSearchResults([])
+    setIsTenantDropdownOpen(false)
+    setTenantSearchError('')
+  }
+
+  const resetForm = () => {
+    setShowForm(false)
+    setFormData({
+      ministry_id: '',
+      subject: '',
+      description: '',
+      category: 'technical',
+      priority: 'medium',
+    })
+    setSelectedTenant(null)
+    setTenantSearchQuery('')
+    setTenantSearchResults([])
+    setIsTenantDropdownOpen(false)
+    setTenantSearchError('')
+    setError('')
+  }
 
   // FASE 1: Cálculo dos KPIs Executivos do Suporte (sem novas consultas ao banco)
   const kpis = useMemo(() => {
@@ -457,6 +586,11 @@ export default function SuportePage() {
     setError('')
     setSuccess('')
 
+    if (!formData.ministry_id || !selectedTenant) {
+      setError('Por favor, busque e selecione um ministério válido na lista de resultados.')
+      return
+    }
+
     try {
       const response = await authenticatedFetch('/api/v1/admin/tickets', {
         method: 'POST',
@@ -470,14 +604,7 @@ export default function SuportePage() {
       }
 
       setSuccess('Ticket criado com sucesso!')
-      setFormData({
-        ministry_id: '',
-        subject: '',
-        description: '',
-        category: 'technical',
-        priority: 'medium',
-      })
-      setShowForm(false)
+      resetForm()
       fetchTickets()
     } catch (err: any) {
       setError(err.message)
@@ -788,7 +915,13 @@ export default function SuportePage() {
             {ticketView === 'tenant' && (
               <button
                 type="button"
-                onClick={() => setShowForm(!showForm)}
+                onClick={() => {
+                  if (showForm) {
+                    resetForm()
+                  } else {
+                    setShowForm(true)
+                  }
+                }}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-semibold shadow-sm transition shrink-0"
               >
                 <Plus className="h-4 w-4" />
@@ -802,14 +935,168 @@ export default function SuportePage() {
             <div className="bg-gray-800 rounded-xl border border-gray-700 p-6">
               <h2 className="text-lg font-bold text-white mb-4">Novo Ticket de Suporte</h2>
               <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  placeholder="ID do Ministério"
-                  value={formData.ministry_id}
-                  onChange={(e) => setFormData({ ...formData, ministry_id: e.target.value })}
-                  required
-                  className="col-span-2 px-4 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg placeholder-gray-500 focus:outline-none focus:border-blue-500"
-                />
+                {/* Autocomplete de Busca Dinâmica de Ministério / Tenant */}
+                <div className="col-span-2 relative" ref={tenantSearchRef}>
+                  <label className="block text-xs font-semibold text-gray-300 mb-1.5">
+                    Ministério / Tenant <span className="text-red-400">*</span>
+                  </label>
+
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                      <Building2 className="w-4 h-4" />
+                    </div>
+
+                    <input
+                      type="text"
+                      placeholder="Buscar ministério por nome (mínimo 3 caracteres)..."
+                      value={tenantSearchQuery}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setTenantSearchQuery(val)
+                        if (selectedTenant && val !== selectedTenant.name) {
+                          setSelectedTenant(null)
+                          setFormData((prev) => ({ ...prev, ministry_id: '' }))
+                        }
+                        if (val.trim().length >= 3) {
+                          setIsTenantDropdownOpen(true)
+                        } else {
+                          setIsTenantDropdownOpen(false)
+                        }
+                      }}
+                      onFocus={() => {
+                        if (tenantSearchQuery.trim().length >= 3 && !selectedTenant) {
+                          setIsTenantDropdownOpen(true)
+                        }
+                      }}
+                      className={`w-full pl-10 pr-10 py-2.5 bg-gray-900 border text-white rounded-lg placeholder-gray-500 focus:outline-none transition text-sm ${
+                        selectedTenant
+                          ? 'border-green-600/70 focus:border-green-500'
+                          : 'border-gray-700 focus:border-blue-500'
+                      }`}
+                    />
+
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center gap-1.5">
+                      {isSearchingTenants && (
+                        <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+                      )}
+                      {selectedTenant && !isSearchingTenants && (
+                        <Check className="w-4 h-4 text-green-400" />
+                      )}
+                      {(tenantSearchQuery || selectedTenant) && (
+                        <button
+                          type="button"
+                          onClick={handleClearTenant}
+                          className="text-gray-400 hover:text-white p-0.5 rounded transition"
+                          title="Limpar seleção"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Dropdown de resultados dinâmicos */}
+                  {isTenantDropdownOpen && tenantSearchQuery.trim().length >= 3 && !selectedTenant && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 max-h-64 overflow-y-auto divide-y divide-gray-800">
+                      {isSearchingTenants ? (
+                        <div className="px-4 py-3 text-xs text-gray-400 flex items-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+                          <span>Buscando ministérios cadastrados...</span>
+                        </div>
+                      ) : tenantSearchError ? (
+                        <div className="px-4 py-3 text-xs text-red-400 flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 shrink-0" />
+                          <span>{tenantSearchError}</span>
+                        </div>
+                      ) : tenantSearchResults.length === 0 ? (
+                        <div className="px-4 py-3 text-xs text-gray-400">
+                          Nenhum ministério encontrado para &quot;{tenantSearchQuery}&quot;.
+                        </div>
+                      ) : (
+                        tenantSearchResults.map((tenant) => (
+                          <button
+                            key={tenant.id}
+                            type="button"
+                            onClick={() => handleSelectTenant(tenant)}
+                            className="w-full text-left px-4 py-2.5 hover:bg-gray-800 focus:bg-gray-800 focus:outline-none transition group"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-semibold text-sm text-white group-hover:text-blue-400 truncate">
+                                {tenant.name}
+                              </span>
+                              {tenant.subscription_status && (
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono uppercase shrink-0 ${
+                                  tenant.subscription_status === 'active'
+                                    ? 'bg-green-950/80 text-green-400 border border-green-800'
+                                    : tenant.subscription_status === 'trial'
+                                    ? 'bg-amber-950/80 text-amber-400 border border-amber-800'
+                                    : 'bg-gray-800 text-gray-400 border border-gray-700'
+                                }`}>
+                                  {tenant.subscription_status}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2.5 mt-1 text-xs text-gray-400 flex-wrap">
+                              {(tenant.address_city || tenant.address_state) && (
+                                <span className="flex items-center gap-1 text-gray-300">
+                                  📍 {tenant.address_city || ''}{tenant.address_state ? `/${tenant.address_state}` : ''}
+                                </span>
+                              )}
+                              {tenant.plan && (
+                                <span className="text-gray-400">
+                                  Plano: <span className="text-gray-200 capitalize">{tenant.plan}</span>
+                                </span>
+                              )}
+                              {tenant.cnpj_cpf && (
+                                <span className="font-mono text-[11px] text-gray-500">
+                                  Doc: {tenant.cnpj_cpf}
+                                </span>
+                              )}
+                              {tenant.slug && (
+                                <span className="font-mono text-[11px] text-gray-500">
+                                  @{tenant.slug}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {/* Confirmação do ministério selecionado */}
+                  {selectedTenant && (
+                    <div className="mt-2 p-2.5 rounded-lg bg-teal-950/40 border border-teal-800/60 flex items-center justify-between text-xs text-teal-300">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <CheckCircle2 className="w-4 h-4 text-teal-400 shrink-0" />
+                        <div className="truncate">
+                          <span className="font-semibold text-white">{selectedTenant.name}</span>
+                          {(selectedTenant.address_city || selectedTenant.address_state) && (
+                            <span className="text-teal-200/80"> • {selectedTenant.address_city || ''}{selectedTenant.address_state ? `/${selectedTenant.address_state}` : ''}</span>
+                          )}
+                          {selectedTenant.plan && (
+                            <span className="text-teal-200/80"> • Plano: <span className="capitalize">{selectedTenant.plan}</span></span>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleClearTenant}
+                        className="text-xs text-teal-400 hover:text-white underline font-semibold ml-2 shrink-0"
+                      >
+                        Trocar
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Dica para o operador quando digitar menos de 3 caracteres */}
+                  {!selectedTenant && tenantSearchQuery.trim().length > 0 && tenantSearchQuery.trim().length < 3 && (
+                    <p className="mt-1 text-xs text-amber-400/90">
+                      Digite mais {3 - tenantSearchQuery.trim().length} caractere(s) para pesquisar...
+                    </p>
+                  )}
+                </div>
                 <input
                   type="text"
                   placeholder="Assunto"
@@ -850,17 +1137,7 @@ export default function SuportePage() {
                 <div className="col-span-2 flex items-center justify-end gap-3">
                   <button
                     type="button"
-                    onClick={() => {
-                      setShowForm(false)
-                      setFormData({
-                        ministry_id: '',
-                        subject: '',
-                        description: '',
-                        category: 'technical',
-                        priority: 'medium',
-                      })
-                      setError('')
-                    }}
+                    onClick={resetForm}
                     className="px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 font-semibold"
                   >
                     Cancelar
