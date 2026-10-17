@@ -52,8 +52,14 @@ export async function GET(request: NextRequest) {
     try {
       const codigo = searchParams.get('codigo') || '';
       const excludeId = searchParams.get('exclude_id') || undefined;
+      const dataLancamento = searchParams.get('data') || searchParams.get('data_lancamento') || undefined;
+      const congregacaoId = searchParams.has('congregacao_id') ? searchParams.get('congregacao_id') : undefined;
       const service = new TesourariaService(admin);
-      const exists = await service.verificarCodigoExiste(ministryId, codigo, excludeId);
+      const exists = await service.verificarCodigoExiste(ministryId, codigo, {
+        dataLancamento,
+        congregacaoId,
+        excludeId,
+      });
       return NextResponse.json({ exists, codigo });
     } catch (err: any) {
       return NextResponse.json({ error: err?.message || 'Erro ao verificar código' }, { status: 500 });
@@ -172,7 +178,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error: 'DUPLICATE_CODIGO_REGISTRO',
-          message: 'Já existe um lançamento registrado com este Código / ID nesta igreja/congregação.',
+          message: 'Já existe um lançamento registrado com este Código / ID nesta igreja/congregação no mesmo mês e ano.',
           codigo: body.codigo_registro,
           requires_confirmation: true,
         },
@@ -324,7 +330,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json(
         {
           error: 'DUPLICATE_CODIGO_REGISTRO',
-          message: 'Já existe um lançamento registrado com este Código / ID nesta igreja/congregação.',
+          message: 'Já existe um lançamento registrado com este Código / ID nesta igreja/congregação no mesmo mês e ano.',
           codigo: body.codigo_registro,
           requires_confirmation: true,
         },

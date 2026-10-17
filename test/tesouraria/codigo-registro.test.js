@@ -59,15 +59,44 @@ class MockTesourariaRepository {
     return this.obterPreviaCodigoRegistro(ministryId, ano);
   }
 
-  async verificarCodigoExiste(ministryId, codigo, excludeId) {
+  async verificarCodigoExiste(ministryId, codigo, optionsOrExcludeId) {
     if (!codigo || !codigo.trim()) return false;
     const target = codigo.trim().toLowerCase();
-    return this.lancamentos.some(
-      (l) => l.ministry_id === ministryId &&
-             l.codigo_registro &&
-             l.codigo_registro.trim().toLowerCase() === target &&
-             l.id !== excludeId
-    );
+
+    let excludeId;
+    let dataLancamento;
+    let congregacaoId;
+
+    if (typeof optionsOrExcludeId === 'string') {
+      excludeId = optionsOrExcludeId;
+    } else if (optionsOrExcludeId && typeof optionsOrExcludeId === 'object') {
+      excludeId = optionsOrExcludeId.excludeId;
+      dataLancamento = optionsOrExcludeId.dataLancamento;
+      congregacaoId = optionsOrExcludeId.congregacaoId;
+    }
+
+    return this.lancamentos.some((l) => {
+      if (l.ministry_id !== ministryId) return false;
+      if (!l.codigo_registro || l.codigo_registro.trim().toLowerCase() !== target) return false;
+      if (excludeId && l.id === excludeId) return false;
+
+      // Escopo de congregação/caixa
+      if (congregacaoId !== undefined) {
+        const lCong = l.congregacao_id || null;
+        const targetCong = congregacaoId || null;
+        if (lCong !== targetCong) return false;
+      }
+
+      // Escopo mensal (mês e ano da data do lançamento)
+      if (dataLancamento && /^\d{4}-\d{2}/.test(dataLancamento)) {
+        if (!l.data_lancamento) return false;
+        const [targetAno, targetMes] = dataLancamento.split('-');
+        const [lAno, lMes] = l.data_lancamento.split('-');
+        if (targetAno !== lAno || targetMes !== lMes) return false;
+      }
+
+      return true;
+    });
   }
 
   async criarLancamento(payload) {
@@ -102,8 +131,8 @@ class MockTesourariaService {
     return this.repository.obterPreviaCodigoRegistro(ministryId, ano);
   }
 
-  async verificarCodigoExiste(ministryId, codigo, excludeId) {
-    return this.repository.verificarCodigoExiste(ministryId, codigo, excludeId);
+  async verificarCodigoExiste(ministryId, codigo, optionsOrExcludeId) {
+    return this.repository.verificarCodigoExiste(ministryId, codigo, optionsOrExcludeId);
   }
 
   async criarLancamento(ministryId, dto) {
@@ -130,7 +159,10 @@ class MockTesourariaService {
 
     if (isManual) {
       const codigoManual = dto.codigo_registro.trim();
-      const jaExiste = await this.repository.verificarCodigoExiste(ministryId, codigoManual);
+      const jaExiste = await this.repository.verificarCodigoExiste(ministryId, codigoManual, {
+        dataLancamento: dto.data_lancamento,
+        congregacaoId: dto.congregacao_id,
+      });
       if (jaExiste) {
         throw new Error('Já existe um lançamento registrado com este Código/ID.');
       }
@@ -139,7 +171,10 @@ class MockTesourariaService {
 
     if (temCodigoInformado) {
       const codigoInformado = dto.codigo_registro.trim();
-      const jaExiste = await this.repository.verificarCodigoExiste(ministryId, codigoInformado);
+      const jaExiste = await this.repository.verificarCodigoExiste(ministryId, codigoInformado, {
+        dataLancamento: dto.data_lancamento,
+        congregacaoId: dto.congregacao_id,
+      });
       if (jaExiste) {
         throw new Error('Já existe um lançamento registrado com este Código/ID.');
       }
@@ -171,7 +206,14 @@ class MockTesourariaService {
       if (dto.codigo_registro && dto.codigo_registro.trim().length > 0) {
         const codigoTrim = dto.codigo_registro.trim();
         if (!dto.permitir_duplicidade) {
-          const jaExiste = await this.repository.verificarCodigoExiste(ministryId, codigoTrim, id);
+          const atual = this.repository.lancamentos.find((l) => l.id === id && l.ministry_id === ministryId);
+          const dataRef = dto.data_lancamento || atual?.data_lancamento;
+          const congRef = dto.congregacao_id !== undefined ? dto.congregacao_id : atual?.congregacao_id;
+          const jaExiste = await this.repository.verificarCodigoExiste(ministryId, codigoTrim, {
+            dataLancamento: dataRef,
+            congregacaoId: congRef,
+            excludeId: id,
+          });
           if (jaExiste) {
             throw new Error('Já existe um lançamento registrado com este Código/ID.');
           }
@@ -409,6 +451,146 @@ describe('Módulo Tesouraria - Código / ID de Registro e Concorrência Atômica
     });
 
     assert.equal(atualizado.codigo_registro, 'OFERTA-2026-001');
+  });
+
+  describe('Regra de Negócio: Validação Mensal e Congregação do Código / ID Financeiro', () => {
+    const congNorte = 'cong-norte-uuid';
+    const congSul = 'cong-sul-uuid';
+    const codigoRecorrente = 'CULTO-DOM-01';
+
+    it('15. Mesmo código, mesma congregação, mesmo mês/ano → deve bloquear / exibir confirmação de duplicidade', async () => {
+      // 1. Registra no mês de Maio/2026 na Congregação Norte
+      await service.criarLancamento(tenantA, {
+        data_lancamento: '2026-05-10',
+        tipo_movimento: 'entrada',
+        tipo_recebimento: 'oferta',
+        valor: 500.0,
+        codigo_registro: codigoRecorrente,
+        congregacao_id: congNorte,
+      });
+
+      // 2. Tenta registrar o MESMO código na MESMA congregação no MESMO mês/ano (Maio/2026)
+      await assert.rejects(
+        async () => {
+          await service.criarLancamento(tenantA, {
+            data_lancamento: '2026-05-17',
+            tipo_movimento: 'entrada',
+            tipo_recebimento: 'oferta',
+            valor: 600.0,
+            codigo_registro: codigoRecorrente,
+            congregacao_id: congNorte,
+          });
+        },
+        {
+          name: 'Error',
+          message: 'Já existe um lançamento registrado com este Código/ID.',
+        }
+      );
+    });
+
+    it('16. Mesmo código, mesma congregação, mês diferente → deve permitir sem alerta de duplicidade', async () => {
+      // Registra o MESMO código na MESMA congregação em mês diferente (Junho/2026)
+      const lancMesDiferente = await service.criarLancamento(tenantA, {
+        data_lancamento: '2026-06-07',
+        tipo_movimento: 'entrada',
+        tipo_recebimento: 'oferta',
+        valor: 750.0,
+        codigo_registro: codigoRecorrente,
+        congregacao_id: congNorte,
+      });
+
+      assert.equal(lancMesDiferente.codigo_registro, codigoRecorrente);
+      assert.equal(lancMesDiferente.congregacao_id, congNorte);
+      assert.equal(lancMesDiferente.data_lancamento, '2026-06-07');
+    });
+
+    it('17. Mesmo código, mesma congregação, ano diferente → deve permitir sem alerta de duplicidade', async () => {
+      // Registra o MESMO código na MESMA congregação no mesmo mês (Maio), mas em ANO diferente (2027)
+      const lancAnoDiferente = await service.criarLancamento(tenantA, {
+        data_lancamento: '2027-05-09',
+        tipo_movimento: 'entrada',
+        tipo_recebimento: 'oferta',
+        valor: 820.0,
+        codigo_registro: codigoRecorrente,
+        congregacao_id: congNorte,
+      });
+
+      assert.equal(lancAnoDiferente.codigo_registro, codigoRecorrente);
+      assert.equal(lancAnoDiferente.congregacao_id, congNorte);
+      assert.equal(lancAnoDiferente.data_lancamento, '2027-05-09');
+    });
+
+    it('18. Mesmo código, mesma congregação, outro tenant → não gera conflito (isolamento multi-tenant)', async () => {
+      // Registra o MESMO código na MESMA congregação no MESMO mês/ano em OUTRO tenant (tenantB)
+      const lancTenantB = await service.criarLancamento(tenantB, {
+        data_lancamento: '2026-05-10',
+        tipo_movimento: 'entrada',
+        tipo_recebimento: 'oferta',
+        valor: 990.0,
+        codigo_registro: codigoRecorrente,
+        congregacao_id: congNorte,
+      });
+
+      assert.equal(lancTenantB.codigo_registro, codigoRecorrente);
+      assert.equal(lancTenantB.ministry_id, tenantB);
+    });
+
+    it('19. Mesmo código, mesmo mês/ano, porém em congregações diferentes → deve permitir normalmente', async () => {
+      // Registra o MESMO código no MESMO mês (Maio/2026), porém na Congregação Sul
+      const lancCongSul = await service.criarLancamento(tenantA, {
+        data_lancamento: '2026-05-10',
+        tipo_movimento: 'entrada',
+        tipo_recebimento: 'oferta',
+        valor: 430.0,
+        codigo_registro: codigoRecorrente,
+        congregacao_id: congSul,
+      });
+
+      assert.equal(lancCongSul.codigo_registro, codigoRecorrente);
+      assert.equal(lancCongSul.congregacao_id, congSul);
+    });
+
+    it('20. Alteração da data do lançamento → recalcular duplicidade dinamicamente', async () => {
+      // Cenário: tesoureira tentou salvar em 2026-05-24 (mesmo mês) e deu duplicidade.
+      // Ela altera a data para 2026-07-05 (mês diferente).
+      // Ao recalcular com a nova data, a duplicidade não existe e deve salvar normalmente.
+      const jaExisteMesmoMes = await service.verificarCodigoExiste(tenantA, codigoRecorrente, {
+        dataLancamento: '2026-05-24',
+        congregacaoId: congNorte,
+      });
+      assert.equal(jaExisteMesmoMes, true, 'Deve detectar duplicidade no mesmo mês/ano');
+
+      const jaExisteOutroMes = await service.verificarCodigoExiste(tenantA, codigoRecorrente, {
+        dataLancamento: '2026-07-05',
+        congregacaoId: congNorte,
+      });
+      assert.equal(jaExisteOutroMes, false, 'Não deve detectar duplicidade após alteração de data para outro mês');
+
+      // Se voltar a data para o mesmo mês, volta a detectar duplicidade
+      const jaExisteVoltandoMes = await service.verificarCodigoExiste(tenantA, codigoRecorrente, {
+        dataLancamento: '2026-05-31',
+        congregacaoId: congNorte,
+      });
+      assert.equal(jaExisteVoltandoMes, true, 'Recalcula e volta a acusar duplicidade se a data voltar para o mesmo mês');
+    });
+
+    it('21. Confirmar "Adicionar Mesmo Assim" → registrar normalmente com duplicidade permitida', async () => {
+      // Quando o operador confirma no modal "Adicionar Mesmo Assim", permitir_duplicidade = true
+      const lancForcado = await service.criarLancamento(tenantA, {
+        data_lancamento: '2026-05-17',
+        tipo_movimento: 'entrada',
+        tipo_recebimento: 'oferta',
+        valor: 600.0,
+        codigo_registro: codigoRecorrente,
+        congregacao_id: congNorte,
+        permitir_duplicidade: true,
+      });
+
+      assert.equal(lancForcado.codigo_registro, codigoRecorrente);
+      assert.equal(lancForcado.valor, 600.0);
+      assert.equal(lancForcado.congregacao_id, congNorte);
+      assert.equal(lancForcado.data_lancamento, '2026-05-17');
+    });
   });
 });
 

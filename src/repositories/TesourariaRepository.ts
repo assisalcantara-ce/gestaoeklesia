@@ -28,11 +28,33 @@ export interface LancamentoRow extends LancamentoInsert {
   updated_at?: string | null;
 }
 
+export interface VerificarCodigoOptions {
+  dataLancamento?: string | null;
+  congregacaoId?: string | null;
+  excludeId?: string;
+}
+
 export class TesourariaRepository {
   private supabase: any;
 
   constructor(supabase: any) {
     this.supabase = supabase;
+  }
+
+  /**
+   * Obtém um lançamento por ID e ministério
+   */
+  async obterLancamentoPorId(id: string, ministryId: string): Promise<LancamentoRow | null> {
+    if (!id || !ministryId) return null;
+    const { data, error } = await this.supabase
+      .from('tesouraria_lancamentos')
+      .select('*')
+      .eq('id', id)
+      .eq('ministry_id', ministryId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return data as LancamentoRow;
   }
 
   /**
@@ -110,8 +132,25 @@ export class TesourariaRepository {
     return `${prefix}${String(proximoNum).padStart(6, '0')}`;
   }
 
-  async verificarCodigoExiste(ministryId: string, codigo: string, excludeId?: string): Promise<boolean> {
+  async verificarCodigoExiste(
+    ministryId: string,
+    codigo: string,
+    optionsOrExcludeId?: string | VerificarCodigoOptions
+  ): Promise<boolean> {
     if (!codigo || !codigo.trim()) return false;
+
+    let excludeId: string | undefined;
+    let dataLancamento: string | null | undefined;
+    let congregacaoId: string | null | undefined;
+
+    if (typeof optionsOrExcludeId === 'string') {
+      excludeId = optionsOrExcludeId;
+    } else if (optionsOrExcludeId && typeof optionsOrExcludeId === 'object') {
+      excludeId = optionsOrExcludeId.excludeId;
+      dataLancamento = optionsOrExcludeId.dataLancamento;
+      congregacaoId = optionsOrExcludeId.congregacaoId;
+    }
+
     let query = this.supabase
       .from('tesouraria_lancamentos')
       .select('id')
@@ -120,6 +159,29 @@ export class TesourariaRepository {
 
     if (excludeId) {
       query = query.neq('id', excludeId);
+    }
+
+    // 1. Escopo de Igreja/Congregação ou Caixa
+    if (congregacaoId !== undefined) {
+      if (congregacaoId && congregacaoId.trim()) {
+        query = query.eq('congregacao_id', congregacaoId.trim());
+      } else {
+        query = query.is('congregacao_id', null);
+      }
+    }
+
+    // 2. Escopo Mensal: Mês e Ano da Data do Lançamento
+    if (dataLancamento && /^\d{4}-\d{2}/.test(dataLancamento)) {
+      const [anoStr, mesStr] = dataLancamento.split('-');
+      const ano = parseInt(anoStr, 10);
+      const mes = parseInt(mesStr, 10);
+      if (!isNaN(ano) && !isNaN(mes) && mes >= 1 && mes <= 12) {
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const ultimoDia = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+        const inicioMes = `${ano}-${pad(mes)}-01`;
+        const fimMes = `${ano}-${pad(mes)}-${pad(ultimoDia)}`;
+        query = query.gte('data_lancamento', inicioMes).lte('data_lancamento', fimMes);
+      }
     }
 
     const { data, error } = await query.limit(1);

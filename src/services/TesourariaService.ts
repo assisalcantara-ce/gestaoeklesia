@@ -3,7 +3,7 @@
  * Camada de negócio da Tesouraria para operações de lançamentos financeiros.
  */
 
-import { TesourariaRepository, type LancamentoInsert, type LancamentoRow } from '@/repositories/TesourariaRepository';
+import { TesourariaRepository, type LancamentoInsert, type LancamentoRow, type VerificarCodigoOptions } from '@/repositories/TesourariaRepository';
 
 export interface CriarLancamentoDTO {
   data_lancamento: string;
@@ -39,9 +39,13 @@ export class TesourariaService {
     return this.repository.obterPreviaCodigoRegistro(ministryId, anoValido);
   }
 
-  async verificarCodigoExiste(ministryId: string, codigo: string, excludeId?: string): Promise<boolean> {
+  async verificarCodigoExiste(
+    ministryId: string,
+    codigo: string,
+    optionsOrExcludeId?: string | VerificarCodigoOptions
+  ): Promise<boolean> {
     if (!ministryId || !codigo) return false;
-    return this.repository.verificarCodigoExiste(ministryId, codigo, excludeId);
+    return this.repository.verificarCodigoExiste(ministryId, codigo, optionsOrExcludeId);
   }
 
   async criarLancamento(
@@ -105,7 +109,10 @@ export class TesourariaService {
     // ── Caso 2: Código Manual Customizado (ex: OFERTA-2026-001, NF-4587/2026) ──
     if (isManual) {
       const codigoManual = dto.codigo_registro!.trim();
-      const jaExiste = await this.repository.verificarCodigoExiste(ministryId, codigoManual);
+      const jaExiste = await this.repository.verificarCodigoExiste(ministryId, codigoManual, {
+        dataLancamento: dto.data_lancamento,
+        congregacaoId: dto.congregacao_id,
+      });
       if (jaExiste) {
         throw new Error('Já existe um lançamento registrado com este Código/ID.');
       }
@@ -115,7 +122,10 @@ export class TesourariaService {
     // ── Caso 3: Código informado pelo usuário no formato REG-YYYY-XXXXXX que já existe ──
     if (temCodigoInformado) {
       const codigoInformado = dto.codigo_registro!.trim();
-      const jaExiste = await this.repository.verificarCodigoExiste(ministryId, codigoInformado);
+      const jaExiste = await this.repository.verificarCodigoExiste(ministryId, codigoInformado, {
+        dataLancamento: dto.data_lancamento,
+        congregacaoId: dto.congregacao_id,
+      });
       if (jaExiste) {
         throw new Error('Já existe um lançamento registrado com este Código/ID.');
       }
@@ -188,7 +198,21 @@ export class TesourariaService {
       if (dto.codigo_registro && dto.codigo_registro.trim().length > 0) {
         const codigoTrim = dto.codigo_registro.trim();
         if (!dto.permitir_duplicidade) {
-          const jaExiste = await this.repository.verificarCodigoExiste(ministryId, codigoTrim, id);
+          let dataRef = dto.data_lancamento;
+          let congRef = dto.congregacao_id;
+          if (!dataRef || congRef === undefined) {
+            const atual = await this.repository.obterLancamentoPorId(id, ministryId);
+            if (atual) {
+              if (!dataRef) dataRef = atual.data_lancamento;
+              if (congRef === undefined) congRef = atual.congregacao_id;
+            }
+          }
+
+          const jaExiste = await this.repository.verificarCodigoExiste(ministryId, codigoTrim, {
+            dataLancamento: dataRef,
+            congregacaoId: congRef,
+            excludeId: id,
+          });
           if (jaExiste) {
             throw new Error('Já existe um lançamento registrado com este Código/ID.');
           }

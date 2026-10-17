@@ -57,7 +57,7 @@ export default function ConfirmDuplicidadeCodigoModal({
         {/* Explicação */}
         <div className="space-y-2 text-xs text-slate-600 leading-relaxed bg-slate-50 border border-slate-200 rounded-xl p-3">
           <p>
-            Já existe outro lançamento registrado com este mesmo <strong>Código / ID</strong> nesta igreja/congregação.
+            Já existe outro lançamento registrado com este mesmo <strong>Código / ID</strong> nesta igreja/congregação no mesmo mês e ano.
           </p>
           <p>
             Caso você utilize o mesmo código para agrupar múltiplos lançamentos de um mesmo <strong>culto, evento ou lote</strong>, você pode confirmar para manter e adicionar mesmo assim.

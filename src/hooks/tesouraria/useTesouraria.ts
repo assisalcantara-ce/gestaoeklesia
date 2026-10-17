@@ -1083,6 +1083,35 @@ export function useTesouraria() {
         }
       }
 
+      // Validação de duplicidade no frontend (mesma regra do backend: mesmo código, mesma congregação/caixa, mesmo mês/ano da data do lançamento)
+      if (!options?.forcarDuplicidade && form.codigo_registro?.trim() && form.data_lancamento) {
+        const codigoTrim = form.codigo_registro.trim().toLowerCase();
+        const [anoForm, mesForm] = form.data_lancamento.split('-');
+        const formCongId = form.congregacao_id?.trim() || null;
+
+        const existeNaListaLocal = lancsFiltrados.some((l) => {
+          if (editId && l.id === editId) return false;
+          if (!l.codigo_registro || l.codigo_registro.trim().toLowerCase() !== codigoTrim) return false;
+
+          // Escopo congregação / caixa
+          const lCongId = l.congregacao_id?.trim() || null;
+          if (lCongId !== formCongId) return false;
+
+          // Mês e ano da data do lançamento
+          if (!l.data_lancamento) return false;
+          const [lAno, lMes] = l.data_lancamento.split('-');
+          return lAno === anoForm && lMes === mesForm;
+        });
+
+        if (existeNaListaLocal) {
+          setConfirmDuplicidadeCodigo({
+            open: true,
+            codigo: form.codigo_registro.trim(),
+          });
+          return;
+        }
+      }
+
       const payload = {
         data_lancamento: form.data_lancamento,
         tipo_movimento: form.tipo_movimento,
