@@ -27,6 +27,7 @@ const PUBLIC_PREFIXES = [
   '/eventos/e',
   '/ebd/chamada-rapida',
   '/revista',
+  '/recepcao',
   // Apenas as rotas mobile públicas explícitas estão liberadas do ProtectedRoute global
   '/app/login',
   '/app/vincular',

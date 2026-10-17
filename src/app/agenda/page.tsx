@@ -1,18 +1,23 @@
 'use client';
 
+import { useState } from 'react';
 import DashboardSidebar from '@/components/dashboard/DashboardSidebar';
 import DashboardSection from '@/components/dashboard/DashboardSection';
 import DashboardEmptyState from '@/components/dashboard/DashboardEmptyState';
 import {
   Plus, Calendar as CalendarIcon,
   AlertTriangle, Check, Archive,
-  LayoutDashboard, BookOpen, CheckCircle2, Gavel, ShieldCheck, Lock, Clock, Calendar, Flame,
+  LayoutDashboard, BookOpen, CheckCircle2, Gavel, ShieldCheck, Lock, Clock, Calendar,
   CalendarRange, Filter
 } from 'lucide-react';
 import { useAgenda } from '@/hooks/agenda/useAgenda';
 
-import AgendaToolbar from '@/components/agenda/AgendaToolbar';
-import AgendaCalendar from '@/components/agenda/AgendaCalendar';
+import AgendaHeaderBanner from '@/components/agenda/AgendaHeaderBanner';
+import AgendaCategoryFilters from '@/components/agenda/AgendaCategoryFilters';
+import AgendaCalendarView from '@/components/agenda/AgendaCalendarView';
+import AgendaUpcomingPanel from '@/components/agenda/AgendaUpcomingPanel';
+import { AgendaCategoryKey } from '@/lib/agenda-visual-utils';
+
 import AgendaTimeline from '@/components/agenda/AgendaTimeline';
 import EventoFormModal from '@/components/agenda/EventoFormModal';
 import ConfirmDeleteModal from '@/components/agenda/ConfirmDeleteModal';
@@ -25,20 +30,9 @@ export default function AgendaPage() {
     planFeatures,
     activeTab,
     setActiveTab,
-    daysLeftInMonth,
     currentYear,
     currentMonth,
     MESES_PT,
-    quickFilter,
-    setQuickFilter,
-    showAdvancedFilters,
-    setShowAdvancedFilters,
-    filtroTipoId,
-    setFiltroTipoId,
-    filtroCongregacao,
-    setFiltroCongregacao,
-    filtroVisibilidade,
-    setFiltroVisibilidade,
     selectedDate,
     setSelectedDate,
     tiposAgrupados,
@@ -50,18 +44,12 @@ export default function AgendaPage() {
     erroCongregacoes,
     orgHelper,
     eventos,
-    loading,
     msg,
-    totalCultos,
-    totalReunioes,
-    totalEventosOficiais,
-    totalEventosSincronizados,
     isEscritaPermitida,
     isAdmin,
     isPresidenciaOrAdmin,
     daysInMonthArray,
     eventosPorDia,
-    eventosColunaDireita,
     proximosEventos,
     TABS,
     activePlanning,
@@ -101,7 +89,6 @@ export default function AgendaPage() {
     confirmDeleteAction,
     agendaVisualizada,
     setAgendaVisualizada,
-    isSecretarioGeral,
     isSecretarioLocal,
     userCongregacaoId,
     congregacoesAutorizadas,
@@ -114,6 +101,8 @@ export default function AgendaPage() {
     handleDecidirSolicitacao,
     getEscopoLabel,
   } = useAgenda();
+
+  const [selectedCategory, setSelectedCategory] = useState<AgendaCategoryKey>('todos');
 
   if (ctx.loading || planFeatures.loading) {
     return <div className="p-8 text-gray-500">Carregando...</div>;
@@ -157,221 +146,111 @@ export default function AgendaPage() {
   return (
       <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#f4f7fa] min-h-screen">
         <div className="p-4 sm:p-6 lg:p-8 max-w-[96rem] mx-auto w-full space-y-6">
-          {/* Header da Página */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-teal-700 text-white flex items-center justify-center border border-teal-800 shadow-sm flex-shrink-0">
-                <CalendarIcon className="w-6 h-6" />
-              </div>
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Agenda Ministerial</h1>
-                <p className="text-xs sm:text-sm text-slate-600 font-medium mt-0.5">
-                  Planejamento e coordenação de datas, cultos, reuniões e eventos integrados.
-                </p>
-              </div>
+          {/* 1. Cabeçalho Banner Bíblico */}
+          <AgendaHeaderBanner />
+
+          {/* 2. Filtros por Categoria com Contagem Real e Botão + Novo Evento */}
+          <AgendaCategoryFilters
+            eventos={eventos}
+            selectedCategory={selectedCategory}
+            onSelectCategory={setSelectedCategory}
+            isEscritaPermitida={isEscritaPermitida}
+            onNovoEvento={() => openForm(null)}
+          />
+
+          {/* 3. Navegação de Abas Administrativas & Seletor de Escopo */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+              {TABS.map(tab => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => {
+                      setActiveTab(tab.id as any);
+                      setSelectedDate(null);
+                    }}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                      isActive
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-900 shadow-2xs'
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
             </div>
 
             <div className="flex items-center gap-2">
-              <RevistaPublicaButton ministryId={ctx?.ministryId} />
-
-              {isEscritaPermitida && (
-                <button
-                  onClick={() => openForm(null)}
-                  className="bg-teal-700 hover:bg-teal-800 text-white rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold shadow-sm border border-teal-800 transition-all flex items-center gap-2 cursor-pointer"
-                >
-                  <Plus className="h-4 w-4" />
-                  + Novo evento
-                </button>
+              {congregacoesAutorizadas && congregacoesAutorizadas.length > 0 && (
+                <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-2.5 py-1 text-xs shadow-2xs">
+                  <span className="text-[10px] font-bold uppercase text-slate-400">Escopo:</span>
+                  <select
+                    value={agendaVisualizada}
+                    onChange={(e) => setAgendaVisualizada(e.target.value)}
+                    className="bg-transparent text-xs font-semibold text-slate-800 outline-none cursor-pointer"
+                  >
+                    <option value="todos">Toda a Igreja (Geral)</option>
+                    {congregacoesAutorizadas.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.nome} {c.is_sede ? '(Sede)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               )}
+
+              <RevistaPublicaButton ministryId={ctx?.ministryId} />
             </div>
           </div>
 
-          {/* Navegação de Abas (Pills) */}
-          <div className="flex items-center gap-2.5 overflow-x-auto pb-1">
-            {TABS.map(tab => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => {
-                    setActiveTab(tab.id as any);
-                    setSelectedDate(null);
-                  }}
-                  className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-                    isActive
-                      ? 'bg-teal-700 text-white shadow-sm border border-teal-800'
-                      : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:text-slate-900 shadow-xs'
-                  }`}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
+          {msg && (
+            <div className={`p-3 rounded-xl border flex items-center gap-2 text-xs font-semibold ${
+              msg.tipo === 'ok' ? 'bg-emerald-50 text-emerald-800 border-emerald-150' : 'bg-rose-50 text-rose-800 border-rose-150'
+            }`}>
+              {msg.tipo === 'ok' ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <AlertTriangle className="h-4 w-4 text-rose-600" />}
+              {msg.texto}
+            </div>
+          )}
 
-          {/* CARDS PRINCIPAIS — KPIs COLORIDOS (PADRÃO MEMBROS) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* 1. Calendário Oficial (Azul) */}
-            <div className="bg-[#ebf5ff] border border-[#d0e6ff] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between">
-              <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                <div className="w-13 h-13 rounded-2xl bg-white text-[#2563eb] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#dbeafe]">
-                  <ShieldCheck className="w-7 h-7" />
-                </div>
-                <div className="min-w-0">
-                  <span className="text-xs font-bold text-slate-800 block truncate">
-                    Eventos Oficiais
-                  </span>
-                  <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
-                    {totalEventosOficiais}
-                  </p>
-                  <p className="text-[11px] font-bold text-teal-700 mt-1 truncate">
-                    Calendário Geral da Igreja
-                  </p>
-                </div>
+          {/* 4. Calendário Principal e Painel Lateral (Layout Idêntico ao Mockup) */}
+          {activeTab === 'calendario' && (
+            <div className="flex flex-col lg:flex-row gap-6 items-start">
+              {/* Calendário Principal (~70% no Desktop) */}
+              <div className="w-full lg:w-[68%] xl:w-[70%]">
+                <AgendaCalendarView
+                  currentMonth={currentMonth}
+                  currentYear={currentYear}
+                  MESES_PT={MESES_PT}
+                  daysInMonthArray={daysInMonthArray}
+                  eventosPorDia={eventosPorDia}
+                  selectedDate={selectedDate}
+                  onSelectDate={setSelectedDate}
+                  onPrevMonth={handlePrevMonth}
+                  onNextMonth={handleNextMonth}
+                  onGoToToday={handleGoToToday}
+                  isEscritaPermitida={isEscritaPermitida}
+                  onOpenForm={openForm}
+                  activeCategory={selectedCategory}
+                />
               </div>
-              <div className="w-8 h-8 rounded-xl bg-[#dbeafe] text-[#2563eb] flex items-center justify-center flex-shrink-0 self-start">
-                <CalendarIcon className="w-4 h-4" />
+
+              {/* Painel Lateral Próximos Compromissos (~30% no Desktop) */}
+              <div className="w-full lg:w-[32%] xl:w-[30%]">
+                <AgendaUpcomingPanel
+                  proximosEventos={proximosEventos}
+                  selectedDate={selectedDate}
+                  selectedCategory={selectedCategory}
+                  onSelectDate={setSelectedDate}
+                  onOpenForm={openForm}
+                  onVerTodos={() => setActiveTab('dashboard')}
+                />
               </div>
             </div>
-
-            {/* 2. Total de Compromissos (Verde) */}
-            <div className="bg-[#ecfdf3] border border-[#cff7de] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between">
-              <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                <div className="w-13 h-13 rounded-2xl bg-white text-[#16a34a] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#dcfce7]">
-                  <Calendar className="w-7 h-7" />
-                </div>
-                <div className="min-w-0">
-                  <span className="text-xs font-bold text-slate-800 block truncate">
-                    Compromissos
-                  </span>
-                  <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
-                    {eventos.length}
-                  </p>
-                  <p className="text-[11px] font-semibold text-slate-700 mt-1 truncate">
-                    {MESES_PT[currentMonth - 1]} de {currentYear}
-                  </p>
-                </div>
-              </div>
-              <div className="w-8 h-8 rounded-xl bg-[#dcfce7] text-[#16a34a] flex items-center justify-center flex-shrink-0 self-start">
-                <Clock className="w-4 h-4" />
-              </div>
-            </div>
-
-            {/* 3. Cultos & Reuniões (Âmbar/Laranja) */}
-            <div className="bg-[#fff6ea] border border-[#fde4c4] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between">
-              <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                <div className="w-13 h-13 rounded-2xl bg-white text-[#ea580c] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#ffedd5]">
-                  <Flame className="w-7 h-7" />
-                </div>
-                <div className="min-w-0">
-                  <span className="text-xs font-bold text-slate-800 block truncate">
-                    Cultos & Reuniões
-                  </span>
-                  <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
-                    {totalCultos + totalReunioes}
-                  </p>
-                  <p className="text-[11px] font-semibold text-slate-700 mt-1 truncate">
-                    {totalCultos} Cultos e {totalReunioes} Reuniões
-                  </p>
-                </div>
-              </div>
-              <div className="w-8 h-8 rounded-xl bg-[#ffedd5] text-[#ea580c] flex items-center justify-center flex-shrink-0 self-start">
-                <Flame className="w-4 h-4" />
-              </div>
-            </div>
-
-            {/* 4. Sincronizados (Roxo/Violeta) */}
-            <div className="bg-[#f3f0ff] border border-[#e3dbff] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between">
-              <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                <div className="w-13 h-13 rounded-2xl bg-white text-[#7c3aed] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#ede9fe]">
-                  <Lock className="w-7 h-7" />
-                </div>
-                <div className="min-w-0">
-                  <span className="text-xs font-bold text-slate-800 block truncate">
-                    Sincronizados
-                  </span>
-                  <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
-                    {totalEventosSincronizados}
-                  </p>
-                  <p className="text-[11px] font-bold text-[#7c3aed] mt-1 truncate">
-                    Integrados de outros módulos
-                  </p>
-                </div>
-              </div>
-              <div className="w-8 h-8 rounded-xl bg-[#ede9fe] text-[#7c3aed] flex items-center justify-center flex-shrink-0 self-start">
-                <ShieldCheck className="w-4 h-4" />
-              </div>
-            </div>
-          </div>
-
-        <AgendaToolbar
-          activeTab={activeTab}
-          currentMonth={currentMonth}
-          currentYear={currentYear}
-          MESES_PT={MESES_PT}
-          agendaVisualizada={agendaVisualizada}
-          onAgendaVisualizadaChange={setAgendaVisualizada}
-          congregacoesAutorizadas={congregacoesAutorizadas}
-          isSecretarioGeral={isSecretarioGeral}
-          quickFilter={quickFilter}
-          showAdvancedFilters={showAdvancedFilters}
-          filtroTipoId={filtroTipoId}
-          filtroCongregacao={filtroCongregacao}
-          filtroVisibilidade={filtroVisibilidade}
-          tiposAgrupados={tiposAgrupados}
-          CATEGORIAS_LABEL={CATEGORIAS_LABEL}
-          congregacoes={congregacoes}
-          orgHelper={orgHelper}
-          onPrevMonth={handlePrevMonth}
-          onNextMonth={handleNextMonth}
-          onGoToToday={handleGoToToday}
-          onQuickFilterChange={setQuickFilter}
-          onToggleAdvancedFilters={() => setShowAdvancedFilters(v => !v)}
-          onFiltroTipoChange={setFiltroTipoId}
-          onFiltroCongregacaoChange={setFiltroCongregacao}
-          onFiltroVisibilidadeChange={setFiltroVisibilidade}
-        />
-
-        {msg && (
-          <div className={`p-3 mb-4 rounded-xl border flex items-center gap-2 text-xs font-semibold ${
-            msg.tipo === 'ok' ? 'bg-emerald-50 text-emerald-800 border-emerald-150' : 'bg-rose-50 text-rose-800 border-rose-150'
-          }`}>
-            {msg.tipo === 'ok' ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <AlertTriangle className="h-4 w-4 text-rose-600" />}
-            {msg.texto}
-          </div>
-        )}
-
-        {activeTab === 'calendario' && (
-          <div className="flex flex-col lg:flex-row gap-5 items-start">
-            <AgendaCalendar
-              daysInMonthArray={daysInMonthArray}
-              eventosPorDia={eventosPorDia}
-              selectedDate={selectedDate}
-              onSelectDate={setSelectedDate}
-              isEscritaPermitida={isEscritaPermitida}
-              onOpenForm={openForm}
-            />
-
-            <DashboardSidebar className="w-full lg:w-[320px] lg:border-l lg:border-slate-200/50 lg:pl-5">
-              <AgendaTimeline
-                mode="sidebar"
-                selectedDate={selectedDate}
-                loading={loading}
-                eventosColunaDireita={eventosColunaDireita}
-                proximosEventos={proximosEventos}
-                isEscritaPermitida={isEscritaPermitida}
-                daysLeftInMonth={daysLeftInMonth}
-                MESES_PT={MESES_PT}
-                getEscopoLabel={getEscopoLabel}
-                onClearSelectedDate={() => setSelectedDate(null)}
-                onOpenForm={openForm}
-                onDeleteEvento={handleDelete}
-              />
-            </DashboardSidebar>
-          </div>
-        )}
+          )}
 
         {activeTab === 'dashboard' && (
           <div className="flex flex-col lg:flex-row gap-6">
@@ -381,6 +260,7 @@ export default function AgendaPage() {
               isEscritaPermitida={isEscritaPermitida}
               getEscopoLabel={getEscopoLabel}
               onOpenForm={openForm}
+              onDeleteEvento={handleDelete}
             />
 
             <DashboardSidebar className="w-full lg:w-80">

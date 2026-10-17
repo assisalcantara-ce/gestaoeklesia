@@ -40,6 +40,7 @@ const STANDALONE_PUBLIC_PREFIXES = [
   '/membro',
   '/validar',
   '/revista',
+  '/recepcao',
 ];
 
 export default function AppShell({ children }: { children: ReactNode }) {
