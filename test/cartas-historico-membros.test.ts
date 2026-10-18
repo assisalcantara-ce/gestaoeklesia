@@ -623,3 +623,135 @@ test('7. Atomicidade e Rollback no PostgreSQL: falha reverte a deliberação int
   assert.equal(pedido.status, 'pendente');
   assert.ok(!pedido.autorizador_id);
 });
+
+test('8. Deliberação Presidencial: Indeferimento com parecer registra data_autorizacao e mantém membro ativo', async () => {
+  const ministryId = 'tenant-1';
+  const memberId = 'member-108';
+  const pedidoId = 'pedido-indef-1';
+
+  const mockDb = createMockSupabase({
+    members: [
+      {
+        id: memberId,
+        ministry_id: ministryId,
+        name: 'Maria Oliveira',
+        status: 'active',
+        custom_fields: {},
+      },
+    ],
+    cartaPedidos: [
+      {
+        id: pedidoId,
+        ministry_id: ministryId,
+        member_id: memberId,
+        tipo_carta: 'mudanca',
+        status: 'pendente',
+      },
+    ],
+    enableRpc: true,
+  });
+
+  const userPresidente = {
+    userId: 'user-pres-1',
+    userName: 'Pastor Presidente João',
+    ministryId,
+    roles: ['admin'],
+    isAdmin: true,
+    nivel: 'presidencia' as any,
+  };
+
+  const resultado = await PresidenciaService.deliberarCartaPedido(mockDb, userPresidente, {
+    pedido_id: pedidoId,
+    decisao: 'rejeitar',
+    motivo_rejeicao: 'Membro possui pendências de liderança a esclarecer antes da transferência.',
+  });
+
+  assert.ok(resultado);
+  const pedido = mockDb.getCartaPedidos().find((p) => p.id === pedidoId);
+  assert.equal(pedido.status, 'rejeitado');
+  assert.equal(pedido.autorizador_id, 'user-pres-1');
+  assert.equal(pedido.autorizador_nome, 'Pastor Presidente João');
+  assert.equal(pedido.motivo_rejeicao, 'Membro possui pendências de liderança a esclarecer antes da transferência.');
+  assert.ok(pedido.data_autorizacao, 'data_autorizacao deve ser preenchida');
+  assert.doesNotThrow(() => new Date(pedido.data_autorizacao).toISOString());
+
+  // Membro deve permanecer inalterado e ativo
+  const member = mockDb.getMembers().find((m) => m.id === memberId);
+  assert.equal(member.status, 'active');
+
+  // Tentativa de deliberar novamente deve ser rejeitada
+  await assert.rejects(async () => {
+    await PresidenciaService.deliberarCartaPedido(mockDb, userPresidente, {
+      pedido_id: pedidoId,
+      decisao: 'rejeitar',
+      motivo_rejeicao: 'Tentativa duplicada',
+    });
+  }, /já se encontra rejeitado/);
+});
+
+test('9. Deliberação Presidencial: Autorização registra data_autorizacao timestamptz e atualiza membro atomicamente', async () => {
+  const ministryId = 'tenant-1';
+  const memberId = 'member-109';
+  const pedidoId = 'pedido-aut-1';
+
+  const mockDb = createMockSupabase({
+    members: [
+      {
+        id: memberId,
+        ministry_id: ministryId,
+        name: 'Carlos Alberto',
+        status: 'active',
+        custom_fields: {},
+      },
+    ],
+    cartaPedidos: [
+      {
+        id: pedidoId,
+        ministry_id: ministryId,
+        member_id: memberId,
+        tipo_carta: 'mudanca',
+        destino: 'Igreja Central de Curitiba',
+        status: 'pendente',
+      },
+    ],
+    enableRpc: true,
+  });
+
+  const userPresidente = {
+    userId: 'user-pres-1',
+    userName: 'Pastor Presidente João',
+    ministryId,
+    roles: ['admin'],
+    isAdmin: true,
+    nivel: 'presidencia' as any,
+  };
+
+  const resultado = await PresidenciaService.deliberarCartaPedido(mockDb, userPresidente, {
+    pedido_id: pedidoId,
+    decisao: 'autorizar',
+  });
+
+  assert.ok(resultado);
+  const pedido = mockDb.getCartaPedidos().find((p) => p.id === pedidoId);
+  assert.equal(pedido.status, 'autorizado');
+  assert.equal(pedido.autorizador_id, 'user-pres-1');
+  assert.ok(pedido.data_autorizacao, 'data_autorizacao deve ser preenchida');
+  assert.doesNotThrow(() => new Date(pedido.data_autorizacao).toISOString());
+
+  // Membro deve ser inativado com histórico ministerial registrado
+  const member = mockDb.getMembers().find((m) => m.id === memberId);
+  assert.equal(member.status, 'inactive');
+  const hist = member.custom_fields.historico_processos;
+  assert.equal(hist.length, 1);
+  assert.equal(hist[0].tipo_evento, 'carta_mudanca');
+  assert.equal(hist[0].destino, 'Igreja Central de Curitiba');
+
+  // Tentativa de deliberar novamente deve ser rejeitada
+  await assert.rejects(async () => {
+    await PresidenciaService.deliberarCartaPedido(mockDb, userPresidente, {
+      pedido_id: pedidoId,
+      decisao: 'autorizar',
+    });
+  }, /já se encontra autorizado/);
+});
+
