@@ -114,15 +114,24 @@ export function calcularFontSizeAutoAjustado({
   const isHandwritten = fontLower.includes('great vibes') || fontLower.includes('allura');
 
   // Coeficiente médio de largura de caractere por px de font-size
-  // Fontes manuscritas caligráficas como Great Vibes e Allura possuem ligaduras, inclinações e glifos largos
-  let charFactor = 0.55;
-  if (fontLower.includes('great vibes')) charFactor = 0.58;
-  else if (fontLower.includes('allura')) charFactor = 0.52;
-  else if (fontLower.includes('times') || fontLower.includes('georgia')) charFactor = 0.50;
-  else if (fontLower.includes('courier')) charFactor = 0.62;
+  // Em fontes caligráficas (Great Vibes, Allura), glifos minúsculos são muito mais estreitos
+  // e fluidos que em maiúsculas (ALL-CAPS).
+  const isAllUpper = textoLimpo.length > 3 && textoLimpo === textoLimpo.toUpperCase();
+  let charFactor = 0.52;
+  if (fontLower.includes('great vibes')) {
+    charFactor = isAllUpper ? 0.58 : 0.44;
+  } else if (fontLower.includes('allura')) {
+    charFactor = isAllUpper ? 0.52 : 0.40;
+  } else if (fontLower.includes('times') || fontLower.includes('georgia')) {
+    charFactor = isAllUpper ? 0.54 : 0.46;
+  } else if (fontLower.includes('courier')) {
+    charFactor = 0.60;
+  } else {
+    charFactor = isAllUpper ? 0.56 : 0.48;
+  }
 
-  // Se o elemento tiver padding horizontal interno reservamos uma margem de segurança (mínimo 12px)
-  const safeWidth = Math.max(10, larguraElemento - 12);
+  // Se o elemento tiver padding horizontal interno reservamos uma margem de segurança (mínimo 10px)
+  const safeWidth = Math.max(10, larguraElemento - 10);
   const safeHeight = Math.max(10, alturaElemento - 4);
 
   // Se for linha única (ou participante/nome de destaque), deve caber integralmente em 1 linha

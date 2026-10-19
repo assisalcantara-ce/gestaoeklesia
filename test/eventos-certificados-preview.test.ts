@@ -92,7 +92,7 @@ test('3. Pré-visualização com dados reais do evento: substituição completa 
 
   // Textos com placeholders típicos do template de eventos
   const textoNome = substituirPlaceholdersCertificado('Certificamos que {{participante_nome}} participou com aproveitamento', map, 'eventos');
-  assert.equal(textoNome, 'Certificamos que CARLOS EDUARDO OLIVEIRA participou com aproveitamento');
+  assert.equal(textoNome, 'Certificamos que Carlos Eduardo Oliveira participou com aproveitamento');
 
   const textoEvento = substituirPlaceholdersCertificado('do evento {{evento_nome}}', map, 'eventos');
   assert.equal(textoEvento, 'do evento ESCOLA DE OBREIROS 2026');

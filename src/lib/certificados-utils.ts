@@ -232,6 +232,59 @@ const formatDate = (value?: string | null) => {
   return str;
 };
 
+/**
+ * Preposições e partículas em língua portuguesa que devem permanecer em minúsculas
+ * no interior de nomes próprios compostos.
+ */
+const PREPOSICOES_NOMES = new Set(['de', 'da', 'do', 'das', 'dos', 'e', 'em']);
+
+/**
+ * Formata um nome próprio em Title Case elegante, mantendo preposições minúsculas,
+ * preservando acentuação e tratando múltiplos espaços ou parênteses.
+ * Exemplo: "CARLOS EDUARDO OLIVEIRA" -> "Carlos Eduardo Oliveira"
+ * Exemplo: "carlos eduardo de oliveira (participante)" -> "Carlos Eduardo de Oliveira (Participante)"
+ */
+export function formatarNomeProprio(nome?: string | null): string {
+  if (!nome || !nome.trim()) return '';
+  const limpo = nome.trim().replace(/\s+/g, ' ');
+
+  // Se o nome contém parênteses ou delimitadores, processa tokens respeitando-os
+  return limpo.replace(/([\p{L}\p{M}]+)/gu, (palavra, _p1, offset) => {
+    const lower = palavra.toLowerCase();
+    // A primeira palavra do nome sempre inicia em maiúscula; no interior, preposições ficam minúsculas
+    if (offset > 0 && PREPOSICOES_NOMES.has(lower)) {
+      return lower;
+    }
+    // Capitaliza a primeira letra e mantém o restante em minúsculas
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  });
+}
+
+/**
+ * Campos que representam nomes de pessoas e devem ser formatados como Nome Próprio
+ * (Title Case com preposições minúsculas) em vez de caixa alta forçada.
+ */
+const CAMPOS_NOME_PESSOA = new Set([
+  'participante_nome',
+  'nome',
+  'membro_nome',
+  'participante',
+  'ministro_nome',
+  'presidente_nome',
+  'pastor_nome',
+  'responsavel_nome',
+  'responsavel_evento',
+  'crianca_nome',
+  'pai_nome',
+  'mae_nome',
+  'candidato_nome',
+  'conjuge1_nome',
+  'conjuge2_nome',
+  'obreiro_nome',
+  'aluno_nome',
+  'professor_nome',
+]);
+
 export function substituirPlaceholdersCertificado(
   texto: string,
   dados: Record<string, any>,
@@ -277,14 +330,21 @@ export function substituirPlaceholdersCertificado(
   const placeholders = getCertificadoPlaceholders(categoria);
   placeholders.forEach((ph) => {
     const rawCampo = ph.campo;
-    const valor = String(base[rawCampo] ?? '').toUpperCase();
+    const valorOriginal = base[rawCampo] !== undefined && base[rawCampo] !== null ? String(base[rawCampo]) : '';
+
+    // Se for campo de nome de pessoa, formata em Nome Próprio (Title Case) para legibilidade estética
+    // Preserva acentuação, preposições minúsculas e evita grito em caixa alta nas fontes caligráficas
+    let valorFinal = valorOriginal;
+    if (CAMPOS_NOME_PESSOA.has(rawCampo) && valorOriginal) {
+      valorFinal = formatarNomeProprio(valorOriginal);
+    }
 
     // Suporta tanto {{campo}} quanto {campo} de forma flexível e insensível a maiúsculas/minúsculas
     const regexDuplo = new RegExp(`\\{\\{\\s*${rawCampo}\\s*\\}\\}`, 'gi');
     const regexSimples = new RegExp(`\\{\\s*${rawCampo}\\s*\\}`, 'gi');
 
-    resultado = resultado.replace(regexDuplo, valor);
-    resultado = resultado.replace(regexSimples, valor);
+    resultado = resultado.replace(regexDuplo, valorFinal);
+    resultado = resultado.replace(regexSimples, valorFinal);
   });
 
   return resultado;

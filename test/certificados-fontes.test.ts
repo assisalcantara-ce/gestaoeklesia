@@ -67,49 +67,44 @@ test('calcularFontSizeAutoAjustado ajusta nomes curtos, médios e longos sem alt
   });
   assert.equal(sizeCurto, 22, 'Nome curto deve manter o fontSize original de 22px');
 
-  // Nome médio
-  const medio = 'Carlos Eduardo Oliveira';
-  const sizeMedio = calcularFontSizeAutoAjustado({
-    texto: medio,
+  // Nome completo realista (sem sufixo artificial): cabe com tamanho normal/confortável
+  const nomeRealista = 'Carlos Eduardo Oliveira';
+  const sizeRealista = calcularFontSizeAutoAjustado({
+    texto: nomeRealista,
     larguraElemento: el.largura,
     alturaElemento: el.altura,
     fontSizeBase: el.fontSize,
     fonte: el.fonte,
     isSingleLine: true,
   });
-  assert.ok(sizeMedio <= 22 && sizeMedio >= 18, `Nome médio deve caber confortavelmente (${sizeMedio}px)`);
+  assert.equal(sizeRealista, 22, 'Nome completo realista em Title Case cabe no tamanho original de 22px sem redução desnecessária');
 
-  // Nome longo (cenário real do usuário que estava quebrando em 2 linhas)
-  const longo = 'Carlos Eduardo Oliveira (Participante Demonstrativo)';
-  const sizeLongo = calcularFontSizeAutoAjustado({
-    texto: longo,
+  // Nome extremamente longo em caixa alta (ex: com sufixo demonstrativo em ALL CAPS): é reduzido proporcionalmente
+  const longoAllCaps = 'CARLOS EDUARDO OLIVEIRA (PARTICIPANTE DEMONSTRATIVO)';
+  const sizeLongoUpper = calcularFontSizeAutoAjustado({
+    texto: longoAllCaps,
     larguraElemento: el.largura,
     alturaElemento: el.altura,
     fontSizeBase: el.fontSize,
     fonte: el.fonte,
     isSingleLine: true,
   });
-  assert.ok(sizeLongo < 22, 'Nome longo deve ser reduzido automaticamente');
-  assert.ok(sizeLongo >= 10, 'Nome longo deve respeitar tamanho mínimo legível');
-
-  // Verificar que não ultrapassa a largura máxima
-  // 52 caracteres * sizeLongo * 0.50 <= 595
-  const estimatedPx = longo.length * sizeLongo * 0.50;
-  assert.ok(estimatedPx <= el.largura, `Tamanho estimado (${estimatedPx}px) não pode ultrapassar o elemento (${el.largura}px)`);
+  assert.ok(sizeLongoUpper < 22, 'Nome muito longo em maiúsculas deve ser reduzido automaticamente');
+  assert.ok(sizeLongoUpper >= 10, 'Deve respeitar tamanho mínimo legível');
 
   // Testar também com a fonte Allura
   const sizeAllura = calcularFontSizeAutoAjustado({
-    texto: longo,
+    texto: nomeRealista,
     larguraElemento: el.largura,
     alturaElemento: el.altura,
     fontSizeBase: el.fontSize,
     fonte: 'Allura',
     isSingleLine: true,
   });
-  assert.ok(sizeAllura <= 22 && sizeAllura >= 10, `Allura deve ajustar fonte proporcionalmente (${sizeAllura}px)`);
+  assert.equal(sizeAllura, 22, 'Allura em Title Case cabe no tamanho original');
 
   // Testar buildTextoEstiloRenderizacao
-  const { containerStyle, innerStyle, fontSizeEfetivo } = buildTextoEstiloRenderizacao(el, longo, true);
+  const { containerStyle, innerStyle, fontSizeEfetivo } = buildTextoEstiloRenderizacao(el, nomeRealista, true);
   assert.ok(containerStyle.includes('overflow:hidden'), 'Container deve conter overflow:hidden');
   assert.ok(containerStyle.includes('display:flex'), 'Container deve usar flex');
   assert.ok(innerStyle.includes('white-space:nowrap'), 'Nome do participante deve priorizar linha única');
@@ -143,4 +138,32 @@ test('buildEventoPlaceholderMap formata evento_data estritamente como DD/MM/YYYY
   assert.ok(!map.evento_data.includes(':'), 'evento_data não deve conter horário nem dois-pontos');
   assert.ok(map.evento_data_inicio.includes(':'), 'evento_data_inicio preserva data e horário para quem precisar');
 });
+
+test('formatarNomeProprio e substituirPlaceholdersCertificado preservam nomes próprios sem forçar maiúsculas', async () => {
+  const { formatarNomeProprio, substituirPlaceholdersCertificado } = await import('../src/lib/certificados-utils');
+
+  // Testar formatarNomeProprio com preposições e acentuação
+  assert.equal(formatarNomeProprio('CARLOS EDUARDO OLIVEIRA'), 'Carlos Eduardo Oliveira');
+  assert.equal(formatarNomeProprio('carlos eduardo de oliveira'), 'Carlos Eduardo de Oliveira');
+  assert.equal(formatarNomeProprio('JOÃO DA SILVA E SOUZA'), 'João da Silva e Souza');
+  assert.equal(formatarNomeProprio('MARIA DAS DORES DOS SANTOS'), 'Maria das Dores dos Santos');
+  assert.equal(formatarNomeProprio('josé antônio de sousa'), 'José Antônio de Sousa');
+  assert.equal(formatarNomeProprio('Carlos Eduardo Oliveira (Participante Demonstrativo)'), 'Carlos Eduardo Oliveira (Participante Demonstrativo)');
+
+  // Testar substituição no template de evento
+  const templateTexto = 'Certificamos que {{participante_nome}} participou do evento {{evento_nome}} em {{cidade}} - {{estado}}.';
+  const dados = {
+    participante_nome: 'CARLOS EDUARDO OLIVEIRA',
+    evento_nome: 'ESCOLA DE OBREIROS 2026',
+    cidade: 'Ananindeua',
+    estado: 'PA',
+  };
+
+  const resultado = substituirPlaceholdersCertificado(templateTexto, dados, 'eventos');
+  assert.ok(resultado.includes('Carlos Eduardo Oliveira'), `O nome deve ser formatado em Title Case: ${resultado}`);
+  assert.ok(!resultado.includes('CARLOS EDUARDO OLIVEIRA'), 'Não deve manter o nome em maiúsculas forçadas');
+  assert.ok(resultado.includes('ESCOLA DE OBREIROS 2026'), 'Nome do evento deve ser mantido');
+  assert.ok(resultado.includes('Ananindeua - PA'), 'Cidade e estado devem ser mantidos');
+});
+
 

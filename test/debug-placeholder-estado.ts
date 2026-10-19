@@ -30,7 +30,7 @@ test('buildEventoPlaceholderMap extrai cidade e estado de configIgreja estrutura
 
   const texto = 'Local: {{cidade}} / {{estado}}';
   const substituido = substituirPlaceholdersCertificado(texto, map, 'eventos');
-  assert.equal(substituido, 'Local: ANANINDEUA / PA');
+  assert.equal(substituido, 'Local: Ananindeua / PA');
 });
 
 test('buildEventoPlaceholderMap extrai cidade e estado a partir do endereco se cidade/estado não vierem preenchidos', () => {
