@@ -26,9 +26,15 @@ interface EventoPublico {
   inclui_alimentacao?: boolean;
   inclui_hospedagem?: boolean;
   inscritos_confirmados: number;
+  inscritos_aguardando?: number;
   lista_espera: number;
   vagas_restantes: number | null;
   lotado: boolean;
+  status_inscricao?: 'aberto' | 'lotado' | 'encerrado_manual' | 'expirado' | 'cancelado';
+  permite_inscricao?: boolean;
+  is_lista_espera?: boolean;
+  motivo_bloqueio?: string | null;
+  descricao_status?: string;
 }
 
 type FormState = {
@@ -201,9 +207,15 @@ export default function EventoPublicoPage() {
     );
   }
 
-  const encerrado = evento.status === 'cancelado' || evento.status === 'realizado';
-  const podeSe = evento.aceita_inscricao && !encerrado && !sucesso;
-  const mostrarLotado = evento.lotado && evento.aceita_inscricao && !encerrado;
+  const statusInsc = evento.status_inscricao ?? (
+    evento.status === 'cancelado' ? 'cancelado' :
+    evento.status === 'realizado' ? 'expirado' :
+    !evento.aceita_inscricao ? 'encerrado_manual' :
+    evento.lotado ? 'lotado' : 'aberto'
+  );
+
+  const podeSe = (evento.permite_inscricao ?? (statusInsc === 'aberto' || statusInsc === 'lotado')) && !sucesso;
+  const mostrarLotado = Boolean(evento.is_lista_espera ?? (statusInsc === 'lotado'));
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#123b63]/5 to-white">
@@ -327,12 +339,35 @@ export default function EventoPublicoPage() {
           </div>
         )}
 
-        {/* Status: cancelado/realizado */}
-        {encerrado && (
-          <div className="bg-gray-50 rounded-xl border border-gray-300 p-6 text-center">
-            <AlertTriangle className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-            <p className="text-gray-600 font-semibold">
-              {evento.status === 'cancelado' ? 'Este evento foi cancelado.' : 'Este evento já foi realizado.'}
+        {/* Status: cancelado */}
+        {statusInsc === 'cancelado' && (
+          <div className="bg-rose-50 rounded-xl border border-rose-200 p-6 text-center space-y-2 shadow-xs">
+            <AlertTriangle className="w-10 h-10 text-rose-500 mx-auto" />
+            <h3 className="font-bold text-base text-rose-900">Evento Cancelado</h3>
+            <p className="text-rose-700 text-sm">
+              {evento.motivo_bloqueio || 'Este evento foi cancelado pela organização e não está aceitando novas inscrições.'}
+            </p>
+          </div>
+        )}
+
+        {/* Status: expirado / realizado */}
+        {statusInsc === 'expirado' && (
+          <div className="bg-amber-50/80 rounded-xl border border-amber-200 p-6 text-center space-y-2 shadow-xs">
+            <Clock className="w-10 h-10 text-amber-500 mx-auto" />
+            <h3 className="font-bold text-base text-amber-900">Inscrições Encerradas</h3>
+            <p className="text-amber-800 text-sm">
+              {evento.motivo_bloqueio || 'Este evento já foi realizado ou o prazo de inscrições expirou.'}
+            </p>
+          </div>
+        )}
+
+        {/* Status: encerramento manual pela organização */}
+        {statusInsc === 'encerrado_manual' && (
+          <div className="bg-slate-50 rounded-xl border border-slate-200 p-6 text-center space-y-2 shadow-xs">
+            <AlertTriangle className="w-10 h-10 text-slate-400 mx-auto" />
+            <h3 className="font-bold text-base text-slate-800">Inscrições Encerradas</h3>
+            <p className="text-slate-600 text-sm">
+              {evento.motivo_bloqueio || 'As inscrições para este evento foram encerradas pela organização.'}
             </p>
           </div>
         )}
@@ -545,13 +580,6 @@ export default function EventoPublicoPage() {
                 }
               </button>
             </form>
-          </div>
-        )}
-
-        {/* Sem inscrição aberta */}
-        {!encerrado && !evento.aceita_inscricao && (
-          <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 text-center">
-            <p className="text-gray-500 text-sm">As inscrições para este evento estão encerradas.</p>
           </div>
         )}
 

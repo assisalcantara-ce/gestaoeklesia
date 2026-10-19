@@ -25,10 +25,24 @@ export const CERTIFICADO_CATEGORIAS: Array<{ value: CertificadoCategoria; label:
  */
 export function isTemplateCategoriaEventos(template: any): boolean {
   if (!template) return false;
-  const rawCat = (template.categoria || template.category || '').toString().trim().toLowerCase();
+  const rawCat = (template.categoria || template.category || template.tipo || '').toString().trim().toLowerCase();
   const cat = rawCat.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-  const outrasCategorias = [
+  const key = (template.template_key || template.id || template.chave || '').toString().trim().toLowerCase();
+  const rawNome = (template.nome || template.name || '').toString().trim().toLowerCase();
+  const nomeNorm = rawNome.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  // 1. Chaves explícitas conhecidas de eventos
+  if (
+    key === 'evento-padrao' ||
+    key === 'cert-eventos' ||
+    key.startsWith('evento-')
+  ) {
+    return true;
+  }
+
+  // 2. Exclusão estrita de outras categorias eclesiásticas/ministeriais não relacionadas a eventos
+  const outrasCategoriasEstritas = [
     'ministerial',
     'consagracao-obreiro',
     'apresentacao-criancas',
@@ -36,21 +50,57 @@ export function isTemplateCategoriaEventos(template: any): boolean {
     'casamento',
     'ebd',
   ];
-  if (outrasCategorias.includes(cat)) {
+  if (outrasCategoriasEstritas.includes(cat)) {
     return false;
   }
 
-  if (cat === 'eventos' || cat === 'evento' || cat.startsWith('evento')) {
+  // Se tiver cargo ministerial ou chave estritamente ministerial nativa
+  const cargoKey = (template.cargo_key || '').toString().trim();
+  const isChaveMinisterialNativa =
+    key.startsWith('ministerial-') ||
+    key.startsWith('consagracao-') ||
+    key.startsWith('diacono-') ||
+    key.startsWith('diaconisa-');
+
+  if (cargoKey || isChaveMinisterialNativa) {
+    return false;
+  }
+
+  // 3. Categorias explícitas de eventos, participação ou atividades correlatas
+  if (
+    cat === 'eventos' ||
+    cat === 'evento' ||
+    cat.startsWith('evento') ||
+    cat.includes('evento') ||
+    cat === 'participacao' ||
+    cat.includes('participacao') ||
+    cat === 'presenca' ||
+    cat === 'congresso' ||
+    cat === 'conferencia' ||
+    cat === 'workshop' ||
+    cat === 'seminario' ||
+    cat === 'curso' ||
+    cat === 'treinamento'
+  ) {
     return true;
   }
 
-  const key = (template.template_key || template.id || template.chave || '').toString().trim().toLowerCase();
-  if (key === 'evento-padrao' || key === 'cert-eventos' || key.startsWith('evento-')) {
+  // 4. Se o nome contiver termos típicos de evento, participação, conferência ou congresso
+  if (
+    nomeNorm.includes('evento') ||
+    nomeNorm.includes('participa') ||
+    nomeNorm.includes('congresso') ||
+    nomeNorm.includes('conferencia') ||
+    nomeNorm.includes('workshop') ||
+    nomeNorm.includes('seminario') ||
+    nomeNorm.includes('retiro') ||
+    nomeNorm.includes('encontro')
+  ) {
     return true;
   }
 
-  const nomeNorm = (template.nome || template.name || '').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  if (nomeNorm.includes('evento') && (cat === '' || cat === 'eventos' || cat === 'evento')) {
+  // 5. Se o modelo foi criado pelo usuário (criado_pelo_usuario === true)
+  if (template.criado_pelo_usuario === true && (cat === '' || cat === 'eventos' || cat === 'evento')) {
     return true;
   }
 

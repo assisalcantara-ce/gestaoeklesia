@@ -7,6 +7,7 @@ import {
   createAsaasPixCharge,
   futureDateStr,
 } from '@/lib/asaas-eventos';
+import { avaliarStatusInscricao } from '@/lib/evento-status-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
   // Buscar evento público
   const { data: evento, error: evErr } = await admin
     .from('eventos')
-    .select('id, titulo, ministry_id, status, is_publico, aceita_inscricao, capacidade, data_inicio, valor_inscricao')
+    .select('id, titulo, ministry_id, status, is_publico, aceita_inscricao, capacidade, data_inicio, data_fim, valor_inscricao')
     .eq('slug', slug)
     .maybeSingle();
 
@@ -59,19 +60,39 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Inscrições desabilitadas para este ministério.' }, { status: 403 });
   }
 
-  // Validações de negócio
+  // Validação de visibilidade pública
   if (!evento.is_publico) {
     // Retorna 404 (não 403) para não revelar que o slug existe mas é privado
     return NextResponse.json({ error: 'Evento não encontrado.' }, { status: 404 });
   }
-  if (!evento.aceita_inscricao) {
-    return NextResponse.json({ error: 'Este evento não está aceitando inscrições no momento.' }, { status: 409 });
+
+  // Contagem de inscritos para avaliação de capacidade e concorrência
+  let totalOcupados = 0;
+  if (evento.capacidade != null) {
+    const { count } = await admin
+      .from('eventos_inscricoes')
+      .select('id', { count: 'exact', head: true })
+      .eq('evento_id', evento.id)
+      .in('status', ['confirmado', 'aguardando_pagamento']);
+    totalOcupados = count ?? 0;
   }
-  if (evento.status === 'cancelado') {
-    return NextResponse.json({ error: 'Este evento foi cancelado.' }, { status: 409 });
-  }
-  if (evento.status === 'realizado') {
-    return NextResponse.json({ error: 'Este evento já foi realizado. Não é possível realizar novas inscrições.' }, { status: 409 });
+
+  // Validação unificada de status do ciclo de vida e fuso horário de Brasília
+  const statusInfo = avaliarStatusInscricao({
+    status: evento.status,
+    aceita_inscricao: evento.aceita_inscricao,
+    data_inicio: evento.data_inicio,
+    data_fim: evento.data_fim,
+    capacidade: evento.capacidade,
+    inscritos_confirmados: totalOcupados,
+    aguardando_pagamento: 0,
+  });
+
+  if (!statusInfo.permite_inscricao) {
+    return NextResponse.json(
+      { error: statusInfo.motivo_bloqueio ?? 'Inscrições não disponíveis.' },
+      { status: 409 }
+    );
   }
 
   // Verificar duplicidade por email
@@ -94,24 +115,10 @@ export async function POST(request: NextRequest) {
   // Determinar status da inscrição: confirmado, aguardando_pagamento ou lista_espera
   const isPago = Number(evento.valor_inscricao) > 0;
   let statusInscricao: 'confirmado' | 'lista_espera' | 'aguardando_pagamento' = 'confirmado';
-  let temVaga = true;
 
-  if (evento.capacidade != null) {
-    // Conta confirmados + aguardando_pagamento para evitar overbooking
-    // (inscrições pendentes de pagamento reservam a vaga temporariamente)
-    const { count } = await admin
-      .from('eventos_inscricoes')
-      .select('id', { count: 'exact', head: true })
-      .eq('evento_id', evento.id)
-      .in('status', ['confirmado', 'aguardando_pagamento']);
-
-    if ((count ?? 0) >= evento.capacidade) {
-      temVaga = false;
-      statusInscricao = 'lista_espera';
-    }
-  }
-
-  if (temVaga && isPago) {
+  if (statusInfo.is_lista_espera || statusInfo.status_inscricao === 'lotado') {
+    statusInscricao = 'lista_espera';
+  } else if (isPago) {
     statusInscricao = 'aguardando_pagamento';
   }
 

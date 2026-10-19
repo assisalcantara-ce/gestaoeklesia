@@ -15,6 +15,7 @@ import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organi
 import { loadCertificadosTemplatesForCurrentUser } from '@/lib/certificados-templates-sync';
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { substituirPlaceholdersCertificado, isTemplateCategoriaEventos } from '@/lib/certificados-utils';
+import { formatarEnderecoCongregacao, buildEventoPlaceholderMap } from '@/lib/evento-status-utils';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   AlertCircle,
@@ -40,6 +41,7 @@ import {
   HelpCircle,
   Landmark,
   LayoutList,
+  Lock,
   MapPin,
   MoreVertical,
   Pencil,
@@ -47,6 +49,7 @@ import {
   Plus,
   Printer,
   QrCode,
+  RefreshCw,
   RotateCcw,
   Search,
   ShieldCheck,
@@ -115,126 +118,9 @@ interface Congregacao {
   supervisao_id?: string | null;
 }
 
-export function formatarEnderecoCongregacao(cong?: {
-  endereco?: string | null;
-  cidade?: string | null;
-  municipio?: string | null;
-  uf?: string | null;
-  cep?: string | null;
-} | null): string {
-  if (!cong) return '';
-  const parts: string[] = [];
-  const logradouro = (cong.endereco || '').trim();
-  if (logradouro) parts.push(logradouro);
-
-  const cidade = (cong.cidade || cong.municipio || '').trim();
-  const uf = (cong.uf || '').trim().toUpperCase();
-  if (cidade && uf) {
-    parts.push(`${cidade} - ${uf}`);
-  } else if (cidade) {
-    parts.push(cidade);
-  } else if (uf) {
-    parts.push(uf);
-  }
-
-  const cep = (cong.cep || '').trim();
-  if (cep) {
-    parts.push(cep.toUpperCase().startsWith('CEP') ? cep : `CEP: ${cep}`);
-  }
-
-  return parts.join(', ');
-}
 interface Membro {
   id: string;
   nome_completo: string;
-}
-
-export function buildEventoPlaceholderMap(
-  evento: Partial<Evento> & { titulo?: string; local_nome?: string | null; local_endereco?: string | null; tipo?: any; congregacao_nome?: string | null; data_inicio?: string; data_fim?: string | null; descricao?: string | null; carga_horaria?: number | string | null },
-  insc: { id?: string; nome_display?: string; nome_externo?: string | null; nome?: string | null; cpf?: string | null; telefone?: string | null; email?: string | null; data_confirmacao?: string | null; data_inscricao?: string | null; status?: string | null },
-  configIgreja?: Partial<ConfiguracaoIgreja> & { nome?: string; endereco?: string; cnpj?: string; responsavel?: string; cidade?: string; uf?: string }
-): Record<string, string> {
-  const cfg = configIgreja || {};
-  const endParts = (cfg.endereco || '').split(',');
-  const cidadeUf = endParts.length > 1 ? endParts[endParts.length - 2]?.trim() : (cfg.endereco || '');
-  const cidadeParts = cidadeUf.split('-');
-  const cidade = cfg.cidade || cidadeParts[0]?.trim() || '';
-  const estado = cfg.uf || cidadeParts[1]?.trim() || '';
-
-  const localResolvido = evento.local_nome && evento.local_endereco
-    ? `${evento.local_nome} - ${evento.local_endereco}`
-    : (evento.local_nome || evento.local_endereco || 'Templo Sede');
-
-  const dtInicio = evento.data_inicio
-    ? new Date(evento.data_inicio).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
-    : '';
-  const dtFim = evento.data_fim
-    ? new Date(evento.data_fim).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
-    : '';
-
-  const nomeParticipante = insc.nome_display || insc.nome_externo || (insc as any).nome || '';
-  const cargaHorariaStr = evento.carga_horaria ? `${evento.carga_horaria} horas` : '';
-
-  return {
-    participante_nome: nomeParticipante,
-    nome: nomeParticipante,
-    membro_nome: nomeParticipante,
-    participante: nomeParticipante,
-    '{{NOME}}': nomeParticipante,
-    '{{NOME_PARTICIPANTE}}': nomeParticipante,
-    '{{CPF}}': insc.cpf || '',
-    '{{CPF_PARTICIPANTE}}': insc.cpf || '',
-    '{{TELEFONE}}': insc.telefone || '',
-    '{{EMAIL}}': (insc as any).email_externo || insc.email || '',
-    evento_nome: evento.titulo || '',
-    evento_titulo: evento.titulo || '',
-    titulo: evento.titulo || '',
-    '{{NOME_EVENTO}}': evento.titulo || '',
-    '{{TITULO_EVENTO}}': evento.titulo || '',
-    evento_tipo: evento.tipo ? String(evento.tipo) : '',
-    tipo_evento: evento.tipo ? String(evento.tipo) : '',
-    tipo: evento.tipo ? String(evento.tipo) : '',
-    evento_data: dtInicio,
-    data_evento: dtInicio,
-    data: dtInicio,
-    evento_data_inicio: dtInicio,
-    data_inicio: dtInicio,
-    evento_data_fim: dtFim,
-    data_fim: dtFim,
-    evento_local: localResolvido,
-    local_evento: evento.local_nome || localResolvido,
-    local: localResolvido,
-    local_nome: evento.local_nome || '',
-    local_endereco: evento.local_endereco || '',
-    '{{LOCAL}}': localResolvido,
-    '{{LOCAL_NOME}}': evento.local_nome || localResolvido,
-    '{{ENDERECO}}': evento.local_endereco || localResolvido,
-    evento_congregacao: evento.congregacao_nome || 'Templo Sede',
-    congregacao: evento.congregacao_nome || 'Templo Sede',
-    evento_descricao: evento.descricao || '',
-    descricao: evento.descricao || '',
-    evento_carga_horaria: cargaHorariaStr,
-    carga_horaria: cargaHorariaStr,
-    '{{CARGA_HORARIA}}': cargaHorariaStr,
-    responsavel_evento: cfg.responsavel || '',
-    pastor_nome: cfg.responsavel || '',
-    responsavel: cfg.responsavel || '',
-    ministerio_nome: cfg.nome || 'Igreja',
-    nome_igreja: cfg.nome || 'Igreja',
-    igreja_nome: cfg.nome || 'Igreja',
-    '{{NOME_IGREJA}}': cfg.nome || 'Igreja',
-    ministerio_cnpj: cfg.cnpj || '',
-    cnpj: cfg.cnpj || '',
-    cidade,
-    '{{CIDADE_IGREJA}}': cidade,
-    estado,
-    uf: estado,
-    '{{UF_IGREJA}}': estado,
-    '{{CIDADE_UF_IGREJA}}': cidade && estado ? `${cidade} - ${estado}` : (cidade || estado),
-    evento_protocolo: insc.id ? insc.id.substring(0, 8).toUpperCase() : '',
-    protocolo: insc.id ? insc.id.substring(0, 8).toUpperCase() : '',
-    data_emissao: new Date().toLocaleDateString('pt-BR'),
-  };
 }
 
 interface Evento {
@@ -475,7 +361,7 @@ const FORM_EVENTO_INICIAL: FormEvento = {
   local_endereco: '',
   capacidade: '',
   is_publico: true,
-  aceita_inscricao: false,
+  aceita_inscricao: true,
   evento_pago: false,
   valor_inscricao: '0,00',
   formas_pagamento: [],
@@ -688,21 +574,33 @@ export default function EventosPage() {
   const [certTemplatesFull, setCertTemplatesFull] = useState<any[]>([]);
 
   const optionsCertificados = useMemo(() => {
-    const list = [...templatesCertificados];
-    if (formEvento.certificado_modelo_id && !list.some(t => t.id === formEvento.certificado_modelo_id)) {
+    const map = new Map<string, { id: string; nome: string }>();
+    for (const t of templatesCertificados) {
+      if (t.id) map.set(t.id, t);
+    }
+    // Preservar modelo já selecionado no evento, mesmo se for UUID ou modelo arquivado
+    if (formEvento.certificado_modelo_id) {
       const match = certTemplatesFull.find(t =>
         t.id === formEvento.certificado_modelo_id ||
         t.template_key === formEvento.certificado_modelo_id ||
         t.db_id === formEvento.certificado_modelo_id
       );
       if (match) {
-        list.unshift({
+        const canonicalKey = match.id || match.template_key || formEvento.certificado_modelo_id;
+        if (!map.has(canonicalKey) && !map.has(formEvento.certificado_modelo_id)) {
+          map.set(formEvento.certificado_modelo_id, {
+            id: formEvento.certificado_modelo_id,
+            nome: match.nome || match.name || 'Certificado Selecionado',
+          });
+        }
+      } else if (!map.has(formEvento.certificado_modelo_id)) {
+        map.set(formEvento.certificado_modelo_id, {
           id: formEvento.certificado_modelo_id,
-          nome: match.nome || match.name || 'Certificado Selecionado',
+          nome: 'Certificado Selecionado',
         });
       }
     }
-    return list;
+    return Array.from(map.values());
   }, [templatesCertificados, formEvento.certificado_modelo_id, certTemplatesFull]);
   const [configIgreja, setConfigIgreja] = useState<ConfiguracaoIgreja>({
     nome: '',
@@ -866,6 +764,89 @@ export default function EventosPage() {
     };
   }, [menuAbertoId, fecharMenuAcoes]);
 
+  // ── Carregar Templates de Certificados do Tenant Dinamicamente ─────────────
+  const carregarTemplatesCertificados = useCallback(async (midParam?: string) => {
+    const targetMid = midParam || ministryId;
+    if (!targetMid) return;
+    try {
+      const { data: certRows, error: certErr } = await supabase
+        .from('certificados_templates')
+        .select('id, template_key, name, template_data, is_active, created_at, updated_at')
+        .eq('ministry_id', targetMid)
+        .order('name');
+
+      let rows = (certRows as any[]) || [];
+
+      // Se ainda não houver templates salvos no banco para o tenant (primeiro acesso),
+      // acionar a rotina oficial de carga/semeadura como fallback seguro
+      if (rows.length === 0 && !certErr) {
+        try {
+          const syncRes = await loadCertificadosTemplatesForCurrentUser(supabase);
+          if (syncRes?.templates && Array.isArray(syncRes.templates)) {
+            const { data: refetched } = await supabase
+              .from('certificados_templates')
+              .select('id, template_key, name, template_data, is_active, created_at, updated_at')
+              .eq('ministry_id', targetMid)
+              .order('name');
+            rows = (refetched as any[]) || syncRes.templates.map((t: any) => ({
+              id: t.id,
+              template_key: t.template_key || t.id,
+              name: t.nome || t.name,
+              template_data: t,
+              is_active: t.ativo !== false,
+            }));
+          }
+        } catch {
+          // fallback silencioso
+        }
+      }
+
+      const fullTemplates = rows.map((r: any) => {
+        const td = typeof r.template_data === 'string'
+          ? (() => { try { return JSON.parse(r.template_data); } catch { return {}; } })()
+          : (r.template_data || {});
+        const key = r.template_key || td.id || r.id;
+        const nome = td.nome || r.name || 'Certificado';
+        const rawCat = td.categoria || td.category || td.tipo || '';
+        const categoria = rawCat.toString().trim().toLowerCase();
+        return {
+          ...td,
+          db_id: r.id,
+          template_key: key,
+          id: key,
+          nome,
+          categoria,
+          ativo: r.is_active ?? td.ativo ?? true,
+        };
+      });
+
+      setCertTemplatesFull(fullTemplates);
+
+      // Filtrar estritamente templates pertencentes à categoria 'eventos' / 'evento'
+      const elegiveis = fullTemplates.filter((t: any) => isTemplateCategoriaEventos(t));
+
+      setTemplatesCertificados(
+        elegiveis.map((t: any) => ({
+          id: t.id,
+          nome: t.nome,
+        }))
+      );
+    } catch (err) {
+      console.warn('Erro ao carregar configurações/templates de certificados:', err);
+    }
+  }, [ministryId, supabase]);
+
+  // Sincronização automática ao focar a aba (ex: após configurar certificados em outra aba)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (ministryId) {
+        carregarTemplatesCertificados(ministryId);
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [ministryId, carregarTemplatesCertificados]);
+
   // ── Carga inicial ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user || ctx.loading) return;
@@ -945,69 +926,9 @@ export default function EventosPage() {
 
       // Carregar configurações institucionais e modelos de certificados disponíveis para o tenant
       try {
-        const [config, { data: certRows, error: certErr }] = await Promise.all([
-          fetchConfiguracaoIgrejaFromSupabase(supabase, mid),
-          supabase
-            .from('certificados_templates')
-            .select('id, template_key, name, template_data, is_active, created_at, updated_at')
-            .eq('ministry_id', mid)
-            .order('name'),
-        ]);
+        const config = await fetchConfiguracaoIgrejaFromSupabase(supabase, mid);
         if (config) setConfigIgreja(config);
-
-        let rows = (certRows as any[]) || [];
-
-        // Se ainda não houver templates salvos no banco para o tenant (primeiro acesso),
-        // acionar a rotina oficial de carga/semeadura como fallback seguro
-        if (rows.length === 0 && !certErr) {
-          try {
-            const syncRes = await loadCertificadosTemplatesForCurrentUser(supabase);
-            if (syncRes?.templates && Array.isArray(syncRes.templates)) {
-              const { data: refetched } = await supabase
-                .from('certificados_templates')
-                .select('id, template_key, name, template_data, is_active, created_at, updated_at')
-                .eq('ministry_id', mid)
-                .order('name');
-              rows = (refetched as any[]) || syncRes.templates.map((t: any) => ({
-                id: t.id,
-                template_key: t.template_key || t.id,
-                name: t.nome || t.name,
-                template_data: t,
-                is_active: t.ativo !== false,
-              }));
-            }
-          } catch {
-            // fallback silencioso
-          }
-        }
-
-        const fullTemplates = rows.map((r: any) => {
-          const td = r.template_data || {};
-          const key = r.template_key || td.id || r.id;
-          const nome = td.nome || r.name || 'Certificado';
-          const categoria = (td.categoria || td.category || '').toString().trim().toLowerCase();
-          return {
-            ...td,
-            db_id: r.id,
-            template_key: key,
-            id: key,
-            nome,
-            categoria,
-            ativo: r.is_active ?? td.ativo ?? true,
-          };
-        });
-
-        setCertTemplatesFull(fullTemplates);
-
-        // Filtrar estritamente templates pertencentes à categoria 'eventos' / 'evento'
-        const elegiveis = fullTemplates.filter((t: any) => isTemplateCategoriaEventos(t));
-
-        setTemplatesCertificados(
-          elegiveis.map((t: any) => ({
-            id: t.id,
-            nome: t.nome,
-          }))
-        );
+        await carregarTemplatesCertificados(mid);
       } catch (err) {
         console.warn('Erro ao carregar configurações/templates de certificados:', err);
       }
@@ -1425,6 +1346,9 @@ export default function EventosPage() {
     setEditandoId(null);
     const endInicial = resolverEnderecoPorCongregacao('');
     ultimoEnderecoAutoPreenchido.current = endInicial;
+    if (ministryId) {
+      carregarTemplatesCertificados(ministryId);
+    }
     setFormEvento({
       ...FORM_EVENTO_INICIAL,
       congregacao_id: '',
@@ -1587,6 +1511,20 @@ export default function EventosPage() {
     const endEvento = e.local_endereco ?? '';
     ultimoEnderecoAutoPreenchido.current = endEvento;
 
+    if (ministryId) {
+      carregarTemplatesCertificados(ministryId);
+    }
+
+    let certModeloIdFinal = e.certificado_modelo_id ?? '';
+    const matchCert = certTemplatesFull.find(t =>
+      t.id === certModeloIdFinal ||
+      t.template_key === certModeloIdFinal ||
+      t.db_id === certModeloIdFinal
+    );
+    if (matchCert) {
+      certModeloIdFinal = matchCert.id || matchCert.template_key || certModeloIdFinal;
+    }
+
     setFormEvento({
       congregacao_id: e.congregacao_id ?? '',
       titulo: e.titulo,
@@ -1608,7 +1546,7 @@ export default function EventosPage() {
       brinde_distribuicao: (e.brinde_distribuicao as BrindeDistribuicao) ?? 'todos',
       brinde_quantidade: e.brinde_quantidade?.toString() ?? '',
       inclui_certificado: certHab,
-      certificado_modelo_id: e.certificado_modelo_id ?? '',
+      certificado_modelo_id: certModeloIdFinal,
       status: e.status,
       vagas_hospedagem: e.vagas_hospedagem?.toString() ?? '',
       descricao_hospedagem: e.descricao_hospedagem ?? '',
@@ -3029,36 +2967,60 @@ export default function EventosPage() {
                           </h4>
                         </div>
                         <p className="text-[11px] text-slate-500 font-medium">
-                          {formEvento.evento_pago
-                            ? 'Defina o valor da inscrição, as formas de pagamento aceitas e o que estará incluído para os participantes.'
-                            : 'Configure se a participação requer pagamento de inscrição ou se o evento é gratuito.'}
+                          {formEvento.aceita_inscricao
+                            ? (formEvento.evento_pago
+                                ? 'Inscrições ativas pelo link público. Defina o valor da inscrição, formas de pagamento e benefícios inclusos.'
+                                : 'Inscrições ativas e gratuitas pelo link público. Configure os benefícios inclusos para os inscritos.')
+                            : 'Inscrições fechadas no momento. Ative a opção "Inscrições Abertas" para permitir cadastros pelo link público.'}
                         </p>
                       </div>
 
-                      {/* Checkbox Principal: Evento Pago */}
-                      <label className="inline-flex items-center gap-2.5 cursor-pointer select-none bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-xs hover:border-blue-400 transition shrink-0">
-                        <input
-                          type="checkbox"
-                          checked={formEvento.evento_pago}
-                          onChange={e => {
-                            const checked = e.target.checked;
-                            setFormEvento(f => ({
-                              ...f,
-                              evento_pago: checked,
-                              valor_inscricao: checked ? (f.valor_inscricao === '0,00' || f.valor_inscricao === '0' ? '0,00' : f.valor_inscricao) : '0,00',
-                              formas_pagamento: checked && f.formas_pagamento.length === 0 ? ['pix'] : checked ? f.formas_pagamento : [],
-                              inclui_alimentacao: checked ? f.inclui_alimentacao : false,
-                              inclui_hospedagem: checked ? f.inclui_hospedagem : false,
-                              inclui_brinde: checked ? f.inclui_brinde : false,
-                              inclui_certificado: checked ? f.inclui_certificado : false,
-                            }));
-                          }}
-                          className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-[#1d4ed8]"
-                        />
-                        <span className="text-xs font-bold text-slate-800">
-                          {formEvento.evento_pago ? 'Evento Pago' : 'Evento Gratuito'}
-                        </span>
-                      </label>
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        {/* Toggle: Inscrições Abertas */}
+                        <label className={`inline-flex items-center gap-2 cursor-pointer select-none px-3.5 py-2 rounded-xl border shadow-xs transition ${
+                          formEvento.aceita_inscricao
+                            ? 'bg-blue-50/80 border-blue-300 text-blue-900'
+                            : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                        }`}>
+                          <input
+                            type="checkbox"
+                            checked={formEvento.aceita_inscricao}
+                            onChange={e => {
+                              const checked = e.target.checked;
+                              setFormEvento(f => ({ ...f, aceita_inscricao: checked }));
+                            }}
+                            className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-[#1d4ed8]"
+                          />
+                          <span className="text-xs font-bold">
+                            {formEvento.aceita_inscricao ? 'Inscrições Abertas' : 'Inscrições Fechadas'}
+                          </span>
+                        </label>
+
+                        {/* Checkbox Principal: Evento Pago */}
+                        <label className="inline-flex items-center gap-2.5 cursor-pointer select-none bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-xs hover:border-blue-400 transition">
+                          <input
+                            type="checkbox"
+                            checked={formEvento.evento_pago}
+                            onChange={e => {
+                              const checked = e.target.checked;
+                              setFormEvento(f => ({
+                                ...f,
+                                evento_pago: checked,
+                                valor_inscricao: checked ? (f.valor_inscricao === '0,00' || f.valor_inscricao === '0' ? '0,00' : f.valor_inscricao) : '0,00',
+                                formas_pagamento: checked && f.formas_pagamento.length === 0 ? ['pix'] : checked ? f.formas_pagamento : [],
+                                inclui_alimentacao: checked ? f.inclui_alimentacao : false,
+                                inclui_hospedagem: checked ? f.inclui_hospedagem : false,
+                                inclui_brinde: checked ? f.inclui_brinde : false,
+                                inclui_certificado: checked ? f.inclui_certificado : false,
+                              }));
+                            }}
+                            className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-[#1d4ed8]"
+                          />
+                          <span className="text-xs font-bold text-slate-800">
+                            {formEvento.evento_pago ? 'Evento Pago' : 'Evento Gratuito'}
+                          </span>
+                        </label>
+                      </div>
                     </div>
 
                     {/* Conteúdo condicional quando Evento Pago está marcado */}
@@ -3235,15 +3197,26 @@ export default function EventosPage() {
                               <label className="text-[11px] font-bold text-slate-800 uppercase tracking-wider block">
                                 Modelo de Certificado <span className="text-rose-500">*</span>
                               </label>
-                              <a
-                                href="/configuracoes/certificados"
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-[11px] font-bold text-[#1d4ed8] hover:underline inline-flex items-center gap-1"
-                              >
-                                Configurar certificados
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => ministryId && carregarTemplatesCertificados(ministryId)}
+                                  title="Atualizar lista de modelos de certificados"
+                                  className="text-[11px] font-semibold text-slate-500 hover:text-emerald-700 inline-flex items-center gap-1 transition"
+                                >
+                                  <RefreshCw className="w-3 h-3" />
+                                  Atualizar
+                                </button>
+                                <a
+                                  href="/configuracoes/certificados"
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[11px] font-bold text-[#1d4ed8] hover:underline inline-flex items-center gap-1"
+                                >
+                                  Configurar certificados
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              </div>
                             </div>
 
                             {optionsCertificados.length === 0 ? (
@@ -3271,7 +3244,7 @@ export default function EventosPage() {
                                 onChange={e => setFormEvento(f => ({ ...f, certificado_modelo_id: e.target.value }))}
                                 className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-semibold focus:ring-2 focus:ring-emerald-500 transition"
                               >
-                                {optionsCertificados.length > 1 && (
+                                {(!formEvento.certificado_modelo_id || optionsCertificados.length > 1) && (
                                   <option value="">Selecione um modelo de certificado...</option>
                                 )}
                                 {optionsCertificados.map(t => (
@@ -3436,15 +3409,26 @@ export default function EventosPage() {
                               <label className="text-[11px] font-bold text-slate-800 uppercase tracking-wider block">
                                 Modelo de Certificado <span className="text-rose-500">*</span>
                               </label>
-                              <a
-                                href="/configuracoes/certificados"
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-[11px] font-bold text-[#1d4ed8] hover:underline inline-flex items-center gap-1"
-                              >
-                                Configurar certificados
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => ministryId && carregarTemplatesCertificados(ministryId)}
+                                  title="Atualizar lista de modelos de certificados"
+                                  className="text-[11px] font-semibold text-slate-500 hover:text-emerald-700 inline-flex items-center gap-1 transition"
+                                >
+                                  <RefreshCw className="w-3 h-3" />
+                                  Atualizar
+                                </button>
+                                <a
+                                  href="/configuracoes/certificados"
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[11px] font-bold text-[#1d4ed8] hover:underline inline-flex items-center gap-1"
+                                >
+                                  Configurar certificados
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              </div>
                             </div>
 
                             {optionsCertificados.length === 0 ? (
@@ -3472,7 +3456,7 @@ export default function EventosPage() {
                                 onChange={e => setFormEvento(f => ({ ...f, certificado_modelo_id: e.target.value }))}
                                 className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-semibold focus:ring-2 focus:ring-emerald-500 transition"
                               >
-                                {optionsCertificados.length > 1 && (
+                                {(!formEvento.certificado_modelo_id || optionsCertificados.length > 1) && (
                                   <option value="">Selecione um modelo de certificado...</option>
                                 )}
                                 {optionsCertificados.map(t => (
@@ -3742,6 +3726,13 @@ export default function EventosPage() {
                                 <span className={`w-2 h-2 rounded-full ${st.dotClass}`} />
                                 {st.label}
                               </span>
+                              {e.status !== 'cancelado' && e.status !== 'realizado' && (
+                                <span className={`block text-[10px] font-semibold mt-1 ${
+                                  e.aceita_inscricao ? 'text-emerald-700' : 'text-slate-400'
+                                }`}>
+                                  {e.aceita_inscricao ? 'Inscrições abertas' : 'Inscrições fechadas'}
+                                </span>
+                              )}
                             </td>
 
                             {/* AÇÕES (Visualizar, Editar, Menu Mais) */}
@@ -3935,6 +3926,47 @@ export default function EventosPage() {
                       <FileBarChart2 className="w-3.5 h-3.5 text-amber-600" />
                       <span>Relatório do Evento</span>
                     </button>
+
+                    {scope.canWrite && (
+                      <button
+                        role="menuitem"
+                        onClick={async () => {
+                          const ev = menuEventoAtivo;
+                          fecharMenuAcoes();
+                          const novoStatus = !ev.aceita_inscricao;
+                          const { error } = await supabase
+                            .from('eventos')
+                            .update({ aceita_inscricao: novoStatus })
+                            .eq('id', ev.id);
+                          if (error) {
+                            showModal('Erro', 'Não foi possível alterar o status das inscrições.', 'error');
+                          } else {
+                            setEventos(prev => prev.map(item => item.id === ev.id ? { ...item, aceita_inscricao: novoStatus } : item));
+                            if (eventoSelecionado?.id === ev.id) {
+                              setEventoSelecionado(prev => prev ? { ...prev, aceita_inscricao: novoStatus } : null);
+                            }
+                            showModal(
+                              'Sucesso',
+                              novoStatus ? 'Inscrições abertas com sucesso!' : 'Inscrições encerradas com sucesso!',
+                              'success'
+                            );
+                          }
+                        }}
+                        className="w-full px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer transition text-left"
+                      >
+                        {menuEventoAtivo.aceita_inscricao ? (
+                          <>
+                            <Lock className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Encerrar Inscrições</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Abrir Inscrições</span>
+                          </>
+                        )}
+                      </button>
+                    )}
 
                     {menuEventoAtivo.is_publico && menuEventoAtivo.slug && (
                       <button

@@ -164,6 +164,7 @@ export async function loadCertificadosTemplatesForCurrentUser(
 
     // Limpar modelos duplicados ou obsoletos (ex: 'ministerial-pastor2-padrao', 'CASAMENTO', 'APRESENTAÇÃO DE CRIANÇAS', modelos antigos de eventos)
     const duplicados = fromDb.filter((t: any) => {
+      if (t.criado_pelo_usuario === true) return false;
       const n = (t.nome || t.name || '').trim();
       const k = t.template_key || t.id || '';
       return (

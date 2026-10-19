@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { isTemplateCategoriaEventos } from '../src/lib/certificados-utils';
-import { buildEventoPlaceholderMap } from '../src/app/eventos/page';
+import { buildEventoPlaceholderMap } from '../src/lib/evento-status-utils';
 
 test('isTemplateCategoriaEventos deve retornar true para categoria "eventos" e "evento"', () => {
   assert.equal(isTemplateCategoriaEventos({ categoria: 'eventos', nome: 'Certificado de Eventos' }), true);
@@ -106,4 +106,87 @@ test('Persistência e identificador real: optionsCertificados preserva certifica
   assert.equal(options[0].id, 'uuid-antigo-arquivado');
   assert.equal(options[1].id, 'uuid-1');
   assert.equal(options[2].id, 'uuid-2');
+});
+
+test('isTemplateCategoriaEventos deve aceitar modelos criados pelo usuário com termos de participação e conferência', () => {
+  assert.equal(
+    isTemplateCategoriaEventos({
+      id: 'custom-uuid-1',
+      nome: 'Certificado de Participação',
+      criado_pelo_usuario: true,
+      categoria: 'eventos',
+    }),
+    true
+  );
+
+  assert.equal(
+    isTemplateCategoriaEventos({
+      id: 'custom-uuid-2',
+      nome: 'Congresso Nacional de Jovens 2026',
+      criado_pelo_usuario: true,
+      categoria: '',
+    }),
+    true
+  );
+
+  assert.equal(
+    isTemplateCategoriaEventos({
+      id: 'custom-uuid-3',
+      nome: 'Workshop de Louvor',
+      categoria: 'workshop',
+    }),
+    true
+  );
+});
+
+test('optionsCertificados não deve duplicar modelo quando selecionado por db_id ou template_key', () => {
+  const templatesCertificados = [
+    { id: 'evento-padrao', nome: 'Certificado de Eventos' },
+    { id: 'uuid-custom', nome: 'Certificado de Participação' },
+  ];
+
+  const certTemplatesFull = [
+    {
+      id: 'evento-padrao',
+      template_key: 'evento-padrao',
+      db_id: 'b9386c94-817c-4731-bf32-6161ca1ea8f6',
+      nome: 'Certificado de Eventos',
+    },
+    {
+      id: 'uuid-custom',
+      template_key: 'uuid-custom',
+      db_id: '71629abc-1234-5678-90ab-cdef12345678',
+      nome: 'Certificado de Participação',
+    },
+  ];
+
+  // Caso 1: O evento possui salvo o db_id (UUID do banco) do template evento-padrao
+  const selectedCertId = 'b9386c94-817c-4731-bf32-6161ca1ea8f6';
+
+  const map = new Map<string, { id: string; nome: string }>();
+  for (const t of templatesCertificados) {
+    if (t.id) map.set(t.id, t);
+  }
+  if (selectedCertId) {
+    const match = certTemplatesFull.find(t =>
+      t.id === selectedCertId ||
+      t.template_key === selectedCertId ||
+      t.db_id === selectedCertId
+    );
+    if (match) {
+      const canonicalKey = match.id || match.template_key || selectedCertId;
+      if (!map.has(canonicalKey) && !map.has(selectedCertId)) {
+        map.set(selectedCertId, {
+          id: selectedCertId,
+          nome: match.nome,
+        });
+      }
+    }
+  }
+
+  const options = Array.from(map.values());
+  // Deve ter exatamente 2 itens, sem duplicação
+  assert.equal(options.length, 2);
+  assert.equal(options[0].id, 'evento-padrao');
+  assert.equal(options[1].id, 'uuid-custom');
 });

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { formatarEnderecoCongregacao } from '../src/app/eventos/page';
+import { formatarEnderecoCongregacao } from '../src/lib/evento-status-utils';
 
 test('formatarEnderecoCongregacao deve formatar endereço com todos os campos', () => {
   const cong = {

@@ -77,7 +77,7 @@ const novoTemplateEmBranco = (nome: string, categoria: string): CertificadoTempl
   id: gId(),
   nome,
   orientacao: 'landscape',
-  ativo: false,
+  ativo: true,
   criado_pelo_usuario: true,
   categoria: (categoria || 'ministerial') as any,
   elementos: [],
@@ -506,13 +506,15 @@ export default function ConfiguracoesCertificadosPage() {
                       <span className="text-xs font-semibold text-gray-500">Categoria</span>
                       <select
                         value={templateEmEdicao.categoria || 'ministerial'}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const novaCat = e.target.value as any;
                           setTemplateEmEdicao((prev) =>
-                            prev
-                              ? { ...prev, categoria: e.target.value as any }
-                              : prev
-                          )
-                        }
+                            prev ? { ...prev, categoria: novaCat } : prev
+                          );
+                          setTemplates((prev) =>
+                            prev.map((t) => (t.id === templateEmEdicao.id ? { ...t, categoria: novaCat } : t))
+                          );
+                        }}
                         className="rounded-md border border-gray-200 px-2 py-1 text-xs"
                       >
                         {CERTIFICADO_CATEGORIAS.map((cat) => (
