@@ -10,11 +10,7 @@ import { createClient } from '@/lib/supabase-client';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { AlignCenter, AlignLeft, AlignRight, Award, Bold, Clipboard, Copy, Download, Image as ImageIcon, Italic, QrCode, Shield, Type, Underline } from 'lucide-react';
 
-const FONTES_DISPONIVEIS = [
-  'Arial', 'Arial Black', 'Georgia', 'Times New Roman', 'Verdana',
-  'Trebuchet MS', 'Comic Sans MS', 'Courier New', 'Impact', 'Tahoma',
-  'Palatino', 'Garamond', 'Book Antiqua', 'Lucida Console',
-];
+import { FONTES_CERTIFICADOS as FONTES_DISPONIVEIS } from '@/lib/certificados-fontes';
 import {
   loadCertificadosTemplatesForCurrentUser,
   persistCertificadosTemplatesSnapshotToSupabase,

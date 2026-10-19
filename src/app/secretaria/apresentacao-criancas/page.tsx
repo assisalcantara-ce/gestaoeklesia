@@ -12,6 +12,7 @@ import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { loadCertificadosTemplatesForCurrentUser } from '@/lib/certificados-templates-sync';
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { substituirPlaceholdersCertificado } from '@/lib/certificados-utils';
+import { getFontesCertificadosHeadHtml, getFontesReadyPrintScript } from '@/lib/certificados-fontes';
 import { Pencil, Printer, Trash2 } from 'lucide-react';
 import { sincronizarAgenda } from '@/lib/agenda-sync-service';
 
@@ -418,7 +419,7 @@ export default function ApresentacaoCriancasPage() {
     const scaleY = (190 * 3.7795) / CERTIFICADO_CANVAS.altura;
     const scale = Math.min(scaleX, scaleY).toFixed(4);
 
-    win.document.write(`<!DOCTYPE html><html><head><title>Certificado</title>`);
+    win.document.write(`<!DOCTYPE html><html><head><title>Certificado</title>${getFontesCertificadosHeadHtml()}`);
     win.document.write(`<style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
       @page { size: A4 landscape; margin: 1cm; }
@@ -428,10 +429,10 @@ export default function ApresentacaoCriancasPage() {
     </style>`);
     win.document.write('</head><body>');
     win.document.write(`<div class="cert">${html}</div>`);
+    win.document.write(getFontesReadyPrintScript());
     win.document.write('</body></html>');
     win.document.close();
     win.focus();
-    setTimeout(() => win.print(), 400);
 
     const nowIso = new Date().toISOString();
     const { error } = await supabase

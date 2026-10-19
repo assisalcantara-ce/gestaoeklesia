@@ -16,6 +16,7 @@ import { loadCertificadosTemplatesForCurrentUser } from '@/lib/certificados-temp
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { substituirPlaceholdersCertificado, isTemplateCategoriaEventos } from '@/lib/certificados-utils';
 import { formatarEnderecoCongregacao, buildEventoPlaceholderMap } from '@/lib/evento-status-utils';
+import { getFontesCertificadosHeadHtml, getFontesReadyPrintScript } from '@/lib/certificados-fontes';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   AlertCircle,
@@ -2241,16 +2242,15 @@ export default function EventosPage() {
       return;
     }
 
-    win.document.write(`<!DOCTYPE html><html><head><title>Teste de Certificado - ${evento?.titulo || 'Evento'}</title><style>
+    win.document.write(`<!DOCTYPE html><html><head><title>Teste de Certificado - ${evento?.titulo || 'Evento'}</title>${getFontesCertificadosHeadHtml()}<style>
       *{box-sizing:border-box;margin:0;padding:0;}
       @page{size:A4 ${orientacao};margin:1cm;}
       html,body{width:100%;height:100%;display:flex;justify-content:center;align-items:center;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
       .cert{zoom:${scale};width:${largura}px;height:${altura}px;overflow:hidden;flex-shrink:0;}
       img{display:block;}
-    </style></head><body><div class="cert">${html}</div></body></html>`);
+    </style></head><body><div class="cert">${html}</div>${getFontesReadyPrintScript()}</body></html>`);
     win.document.close();
     win.focus();
-    setTimeout(() => { win.print(); }, 400);
   };
 
   const handleImprimirCertificado = async (insc: Inscricao) => {
@@ -2281,16 +2281,15 @@ export default function EventosPage() {
       return;
     }
 
-    win.document.write(`<!DOCTYPE html><html><head><title>Certificado - ${insc.nome_display}</title><style>
+    win.document.write(`<!DOCTYPE html><html><head><title>Certificado - ${insc.nome_display}</title>${getFontesCertificadosHeadHtml()}<style>
       *{box-sizing:border-box;margin:0;padding:0;}
       @page{size:A4 ${orientacao};margin:1cm;}
       html,body{width:100%;height:100%;display:flex;justify-content:center;align-items:center;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
       .cert{zoom:${scale};width:${largura}px;height:${altura}px;overflow:hidden;flex-shrink:0;}
       img{display:block;}
-    </style></head><body><div class="cert">${html}</div></body></html>`);
+    </style></head><body><div class="cert">${html}</div>${getFontesReadyPrintScript()}</body></html>`);
     win.document.close();
     win.focus();
-    setTimeout(() => { win.print(); }, 400);
   };
 
   const handleImprimirTodosCertificados = async () => {
@@ -2330,17 +2329,16 @@ export default function EventosPage() {
       return;
     }
 
-    win.document.write(`<!DOCTYPE html><html><head><title>Certificados - ${eventoSelecionado.titulo}</title><style>
+    win.document.write(`<!DOCTYPE html><html><head><title>Certificados - ${eventoSelecionado.titulo}</title>${getFontesCertificadosHeadHtml()}<style>
       *{box-sizing:border-box;margin:0;padding:0;}
       @page{size:A4 ${orientacao};margin:1cm;}
       html,body{margin:0;padding:0;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
       .page{width:100%;height:100vh;display:flex;justify-content:center;align-items:center;page-break-after:always;}
       .cert{zoom:${scale};width:${largura}px;height:${altura}px;overflow:hidden;flex-shrink:0;}
       img{display:block;}
-    </style></head><body>${allPages}</body></html>`);
+    </style></head><body>${allPages}${getFontesReadyPrintScript()}</body></html>`);
     win.document.close();
     win.focus();
-    setTimeout(() => { win.print(); }, 600);
   };
 
   const copiarLink = (e: Evento) => {

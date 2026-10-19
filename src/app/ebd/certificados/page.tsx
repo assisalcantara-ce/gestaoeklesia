@@ -9,6 +9,7 @@ import { resolveEbdScope } from '@/lib/cartoes-templates-sync';
 import { loadCertificadosTemplatesForCurrentUser } from '@/lib/certificados-templates-sync';
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { substituirPlaceholdersCertificado } from '@/lib/certificados-utils';
+import { getFontesCertificadosHeadHtml, getFontesReadyPrintScript } from '@/lib/certificados-fontes';
 import { Award, ChevronRight, Printer, Settings } from 'lucide-react';
 import Link from 'next/link';
 
@@ -206,16 +207,16 @@ export default function EbdCertificadosPage() {
     const scaleX = (277 * 3.7795) / CERTIFICADO_CANVAS.largura;
     const scaleY = (190 * 3.7795) / CERTIFICADO_CANVAS.altura;
     const scale  = Math.min(scaleX, scaleY).toFixed(4);
-    win.document.write(`<!DOCTYPE html><html><head><title>Certificado EBD</title><style>
+    win.document.write(`<!DOCTYPE html><html><head><title>Certificado EBD</title>${getFontesCertificadosHeadHtml()}<style>
       *{box-sizing:border-box;margin:0;padding:0;}
       @page{size:A4 landscape;margin:1cm;}
       html,body{width:100%;height:100%;display:flex;justify-content:center;align-items:center;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
       .cert{zoom:${scale};width:${CERTIFICADO_CANVAS.largura}px;height:${CERTIFICADO_CANVAS.altura}px;overflow:hidden;flex-shrink:0;}
       img{display:block;}
-    </style></head><body><div class="cert">${html}</div></body></html>`);
+    </style></head><body><div class="cert">${html}</div>${getFontesReadyPrintScript()}</body></html>`);
     win.document.close();
     win.focus();
-    setTimeout(() => { win.print(); setImprimindo(null); }, 400);
+    setImprimindo(null);
   };
 
   const imprimirTodos = () => {
@@ -233,17 +234,16 @@ export default function EbdCertificadosPage() {
 
     const win = window.open('', '_blank');
     if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>Certificados EBD</title><style>
+    win.document.write(`<!DOCTYPE html><html><head><title>Certificados EBD</title>${getFontesCertificadosHeadHtml()}<style>
       *{box-sizing:border-box;margin:0;padding:0;}
       @page{size:A4 landscape;margin:1cm;}
       html,body{margin:0;padding:0;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
       .page{width:100%;height:100vh;display:flex;justify-content:center;align-items:center;page-break-after:always;}
       .cert{zoom:${scale};width:${CERTIFICADO_CANVAS.largura}px;height:${CERTIFICADO_CANVAS.altura}px;overflow:hidden;flex-shrink:0;}
       img{display:block;}
-    </style></head><body>${allHtml}</body></html>`);
+    </style></head><body>${allHtml}${getFontesReadyPrintScript()}</body></html>`);
     win.document.close();
     win.focus();
-    setTimeout(() => win.print(), 600);
   };
 
   // ── Render ───────────────────────────────────────────────────────────────

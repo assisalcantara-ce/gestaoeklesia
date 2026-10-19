@@ -19,6 +19,7 @@ import { consacracaoService } from '@/services/consagracao-service';
 import type { Comissao } from '@/types/comissoes';
 import { loadCertificadosTemplatesForCurrentUser } from '@/lib/certificados-templates-sync';
 import { substituirPlaceholdersCertificado } from '@/lib/certificados-utils';
+import { getFontesCertificadosHeadHtml, getFontesReadyPrintScript } from '@/lib/certificados-fontes';
 import QRCode from 'qrcode';
 
 interface SimpleOption {
@@ -1919,6 +1920,7 @@ export default function ConsagracaoPage() {
         <head>
           <meta charset="UTF-8">
           <title>${safeDocTitle}</title>
+          ${getFontesCertificadosHeadHtml()}
           <style>
             @page {
               size: A4 landscape;
@@ -1993,13 +1995,7 @@ export default function ConsagracaoPage() {
               ${elementosHtml}
             </div>
           </div>
-          <script>
-            window.onload = function() {
-              setTimeout(function() {
-                window.print();
-              }, 400);
-            };
-          </script>
+          ${getFontesReadyPrintScript()}
         </body>
         </html>
       `);

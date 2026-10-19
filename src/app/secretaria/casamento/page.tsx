@@ -11,6 +11,7 @@ import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { loadCertificadosTemplatesForCurrentUser } from '@/lib/certificados-templates-sync';
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { substituirPlaceholdersCertificado } from '@/lib/certificados-utils';
+import { getFontesCertificadosHeadHtml, getFontesReadyPrintScript } from '@/lib/certificados-fontes';
 import { Pencil, Printer, Trash2 } from 'lucide-react';
 
 type CertificadoTemplate = {
@@ -523,17 +524,16 @@ export default function CasamentoPage() {
     const scaleY = (190 * 3.7795) / CERTIFICADO_CANVAS.altura;
     const scale  = Math.min(scaleX, scaleY).toFixed(4);
 
-    win.document.write(`<!DOCTYPE html><html><head><title>Certificado de Casamento</title>
+    win.document.write(`<!DOCTYPE html><html><head><title>Certificado de Casamento</title>${getFontesCertificadosHeadHtml()}
     <style>
       *{box-sizing:border-box;margin:0;padding:0;}
       @page{size:A4 landscape;margin:1cm;}
       html,body{width:100%;height:100%;display:flex;justify-content:center;align-items:center;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
       .cert{zoom:${scale};width:${CERTIFICADO_CANVAS.largura}px;height:${CERTIFICADO_CANVAS.altura}px;overflow:hidden;flex-shrink:0;}
       img{display:block;}
-    </style></head><body><div class="cert">${html}</div></body></html>`);
+    </style></head><body><div class="cert">${html}</div>${getFontesReadyPrintScript()}</body></html>`);
     win.document.close();
     win.focus();
-    setTimeout(() => win.print(), 400);
 
     const nowIso = new Date().toISOString();
     const { error } = await supabase
