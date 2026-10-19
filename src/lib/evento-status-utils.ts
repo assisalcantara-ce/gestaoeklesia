@@ -234,11 +234,34 @@ export function buildEventoPlaceholderMap(
   }
 ): Record<string, string> {
   const cfg = configIgreja || {};
-  const endParts = (cfg.endereco || '').split(',');
-  const cidadeUf = endParts.length > 1 ? endParts[endParts.length - 2]?.trim() : (cfg.endereco || '');
-  const cidadeParts = cidadeUf.split('-');
-  const cidade = cfg.cidade || cidadeParts[0]?.trim() || '';
-  const estado = cfg.uf || cidadeParts[1]?.trim() || '';
+
+  // Extração inteligente de Cidade e Estado (UF)
+  const extrairCidadeEstadoDeTexto = (texto?: string | null): { cidade: string; estado: string } => {
+    if (!texto) return { cidade: '', estado: '' };
+    // Remove segmento de CEP se presente (ex: "..., CEP: 67015-000")
+    const semCep = texto.replace(/,\s*CEP[:\s].*$/i, '').trim();
+    const segmentos = semCep.split(',').map(s => s.trim()).filter(Boolean);
+
+    // Percorre os segmentos de trás para a frente procurando "Cidade - UF" ou "Cidade/UF"
+    for (let i = segmentos.length - 1; i >= 0; i--) {
+      const seg = segmentos[i];
+      const match = seg.match(/^(.+?)\s*[-/]\s*([A-Za-z]{2})$/);
+      if (match) {
+        return {
+          cidade: match[1].trim(),
+          estado: match[2].trim().toUpperCase(),
+        };
+      }
+    }
+
+    return { cidade: '', estado: '' };
+  };
+
+  const extraidoEndereco = extrairCidadeEstadoDeTexto(cfg.endereco);
+  const extraidoLocal = extrairCidadeEstadoDeTexto(evento.local_endereco);
+
+  const cidade = (cfg.cidade || cfg.municipio || extraidoEndereco.cidade || extraidoLocal.cidade || '').trim();
+  const estado = (cfg.estado || cfg.uf || extraidoEndereco.estado || extraidoLocal.estado || '').trim().toUpperCase();
 
   const localResolvido = evento.local_nome && evento.local_endereco
     ? `${evento.local_nome} - ${evento.local_endereco}`

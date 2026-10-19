@@ -2196,7 +2196,18 @@ export default function EventosPage() {
         status: 'confirmado',
       };
 
-      const map = buildEventoPlaceholderMap(evObj as Evento, inscDemo as Inscricao, configIgreja);
+      // Buscar configuração institucional fresca se ainda não populada
+      let configParaPreview = configIgreja;
+      if (!configParaPreview.cidade && !configParaPreview.estado && !configParaPreview.endereco && ministryId) {
+        try {
+          const cfgFresh = await fetchConfiguracaoIgrejaFromSupabase(supabase, ministryId);
+          if (cfgFresh) configParaPreview = cfgFresh;
+        } catch {
+          // fallback silently
+        }
+      }
+
+      const map = buildEventoPlaceholderMap(evObj as Evento, inscDemo as Inscricao, configParaPreview);
       const html = renderCertificadoHtml(template, map);
 
       setPreviewCertificadoData({
