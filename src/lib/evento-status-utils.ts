@@ -267,12 +267,40 @@ export function buildEventoPlaceholderMap(
     ? `${evento.local_nome} - ${evento.local_endereco}`
     : (evento.local_nome || evento.local_endereco || 'Templo Sede');
 
-  const dtInicio = evento.data_inicio
-    ? new Date(evento.data_inicio).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
-    : '';
-  const dtFim = evento.data_fim
-    ? new Date(evento.data_fim).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
-    : '';
+  // Formatação com fuso horário America/Sao_Paulo estrito para evitar divergências de dia
+  const formataDataApenas = (isoStr: string) => {
+    try {
+      const d = new Date(isoStr);
+      return new Intl.DateTimeFormat('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      }).format(d);
+    } catch {
+      return '';
+    }
+  };
+
+  const formataDataHora = (isoStr: string) => {
+    try {
+      const d = new Date(isoStr);
+      return new Intl.DateTimeFormat('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(d);
+    } catch {
+      return '';
+    }
+  };
+
+  const dataApenasInicio = evento.data_inicio ? formataDataApenas(evento.data_inicio) : '';
+  const dtInicio = evento.data_inicio ? formataDataHora(evento.data_inicio) : '';
+  const dtFim = evento.data_fim ? formataDataHora(evento.data_fim) : '';
 
   const nomeParticipante = insc.nome_display || insc.nome_externo || (insc as unknown as { nome?: string }).nome || '';
   const cargaHorariaStr = evento.carga_horaria ? `${evento.carga_horaria} horas` : '';
@@ -296,9 +324,9 @@ export function buildEventoPlaceholderMap(
     evento_tipo: evento.tipo ? String(evento.tipo) : '',
     tipo_evento: evento.tipo ? String(evento.tipo) : '',
     tipo: evento.tipo ? String(evento.tipo) : '',
-    evento_data: dtInicio,
-    data_evento: dtInicio,
-    data: dtInicio,
+    evento_data: dataApenasInicio,
+    data_evento: dataApenasInicio,
+    data: dataApenasInicio,
     evento_data_inicio: dtInicio,
     data_inicio: dtInicio,
     evento_data_fim: dtFim,

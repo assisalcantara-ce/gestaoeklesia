@@ -16,7 +16,7 @@ import { loadCertificadosTemplatesForCurrentUser } from '@/lib/certificados-temp
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { substituirPlaceholdersCertificado, isTemplateCategoriaEventos } from '@/lib/certificados-utils';
 import { formatarEnderecoCongregacao, buildEventoPlaceholderMap } from '@/lib/evento-status-utils';
-import { getFontesCertificadosHeadHtml, getFontesReadyPrintScript } from '@/lib/certificados-fontes';
+import { getFontesCertificadosHeadHtml, getFontesReadyPrintScript, buildTextoEstiloRenderizacao } from '@/lib/certificados-fontes';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   AlertCircle,
@@ -2061,19 +2061,20 @@ export default function EventosPage() {
       .map((el: any) => {
         const baseStyle = `position:absolute; left:${el.x}px; top:${el.y}px; width:${el.largura}px; height:${el.altura}px;`;
         if (el.tipo === 'texto') {
-          const texto = substituirPlaceholdersCertificado(el.texto || '', map, template.categoria || 'eventos').replace(/\n/g, '<br />');
-          const style = [
-            baseStyle,
-            `font-size:${el.fontSize || 14}px;`,
-            `font-family:${el.fonte || 'Arial'};`,
-            `font-weight:${el.negrito ? 700 : 400};`,
-            `font-style:${el.italico ? 'italic' : 'normal'};`,
-            `text-decoration:${el.sublinhado ? 'underline' : 'none'};`,
-            `color:${el.cor || '#111'};`,
-            `text-align:${el.alinhamento || 'left'};`,
-            'box-sizing:border-box;',
-          ].join('');
-          return `<div style="${style}">${texto}</div>`;
+          const textoBruto = substituirPlaceholdersCertificado(el.texto || '', map, template.categoria || 'eventos');
+          const isNomeParticipante = (el.texto || '').includes('participante_nome') ||
+            (el.texto || '').includes('nome') ||
+            (el.texto || '').includes('NOME') ||
+            el.id === 'b8a21a5e-e4c7-480f-8260-bc8d8a1c686f';
+
+          const { containerStyle, innerStyle } = buildTextoEstiloRenderizacao(
+            el,
+            textoBruto,
+            isNomeParticipante
+          );
+
+          const textoHtml = textoBruto.replace(/\n/g, '<br />');
+          return `<div style="${containerStyle}"><div style="${innerStyle}">${textoHtml}</div></div>`;
         }
         if (el.tipo === 'chapa' || el.tipo === 'forma') {
           const style = [baseStyle, `background-color:${el.cor || '#111'};`, `opacity:${el.transparencia ?? 1};`].join('');

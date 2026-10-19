@@ -41,3 +41,106 @@ test('getFontesReadyPrintScript aguarda document.fonts.ready antes de disparar w
   assert.ok(script.includes('document.fonts.ready'), 'Deve verificar document.fonts.ready');
   assert.ok(script.includes('window.print()'), 'Deve disparar window.print()');
 });
+
+test('calcularFontSizeAutoAjustado ajusta nomes curtos, médios e longos sem alterar o modelo', async () => {
+  const { calcularFontSizeAutoAjustado, buildTextoEstiloRenderizacao } = await import('../src/lib/certificados-fontes');
+
+  // Elemento do participante: largura 603, altura 42, base 22px
+  const el = {
+    x: 117,
+    y: 271,
+    largura: 603,
+    altura: 42,
+    fontSize: 22,
+    fonte: 'Great Vibes',
+  };
+
+  // Nome curto
+  const curto = 'Ana Lima';
+  const sizeCurto = calcularFontSizeAutoAjustado({
+    texto: curto,
+    larguraElemento: el.largura,
+    alturaElemento: el.altura,
+    fontSizeBase: el.fontSize,
+    fonte: el.fonte,
+    isSingleLine: true,
+  });
+  assert.equal(sizeCurto, 22, 'Nome curto deve manter o fontSize original de 22px');
+
+  // Nome médio
+  const medio = 'Carlos Eduardo Oliveira';
+  const sizeMedio = calcularFontSizeAutoAjustado({
+    texto: medio,
+    larguraElemento: el.largura,
+    alturaElemento: el.altura,
+    fontSizeBase: el.fontSize,
+    fonte: el.fonte,
+    isSingleLine: true,
+  });
+  assert.ok(sizeMedio <= 22 && sizeMedio >= 18, `Nome médio deve caber confortavelmente (${sizeMedio}px)`);
+
+  // Nome longo (cenário real do usuário que estava quebrando em 2 linhas)
+  const longo = 'Carlos Eduardo Oliveira (Participante Demonstrativo)';
+  const sizeLongo = calcularFontSizeAutoAjustado({
+    texto: longo,
+    larguraElemento: el.largura,
+    alturaElemento: el.altura,
+    fontSizeBase: el.fontSize,
+    fonte: el.fonte,
+    isSingleLine: true,
+  });
+  assert.ok(sizeLongo < 22, 'Nome longo deve ser reduzido automaticamente');
+  assert.ok(sizeLongo >= 10, 'Nome longo deve respeitar tamanho mínimo legível');
+
+  // Verificar que não ultrapassa a largura máxima
+  // 52 caracteres * sizeLongo * 0.50 <= 595
+  const estimatedPx = longo.length * sizeLongo * 0.50;
+  assert.ok(estimatedPx <= el.largura, `Tamanho estimado (${estimatedPx}px) não pode ultrapassar o elemento (${el.largura}px)`);
+
+  // Testar também com a fonte Allura
+  const sizeAllura = calcularFontSizeAutoAjustado({
+    texto: longo,
+    larguraElemento: el.largura,
+    alturaElemento: el.altura,
+    fontSizeBase: el.fontSize,
+    fonte: 'Allura',
+    isSingleLine: true,
+  });
+  assert.ok(sizeAllura <= 22 && sizeAllura >= 10, `Allura deve ajustar fonte proporcionalmente (${sizeAllura}px)`);
+
+  // Testar buildTextoEstiloRenderizacao
+  const { containerStyle, innerStyle, fontSizeEfetivo } = buildTextoEstiloRenderizacao(el, longo, true);
+  assert.ok(containerStyle.includes('overflow:hidden'), 'Container deve conter overflow:hidden');
+  assert.ok(containerStyle.includes('display:flex'), 'Container deve usar flex');
+  assert.ok(innerStyle.includes('white-space:nowrap'), 'Nome do participante deve priorizar linha única');
+  assert.ok(innerStyle.includes(`font-size:${fontSizeEfetivo}px`), 'Inner style deve refletir font-size calculado');
+});
+
+test('buildEventoPlaceholderMap formata evento_data estritamente como DD/MM/YYYY sem hora', async () => {
+  const { buildEventoPlaceholderMap } = await import('../src/lib/evento-status-utils');
+
+  const eventoFake: any = {
+    id: 'evt-1',
+    titulo: 'ESCOLA DE OBREIROS 2026',
+    data_inicio: '2026-10-23T19:00:00.000Z',
+    data_fim: '2026-10-23T21:30:00.000Z',
+    local_nome: 'ASSEMBLEIA DE DEUS',
+    local_endereco: 'BR 316',
+    tipo: 'conferencia',
+  };
+
+  const inscFake: any = {
+    id: 'insc-1',
+    nome_display: 'Carlos Eduardo Oliveira (Participante Demonstrativo)',
+    cpf: '123.456.789-00',
+  };
+
+  const map = buildEventoPlaceholderMap(eventoFake, inscFake, {} as any);
+
+  // evento_data deve ser apenas data (ex: 23/10/2026)
+  assert.match(map.evento_data, /^\d{2}\/\d{2}\/\d{4}$/, `evento_data deve conter estritamente DD/MM/YYYY, recebido: "${map.evento_data}"`);
+  assert.match(map.data_evento, /^\d{2}\/\d{2}\/\d{4}$/, `data_evento deve conter estritamente DD/MM/YYYY, recebido: "${map.data_evento}"`);
+  assert.ok(!map.evento_data.includes(':'), 'evento_data não deve conter horário nem dois-pontos');
+  assert.ok(map.evento_data_inicio.includes(':'), 'evento_data_inicio preserva data e horário para quem precisar');
+});
+

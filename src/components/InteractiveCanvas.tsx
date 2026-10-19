@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { obterPreviewTexto } from '@/lib/cartoes-utils';
+import { calcularFontSizeAutoAjustado } from '@/lib/certificados-fontes';
 import { createClient } from '@/lib/supabase-client';
 import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
 
@@ -437,9 +438,27 @@ export default function InteractiveCanvas({
         let conteudo: React.ReactNode = null;
 
         switch (elemento.tipo) {
-            case 'texto':
-                conteudo = (
+            case 'texto': {
+                const previewHtml = (getPreviewText ? getPreviewText(elemento.texto || 'Texto') : obterPreviewTexto(elemento.texto || 'Texto', nomenclaturas)) || 'Texto';
+                const isSingleLine = (elemento.texto || '').includes('participante_nome') ||
+                    (elemento.texto || '').includes('nome') ||
+                    (elemento.texto || '').includes('NOME') ||
+                    !elemento.texto?.includes('\n');
 
+                const fontSizeEfetivo = calcularFontSizeAutoAjustado({
+                    texto: previewHtml,
+                    larguraElemento: elemento.largura,
+                    alturaElemento: elemento.altura,
+                    fontSizeBase: elemento.fontSize || 12,
+                    fonte: elemento.fonte || 'Arial',
+                    isSingleLine,
+                });
+
+                const align = elemento.alinhamento || 'left';
+                const isHandwritten = (elemento.fonte || '').toLowerCase().includes('great vibes') || (elemento.fonte || '').toLowerCase().includes('allura');
+                const lineHeight = isHandwritten ? '1.25' : '1.2';
+
+                conteudo = (
                     <div
                         style={{
                             width: '100%',
@@ -452,29 +471,34 @@ export default function InteractiveCanvas({
                             display: 'flex',
                             flexDirection: 'column',
                             justifyContent: 'center', // Centralização vertical padrão
+                            alignItems: align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start',
                         }}
                     >
                         <div
                             style={{
                                 width: '100%',
-                                fontSize: `${elemento.fontSize || 12}px`,
-                                fontFamily: elemento.fonte || 'Arial',
+                                fontSize: `${fontSizeEfetivo}px`,
+                                fontFamily: elemento.fonte ? `${elemento.fonte}, sans-serif` : 'Arial, sans-serif',
                                 fontWeight: elemento.negrito ? 'bold' : 'normal',
                                 fontStyle: elemento.italico ? 'italic' : 'normal',
                                 textDecoration: elemento.sublinhado ? 'underline' : 'none',
                                 textShadow: elemento.sombreado ? '2px 2px 2px rgba(0,0,0,0.5)' : 'none',
                                 color: elemento.cor || '#000',
                                 textAlign: elemento.alinhamento || 'left',
-                                lineHeight: '1.2',
-                                wordBreak: 'break-word',
-                                display: 'block' // Fluxo de texto normal
+                                lineHeight,
+                                whiteSpace: isSingleLine ? 'nowrap' : 'normal',
+                                wordBreak: isSingleLine ? 'normal' : 'break-word',
+                                overflow: 'hidden',
+                                display: 'block',
+                                pointerEvents: 'none',
                             }}
-                            dangerouslySetInnerHTML={{ __html: (getPreviewText ? getPreviewText(elemento.texto || 'Texto') : obterPreviewTexto(elemento.texto || 'Texto', nomenclaturas)) || 'Texto' }}
+                            dangerouslySetInnerHTML={{ __html: previewHtml }}
                         />
                     </div>
                 );
 
                 break;
+            }
 
             case 'qrcode':
                 // Gerar QR code demonstrativo apontando para a rota canônica de validação
