@@ -2047,7 +2047,12 @@ export default function EventosPage() {
   };
 
 
-  const renderCertificadoHtml = (template: any, map: Record<string, string>) => {
+  const renderCertificadoHtml = (
+    template: any,
+    map: Record<string, string>,
+    configParam?: ConfiguracaoIgreja
+  ) => {
+    const configAtiva = configParam || configIgreja;
     const orientacao = template.orientacao === 'portrait' ? 'portrait' : 'landscape';
     const largura = orientacao === 'portrait' ? 595 : 840;
     const altura = orientacao === 'portrait' ? 840 : 595;
@@ -2085,10 +2090,46 @@ export default function EventosPage() {
           return `<div style="${style}"></div>`;
         }
         if (el.tipo === 'logo' || el.tipo === 'imagem' || el.tipo === 'foto-membro') {
-          const src = el.tipo === 'logo' ? (configIgreja.logo || el.imagemUrl || '') : (el.imagemUrl || '');
+          const src = el.tipo === 'logo' ? (configAtiva.logo || el.imagemUrl || '') : (el.imagemUrl || '');
           if (!src) return '';
           const style = [baseStyle, 'object-fit:contain;', `opacity:${el.transparencia ?? 1};`].join('');
           return `<img src="${src}" style="${style}" />`;
+        }
+        if (el.tipo === 'assinatura_presidente' || el.tipo === 'assinatura_secretario_geral') {
+          const isPresidente = el.tipo === 'assinatura_presidente';
+          const sigSrc = isPresidente
+            ? (configAtiva.assinatura_presidente || el.imagemUrl || '')
+            : (configAtiva.assinatura_secretario_geral || el.imagemUrl || '');
+          const rotulo = isPresidente ? 'Assinatura do Presidente' : 'Assinatura do Secretário-Geral';
+
+          if (sigSrc) {
+            const style = [
+              baseStyle,
+              'object-fit:contain;',
+              `opacity:${el.transparencia ?? 1};`,
+              'display:block;',
+            ].join('');
+            return `<img src="${sigSrc}" alt="${rotulo}" style="${style}" />`;
+          }
+
+          // Fallback visual/diagnóstico claro no contexto administrativo quando a assinatura não está cadastrada
+          const diagStyle = [
+            baseStyle,
+            'border:1px dashed #0d9488;',
+            'background:rgba(240, 253, 250, 0.7);',
+            'color:#0f766e;',
+            'display:flex;',
+            'flex-direction:column;',
+            'align-items:center;',
+            'justify-content:center;',
+            'font-size:10px;',
+            'font-weight:600;',
+            'text-align:center;',
+            'padding:2px;',
+            'box-sizing:border-box;',
+            `opacity:${el.transparencia ?? 1};`,
+          ].join('');
+          return `<div style="${diagStyle}"><span>✍️ ${isPresidente ? 'Assinatura Presidente' : 'Assinatura Secretário'}</span><span style="font-size:8px;font-weight:normal;color:#115e59;">(Não cadastrada nas configurações)</span></div>`;
         }
         if (el.tipo === 'qrcode') {
           const qrVal = map.evento_protocolo || map.participante_nome || 'CERTIFICADO';
@@ -2109,18 +2150,10 @@ export default function EventosPage() {
   ) => {
     if (!modeloId) return null;
 
-    // 1. Tentar encontrar em certTemplatesFull em memória
-    let template = certTemplatesFull.find(t =>
-      t.id === modeloId ||
-      t.template_key === modeloId ||
-      t.chave === modeloId ||
-      t.db_id === modeloId
-    );
-    if (template) return template;
+    const targetMid = midParam || ministryId;
 
-    // 2. Se não estiver em memória, buscar diretamente no Supabase
+    // 1. Sempre priorizar buscar a versão mais recente e fresca diretamente no Supabase
     try {
-      const targetMid = midParam || ministryId;
       let q = supabase.from('certificados_templates').select('*');
       if (targetMid) {
         q = q.eq('ministry_id', targetMid);
@@ -2132,7 +2165,7 @@ export default function EventosPage() {
           ? (() => { try { return JSON.parse(r.template_data); } catch { return {}; } })()
           : (r.template_data || {});
         const key = r.template_key || td.id || r.id;
-        return {
+        const freshTemplate = {
           ...td,
           db_id: r.id,
           template_key: key,
@@ -2141,10 +2174,28 @@ export default function EventosPage() {
           categoria: td.categoria || 'eventos',
           ativo: r.is_active !== false,
         };
+        // Atualizar cache local com a versão recém-recuperada
+        setCertTemplatesFull(prev => {
+          const exists = prev.some(t => t.id === key || t.db_id === r.id);
+          if (exists) {
+            return prev.map(t => (t.id === key || t.db_id === r.id) ? freshTemplate : t);
+          }
+          return [...prev, freshTemplate];
+        });
+        return freshTemplate;
       }
     } catch {
-      // ignore
+      // fallback para cache em memória
     }
+
+    // 2. Tentar encontrar em certTemplatesFull em memória caso busca remota falhe
+    const templateEmMemoria = certTemplatesFull.find(t =>
+      t.id === modeloId ||
+      t.template_key === modeloId ||
+      t.chave === modeloId ||
+      t.db_id === modeloId
+    );
+    if (templateEmMemoria) return templateEmMemoria;
 
     // 3. Fallback estrito: somente templates comprovadamente da categoria eventos
     return certTemplatesFull.find(t => isTemplateCategoriaEventos(t)) || null;
@@ -2198,19 +2249,22 @@ export default function EventosPage() {
         status: 'confirmado',
       };
 
-      // Buscar configuração institucional fresca se ainda não populada
+      // Sempre garantir configurações institucionais frescas (com assinaturas atualizadas)
       let configParaPreview = configIgreja;
-      if (!configParaPreview.cidade && !configParaPreview.estado && !configParaPreview.endereco && ministryId) {
+      if (ministryId) {
         try {
           const cfgFresh = await fetchConfiguracaoIgrejaFromSupabase(supabase, ministryId);
-          if (cfgFresh) configParaPreview = cfgFresh;
+          if (cfgFresh) {
+            configParaPreview = cfgFresh;
+            setConfigIgreja(cfgFresh);
+          }
         } catch {
-          // fallback silently
+          // fallback silencioso para config atual
         }
       }
 
       const map = buildEventoPlaceholderMap(evObj as Evento, inscDemo as Inscricao, configParaPreview);
-      const html = renderCertificadoHtml(template, map);
+      const html = renderCertificadoHtml(template, map, configParaPreview);
 
       setPreviewCertificadoData({
         template,
@@ -2257,11 +2311,26 @@ export default function EventosPage() {
   const handleImprimirCertificado = async (insc: Inscricao) => {
     if (!eventoSelecionado) return;
     const modeloId = eventoSelecionado.certificado_modelo_id;
-    const template = await recuperarTemplateCertificado(modeloId, eventoSelecionado.ministry_id);
+    const targetMid = eventoSelecionado.ministry_id || ministryId;
+    const template = await recuperarTemplateCertificado(modeloId, targetMid);
 
     if (!template) {
       showModal('Modelo não encontrado', 'O modelo de certificado configurado para este evento não foi encontrado. Configure o modelo em Configurações > Certificados.', 'error');
       return;
+    }
+
+    // Carregar configuração institucional fresca para garantir assinaturas atualizadas
+    let configParaUso = configIgreja;
+    if (targetMid) {
+      try {
+        const cfgFresh = await fetchConfiguracaoIgrejaFromSupabase(supabase, targetMid);
+        if (cfgFresh) {
+          configParaUso = cfgFresh;
+          setConfigIgreja(cfgFresh);
+        }
+      } catch {
+        // fallback silencioso
+      }
     }
 
     const orientacao = template.orientacao === 'portrait' ? 'portrait' : 'landscape';
@@ -2273,8 +2342,8 @@ export default function EventosPage() {
     const scaleY = (pageH * 3.7795) / altura;
     const scale = Math.min(scaleX, scaleY).toFixed(4);
 
-    const map = buildEventoPlaceholderMap(eventoSelecionado, insc, configIgreja);
-    const html = renderCertificadoHtml(template, map);
+    const map = buildEventoPlaceholderMap(eventoSelecionado, insc, configParaUso);
+    const html = renderCertificadoHtml(template, map, configParaUso);
 
     const win = window.open('', '_blank');
     if (!win) {
@@ -2296,7 +2365,8 @@ export default function EventosPage() {
   const handleImprimirTodosCertificados = async () => {
     if (!eventoSelecionado) return;
     const modeloId = eventoSelecionado.certificado_modelo_id;
-    const template = await recuperarTemplateCertificado(modeloId, eventoSelecionado.ministry_id);
+    const targetMid = eventoSelecionado.ministry_id || ministryId;
+    const template = await recuperarTemplateCertificado(modeloId, targetMid);
 
     if (!template) {
       showModal('Modelo não encontrado', 'O modelo de certificado configurado para este evento não foi encontrado. Configure o modelo em Configurações > Certificados.', 'error');
@@ -2310,6 +2380,20 @@ export default function EventosPage() {
       return;
     }
 
+    // Carregar configuração institucional fresca para garantir assinaturas atualizadas
+    let configParaUso = configIgreja;
+    if (targetMid) {
+      try {
+        const cfgFresh = await fetchConfiguracaoIgrejaFromSupabase(supabase, targetMid);
+        if (cfgFresh) {
+          configParaUso = cfgFresh;
+          setConfigIgreja(cfgFresh);
+        }
+      } catch {
+        // fallback silencioso
+      }
+    }
+
     const orientacao = template.orientacao === 'portrait' ? 'portrait' : 'landscape';
     const largura = orientacao === 'portrait' ? 595 : 840;
     const altura = orientacao === 'portrait' ? 840 : 595;
@@ -2320,8 +2404,8 @@ export default function EventosPage() {
     const scale = Math.min(scaleX, scaleY).toFixed(4);
 
     const allPages = participantesValidos.map(insc => {
-      const map = buildEventoPlaceholderMap(eventoSelecionado, insc, configIgreja);
-      return `<div class="page"><div class="cert">${renderCertificadoHtml(template, map)}</div></div>`;
+      const map = buildEventoPlaceholderMap(eventoSelecionado, insc, configParaUso);
+      return `<div class="page"><div class="cert">${renderCertificadoHtml(template, map, configParaUso)}</div></div>`;
     }).join('');
 
     const win = window.open('', '_blank');
