@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import PageLayout from '@/components/PageLayout';
@@ -104,6 +104,44 @@ type TipoPeriodo =
 interface Congregacao {
   id: string;
   nome: string;
+  is_sede?: boolean;
+  endereco?: string | null;
+  cidade?: string | null;
+  municipio?: string | null;
+  uf?: string | null;
+  cep?: string | null;
+  campo_id?: string | null;
+  supervisao_id?: string | null;
+}
+
+export function formatarEnderecoCongregacao(cong?: {
+  endereco?: string | null;
+  cidade?: string | null;
+  municipio?: string | null;
+  uf?: string | null;
+  cep?: string | null;
+} | null): string {
+  if (!cong) return '';
+  const parts: string[] = [];
+  const logradouro = (cong.endereco || '').trim();
+  if (logradouro) parts.push(logradouro);
+
+  const cidade = (cong.cidade || cong.municipio || '').trim();
+  const uf = (cong.uf || '').trim().toUpperCase();
+  if (cidade && uf) {
+    parts.push(`${cidade} - ${uf}`);
+  } else if (cidade) {
+    parts.push(cidade);
+  } else if (uf) {
+    parts.push(uf);
+  }
+
+  const cep = (cong.cep || '').trim();
+  if (cep) {
+    parts.push(cep.toUpperCase().startsWith('CEP') ? cep : `CEP: ${cep}`);
+  }
+
+  return parts.join(', ');
 }
 interface Membro {
   id: string;
@@ -733,7 +771,7 @@ export default function EventosPage() {
       }
       setMinistryId(mid);
 
-      const [orgService, { data: mu }] = await Promise.all([
+      const [orgService, { data: mu }, { data: congsDb }, { data: camposSedeDb }] = await Promise.all([
         obterEstruturaOrganizacionalService(mid, supabase),
         supabase
           .from('ministry_users')
@@ -741,10 +779,51 @@ export default function EventosPage() {
           .eq('user_id', user.id)
           .eq('ministry_id', mid)
           .single(),
+        supabase
+          .from('congregacoes')
+          .select('id, nome, endereco, cidade, municipio, uf, cep, campo_id, supervisao_id')
+          .eq('ministry_id', mid),
+        supabase
+          .from('campos')
+          .select('id')
+          .eq('ministry_id', mid)
+          .eq('is_sede', true),
       ]);
 
+      const congsMap = new Map<string, any>();
+      (congsDb || []).forEach((c: any) => {
+        congsMap.set(c.id, c);
+      });
+
+      const sedeCamposSet = new Set((camposSedeDb || []).map((c: any) => c.id));
+      const div1Registros = orgService.getRegistros(1);
+      const div1Map = new Map<string, any>();
+      div1Registros.forEach(r => div1Map.set(r.id, r));
+
       const div1Options = orgService.getOptionsFormatadas(1);
-      setCongregacoes(div1Options.map(opt => ({ id: opt.id, nome: opt.nome })));
+      const listaCongregacoes: Congregacao[] = div1Options.map(opt => {
+        const dbItem = congsMap.get(opt.id) || {};
+        const orgItem = div1Map.get(opt.id);
+        const campoId = dbItem.campo_id || opt.campo_id || orgItem?.parentId;
+        const isSedeOficial = Boolean(
+          orgItem?.isSede ||
+          (campoId && sedeCamposSet.has(campoId))
+        );
+
+        return {
+          id: opt.id,
+          nome: opt.nome,
+          is_sede: isSedeOficial,
+          endereco: dbItem.endereco || null,
+          cidade: dbItem.cidade || null,
+          municipio: dbItem.municipio || null,
+          uf: dbItem.uf || null,
+          cep: dbItem.cep || null,
+          campo_id: campoId || null,
+          supervisao_id: dbItem.supervisao_id || opt.supervisao_id || null,
+        };
+      });
+      setCongregacoes(listaCongregacoes);
 
       const perms = ((mu as { permissions?: string[] } | null)?.permissions ?? []);
       const role = ((mu as { role?: string } | null)?.role ?? '');
@@ -1135,6 +1214,77 @@ export default function EventosPage() {
     setBuscaCheckin('');
   };
 
+  // ── Gestão de Endereço Automático e Vínculo de Congregação ────────────────
+  const ultimoEnderecoAutoPreenchido = useRef<string>('');
+
+  const resolverEnderecoPorCongregacao = useCallback(
+    (congId: string): string => {
+      // 1. Templo Sede (quando congregação_id estiver vazia)
+      if (!congId) {
+        const sedeCong = congregacoes.find(c => c.is_sede);
+        if (sedeCong) {
+          const endSede = formatarEnderecoCongregacao(sedeCong);
+          if (endSede) return endSede;
+        }
+        // Fallback: endereço institucional cadastrado no tenant
+        return (configIgreja.endereco || '').trim();
+      }
+
+      // 2. Congregação específica selecionada
+      const cong = congregacoes.find(c => c.id === congId);
+      if (!cong) return '';
+
+      const endCong = formatarEnderecoCongregacao(cong);
+      if (endCong) return endCong;
+
+      // Se for identificada oficialmente como sede e não tiver endereço específico, usa fallback do tenant
+      if (cong.is_sede) {
+        return (configIgreja.endereco || '').trim();
+      }
+
+      // Congregação comum sem endereço: vazio para preenchimento manual
+      return '';
+    },
+    [congregacoes, configIgreja.endereco]
+  );
+
+  const handleCongregacaoChange = (novaCongId: string) => {
+    const novoEndereco = resolverEnderecoPorCongregacao(novaCongId);
+    const enderecoAtual = (formEvento.local_endereco || '').trim();
+    const ultimoAuto = (ultimoEnderecoAutoPreenchido.current || '').trim();
+
+    // Se o operador editou manualmente o endereço para algo diferente do último auto-preenchido
+    const foiEditadoManualmente = enderecoAtual !== '' && enderecoAtual !== ultimoAuto;
+
+    if (foiEditadoManualmente && novoEndereco !== enderecoAtual) {
+      const confirmar = window.confirm(
+        'O endereço foi alterado manualmente. Deseja substituí-lo pelo endereço cadastrado da congregação selecionada?'
+      );
+      if (confirmar) {
+        setFormEvento(f => ({ ...f, congregacao_id: novaCongId, local_endereco: novoEndereco }));
+        ultimoEnderecoAutoPreenchido.current = novoEndereco;
+      } else {
+        setFormEvento(f => ({ ...f, congregacao_id: novaCongId }));
+      }
+    } else {
+      setFormEvento(f => ({ ...f, congregacao_id: novaCongId, local_endereco: novoEndereco }));
+      ultimoEnderecoAutoPreenchido.current = novoEndereco;
+    }
+  };
+
+  const handleAbrirNovoEvento = () => {
+    setEditandoId(null);
+    const endInicial = resolverEnderecoPorCongregacao('');
+    ultimoEnderecoAutoPreenchido.current = endInicial;
+    setFormEvento({
+      ...FORM_EVENTO_INICIAL,
+      congregacao_id: '',
+      local_endereco: endInicial,
+    });
+    setShowForm(true);
+    if (aba !== 'eventos') setAba('eventos');
+  };
+
   // ── Salvar evento (visão operacional contínua) ─────────────────────────────
   const handleSaveEvento = async () => {
     if (!ministryId || !formEvento.titulo.trim() || !formEvento.data_inicio) {
@@ -1199,6 +1349,16 @@ export default function EventosPage() {
       modeloCertId = templatesCertificados[0].id;
     }
 
+    // Resolução oficial do nome do local para preservar compatibilidade com APIs/DB/Relatórios
+    let localNomeFinal = '';
+    if (formEvento.congregacao_id) {
+      const congSel = congregacoes.find(c => c.id === formEvento.congregacao_id);
+      localNomeFinal = congSel?.nome || formEvento.local_nome || 'Congregação';
+    } else {
+      const sedeCong = congregacoes.find(c => c.is_sede);
+      localNomeFinal = sedeCong?.nome || configIgreja?.nome || 'Templo Sede';
+    }
+
     setSalvando(true);
 
     const payload = {
@@ -1209,7 +1369,7 @@ export default function EventosPage() {
       tipo: formEvento.tipo,
       data_inicio: formEvento.data_inicio,
       data_fim: formEvento.data_fim || null,
-      local_nome: formEvento.local_nome || null,
+      local_nome: localNomeFinal,
       local_endereco: formEvento.local_endereco || null,
       capacidade: formEvento.capacidade ? parseInt(formEvento.capacidade) : null,
       is_publico: formEvento.is_publico,
@@ -1266,6 +1426,8 @@ export default function EventosPage() {
     });
     const brindeHab = Boolean(e.brinde_habilitado ?? e.inclui_brinde);
     const certHab = Boolean(e.certificado_habilitado ?? e.inclui_certificado);
+    const endEvento = e.local_endereco ?? '';
+    ultimoEnderecoAutoPreenchido.current = endEvento;
 
     setFormEvento({
       congregacao_id: e.congregacao_id ?? '',
@@ -1275,7 +1437,7 @@ export default function EventosPage() {
       data_inicio: e.data_inicio.slice(0, 16),
       data_fim: e.data_fim ? e.data_fim.slice(0, 16) : '',
       local_nome: e.local_nome ?? '',
-      local_endereco: e.local_endereco ?? '',
+      local_endereco: endEvento,
       capacidade: e.capacidade?.toString() ?? '',
       is_publico: e.is_publico,
       aceita_inscricao: e.aceita_inscricao,
@@ -1295,7 +1457,6 @@ export default function EventosPage() {
       programacao: e.programacao ?? '',
     });
     setShowForm(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDeleteEvento = async (id: string) => {
@@ -2168,12 +2329,7 @@ export default function EventosPage() {
 
             {scope.canWrite && (
               <button
-                onClick={() => {
-                  setEditandoId(null);
-                  setFormEvento(FORM_EVENTO_INICIAL);
-                  setShowForm(true);
-                  if (aba !== 'eventos') setAba('eventos');
-                }}
+                onClick={handleAbrirNovoEvento}
                 className="inline-flex items-center gap-2 px-4.5 py-2 rounded-xl text-xs font-bold text-white bg-[#0f3460] hover:bg-[#162a47] shadow-sm hover:shadow transition active:scale-[0.98]"
               >
                 <Plus className="w-4 h-4 stroke-[2.5]" />
@@ -2545,31 +2701,35 @@ export default function EventosPage() {
 
             {/* Modal / Formulário de Criação/Edição de Evento */}
             {showForm && scope.canWrite && (
-              <div className="bg-white rounded-2xl border border-slate-300 p-6 shadow-xl space-y-5 animate-in fade-in duration-200">
-                <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#1d4ed8]">
-                      <Calendar className="w-5 h-5" />
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+                <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl border border-slate-100 flex flex-col max-h-[92vh] overflow-hidden animate-in zoom-in-95 duration-150">
+                  {/* Cabeçalho Fixo */}
+                  <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-blue-50/50 via-white to-white shrink-0">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-100/80 border border-blue-200 text-[#0f3460] flex items-center justify-center shrink-0">
+                        <Calendar className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-black text-slate-900 leading-tight">
+                          {editandoId ? 'Editar Evento' : 'Novo Evento'}
+                        </h3>
+                        <p className="text-xs text-slate-500 font-medium">
+                          Preencha as informações detalhadas para publicação na agenda.
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-extrabold text-slate-900 text-base">
-                        {editandoId ? 'Editar Evento' : 'Novo Evento'}
-                      </h3>
-                      <p className="text-xs text-slate-500 font-medium">
-                        Preencha as informações detalhadas para publicação na agenda.
-                      </p>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowForm(false)}
+                      className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setShowForm(false)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
 
-                {/* Form Body */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Corpo com rolagem interna */}
+                  <div className="p-6 overflow-y-auto space-y-5 flex-1">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="md:col-span-3">
                     <label className="text-xs font-bold text-slate-700 block mb-1">Título do Evento *</label>
                     <input
@@ -2615,13 +2775,13 @@ export default function EventosPage() {
                     <label className="text-xs font-bold text-slate-700 block mb-1">Congregação</label>
                     <select
                       value={formEvento.congregacao_id}
-                      onChange={e => setFormEvento(f => ({ ...f, congregacao_id: e.target.value }))}
+                      onChange={e => handleCongregacaoChange(e.target.value)}
                       className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:ring-2 focus:ring-[#1d4ed8] transition"
                     >
                       <option value="">Templo Sede</option>
                       {congregacoes.map(c => (
                         <option key={c.id} value={c.id}>
-                          {c.nome}
+                          {c.nome} {c.is_sede ? '(Sede)' : ''}
                         </option>
                       ))}
                     </select>
@@ -2648,28 +2808,6 @@ export default function EventosPage() {
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">Local (Nome)</label>
-                    <input
-                      type="text"
-                      value={formEvento.local_nome}
-                      onChange={e => setFormEvento(f => ({ ...f, local_nome: e.target.value }))}
-                      placeholder="Ex: Templo Sede, Salão Principal..."
-                      className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:ring-2 focus:ring-[#1d4ed8] transition"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="text-xs font-bold text-slate-700 block mb-1">Endereço Completo</label>
-                    <input
-                      type="text"
-                      value={formEvento.local_endereco}
-                      onChange={e => setFormEvento(f => ({ ...f, local_endereco: e.target.value }))}
-                      placeholder="Rua, número, bairro, cidade..."
-                      className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:ring-2 focus:ring-[#1d4ed8] transition"
-                    />
-                  </div>
-
-                  <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">Capacidade de Vagas</label>
                     <input
                       type="number"
@@ -2677,6 +2815,32 @@ export default function EventosPage() {
                       value={formEvento.capacidade}
                       onChange={e => setFormEvento(f => ({ ...f, capacidade: e.target.value }))}
                       placeholder="Vazio para sem limite"
+                      className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:ring-2 focus:ring-[#1d4ed8] transition"
+                    />
+                  </div>
+
+                  <div className="md:col-span-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-bold text-slate-700 block">Endereço Completo</label>
+                      {formEvento.local_endereco !== resolverEnderecoPorCongregacao(formEvento.congregacao_id) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const endCadastrado = resolverEnderecoPorCongregacao(formEvento.congregacao_id);
+                            setFormEvento(f => ({ ...f, local_endereco: endCadastrado }));
+                            ultimoEnderecoAutoPreenchido.current = endCadastrado;
+                          }}
+                          className="text-[11px] font-semibold text-[#1d4ed8] hover:underline"
+                        >
+                          Usar endereço da congregação
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      value={formEvento.local_endereco}
+                      onChange={e => setFormEvento(f => ({ ...f, local_endereco: e.target.value }))}
+                      placeholder="Preenchido automaticamente ao selecionar congregação ou digite aqui..."
                       className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:ring-2 focus:ring-[#1d4ed8] transition"
                     />
                   </div>
@@ -3166,27 +3330,29 @@ export default function EventosPage() {
                     />
                   </div>
                 </div>
-
-                {/* Botões do Form */}
-                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setShowForm(false)}
-                    className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveEvento}
-                    disabled={salvando}
-                    className="px-5 py-2 rounded-xl bg-[#0f3460] hover:bg-[#162a47] text-white text-xs font-bold shadow-sm hover:shadow transition disabled:opacity-50"
-                  >
-                    {salvando ? 'Salvando...' : editandoId ? 'Salvar Alterações' : 'Criar Evento'}
-                  </button>
-                </div>
               </div>
-            )}
+
+              {/* Rodapé Fixo */}
+              <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/60 flex items-center justify-end gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEvento}
+                  disabled={salvando}
+                  className="px-5 py-2 rounded-xl bg-[#0f3460] hover:bg-[#162a47] text-white text-xs font-bold shadow-sm hover:shadow transition disabled:opacity-50"
+                >
+                  {salvando ? 'Salvando...' : 'Salvar Evento'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
             {/* ── 5. HEADER DA LISTAGEM COM TOGGLE [ LISTA | CALENDÁRIO ] ─── */}
             <div className="flex items-center justify-between pt-1">
@@ -3254,11 +3420,7 @@ export default function EventosPage() {
                   )}
                   {scope.canWrite && (
                     <button
-                      onClick={() => {
-                        setEditandoId(null);
-                        setFormEvento(FORM_EVENTO_INICIAL);
-                        setShowForm(true);
-                      }}
+                      onClick={handleAbrirNovoEvento}
                       className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#0f3460] hover:bg-[#162a47] transition shadow-sm"
                     >
                       + Novo Evento
