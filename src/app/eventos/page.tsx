@@ -572,6 +572,13 @@ export default function EventosPage() {
   const [salvando, setSalvando] = useState(false);
   const [templatesCertificados, setTemplatesCertificados] = useState<{ id: string; nome: string }[]>([]);
   const [certTemplatesFull, setCertTemplatesFull] = useState<any[]>([]);
+  const [previewCertificadoAberto, setPreviewCertificadoAberto] = useState(false);
+  const [previewCertificadoData, setPreviewCertificadoData] = useState<{
+    template: any;
+    html: string;
+    evento: any;
+  } | null>(null);
+  const [carregandoPreviewCert, setCarregandoPreviewCert] = useState(false);
 
   const optionsCertificados = useMemo(() => {
     const map = new Map<string, { id: string; nome: string }>();
@@ -586,12 +593,11 @@ export default function EventosPage() {
         t.db_id === formEvento.certificado_modelo_id
       );
       if (match) {
-        const canonicalKey = match.id || match.template_key || formEvento.certificado_modelo_id;
-        if (!map.has(canonicalKey) && !map.has(formEvento.certificado_modelo_id)) {
-          map.set(formEvento.certificado_modelo_id, {
-            id: formEvento.certificado_modelo_id,
-            nome: match.nome || match.name || 'Certificado Selecionado',
-          });
+        const canonicalKey = match.template_key || match.id || formEvento.certificado_modelo_id;
+        const nome = match.nome || match.name || 'Certificado de Eventos';
+        map.set(canonicalKey, { id: canonicalKey, nome });
+        if (formEvento.certificado_modelo_id !== canonicalKey) {
+          map.set(formEvento.certificado_modelo_id, { id: formEvento.certificado_modelo_id, nome });
         }
       } else if (!map.has(formEvento.certificado_modelo_id)) {
         map.set(formEvento.certificado_modelo_id, {
@@ -1495,6 +1501,10 @@ export default function EventosPage() {
 
     showModal('Sucesso', editandoId ? 'Evento atualizado com sucesso.' : 'Evento criado com sucesso!', 'success');
 
+    if (editandoId && eventoSelecionado?.id === editandoId) {
+      setEventoSelecionado(prev => prev ? ({ ...prev, ...payload, id: editandoId } as Evento) : null);
+    }
+
     // Recarrega a agenda operacional com a ordenação cronológica
     await carregarEventos(filtroPeriodo, filtroMesCustom, filtroStatus, filtroCongEv, '');
   };
@@ -2091,18 +2101,154 @@ export default function EventosPage() {
     return `<div style="position:relative;width:${largura}px;height:${altura}px;margin:0 auto;overflow:hidden;background:#fff;">${bgHtml}${elementsHtml}</div>`;
   };
 
-  const handleImprimirCertificado = (insc: Inscricao) => {
-    if (!eventoSelecionado) return;
-    const modeloId = eventoSelecionado.certificado_modelo_id;
-    const template = certTemplatesFull.find(t =>
+  const recuperarTemplateCertificado = useCallback(async (
+    modeloId?: string | null,
+    midParam?: string | null
+  ) => {
+    if (!modeloId) return null;
+
+    // 1. Tentar encontrar em certTemplatesFull em memória
+    let template = certTemplatesFull.find(t =>
       t.id === modeloId ||
       t.template_key === modeloId ||
       t.chave === modeloId ||
       t.db_id === modeloId
-    ) || certTemplatesFull.find(t => isTemplateCategoriaEventos(t)) || certTemplatesFull[0];
+    );
+    if (template) return template;
+
+    // 2. Se não estiver em memória, buscar diretamente no Supabase
+    try {
+      const targetMid = midParam || ministryId;
+      let q = supabase.from('certificados_templates').select('*');
+      if (targetMid) {
+        q = q.eq('ministry_id', targetMid);
+      }
+      const { data: rows } = await q.or(`template_key.eq.${modeloId},id.eq.${modeloId}`).limit(1);
+      if (rows && rows.length > 0) {
+        const r = rows[0];
+        const td = typeof r.template_data === 'string'
+          ? (() => { try { return JSON.parse(r.template_data); } catch { return {}; } })()
+          : (r.template_data || {});
+        const key = r.template_key || td.id || r.id;
+        return {
+          ...td,
+          db_id: r.id,
+          template_key: key,
+          id: key,
+          nome: td.nome || r.name || 'Certificado de Eventos',
+          categoria: td.categoria || 'eventos',
+          ativo: r.is_active !== false,
+        };
+      }
+    } catch {
+      // ignore
+    }
+
+    // 3. Fallback estrito: somente templates comprovadamente da categoria eventos
+    return certTemplatesFull.find(t => isTemplateCategoriaEventos(t)) || null;
+  }, [certTemplatesFull, ministryId, supabase]);
+
+  const abrirPreviewCertificado = useCallback(async (
+    modeloIdParam?: string | null,
+    eventoContexto?: Partial<Evento> | FormEvento | null
+  ) => {
+    const rawId = modeloIdParam || formEvento.certificado_modelo_id || eventoSelecionado?.certificado_modelo_id;
+    if (!rawId) {
+      showModal('Selecione um modelo', 'Por favor, selecione um modelo de certificado no campo "Modelo de Certificado" antes de pré-visualizar.', 'info');
+      return;
+    }
+
+    setCarregandoPreviewCert(true);
+
+    try {
+      const template = await recuperarTemplateCertificado(rawId, ministryId);
+
+      if (!template) {
+        showModal(
+          'Modelo não encontrado',
+          `O modelo de certificado associado ("${rawId}") não foi encontrado no banco de dados deste ministério. Cadastre ou verifique o modelo em Configurações > Certificados.`,
+          'error'
+        );
+        return;
+      }
+
+      // Preparar dados do evento para os placeholders
+      const evObj: Partial<Evento> = {
+        id: (eventoContexto as any)?.id || 'evento-preview',
+        titulo: eventoContexto?.titulo || 'ESCOLA DE OBREIROS 2026',
+        data_inicio: (eventoContexto as any)?.data_inicio || '2026-10-23T19:00:00',
+        data_fim: (eventoContexto as any)?.data_fim || '2026-10-23T21:30:00',
+        local_nome: (eventoContexto as any)?.local_nome || 'ASSEMBLEIA DE DEUS ANANINDEUA',
+        local_endereco: (eventoContexto as any)?.local_endereco || 'BR 316, KM02, 230, ANANINDEUA - PA',
+        tipo: ((eventoContexto as any)?.tipo as TipoEvento) || 'conferencia',
+        ministry_id: ministryId || '',
+      };
+
+      const inscDemo: any = {
+        id: 'insc-demo',
+        nome_display: 'Carlos Eduardo Oliveira (Participante Demonstrativo)',
+        cpf: '123.456.789-00',
+        telefone: '(91) 98765-4321',
+        email: 'participante.exemplo@eklesia.com',
+        data_confirmacao: new Date().toISOString(),
+        data_inscricao: new Date().toISOString(),
+        numero_protocolo: 'EVT-2026-DEMO',
+        status: 'confirmado',
+      };
+
+      const map = buildEventoPlaceholderMap(evObj as Evento, inscDemo as Inscricao, configIgreja);
+      const html = renderCertificadoHtml(template, map);
+
+      setPreviewCertificadoData({
+        template,
+        html,
+        evento: evObj,
+      });
+      setPreviewCertificadoAberto(true);
+    } catch (err: any) {
+      showModal('Erro ao carregar pré-visualização', err?.message || 'Falha ao recuperar modelo.', 'error');
+    } finally {
+      setCarregandoPreviewCert(false);
+    }
+  }, [formEvento.certificado_modelo_id, eventoSelecionado, ministryId, recuperarTemplateCertificado, configIgreja, renderCertificadoHtml]);
+
+  const handleImprimirTestePreview = () => {
+    if (!previewCertificadoData) return;
+    const { template, html, evento } = previewCertificadoData;
+    const orientacao = template.orientacao === 'portrait' ? 'portrait' : 'landscape';
+    const largura = orientacao === 'portrait' ? 595 : 840;
+    const altura = orientacao === 'portrait' ? 840 : 595;
+    const pageW = orientacao === 'portrait' ? 190 : 277;
+    const pageH = orientacao === 'portrait' ? 277 : 190;
+    const scaleX = (pageW * 3.7795) / largura;
+    const scaleY = (pageH * 3.7795) / altura;
+    const scale = Math.min(scaleX, scaleY).toFixed(4);
+
+    const win = window.open('', '_blank');
+    if (!win) {
+      showModal('Aviso', 'Permita a abertura de pop-ups para imprimir o teste do certificado.', 'info');
+      return;
+    }
+
+    win.document.write(`<!DOCTYPE html><html><head><title>Teste de Certificado - ${evento?.titulo || 'Evento'}</title><style>
+      *{box-sizing:border-box;margin:0;padding:0;}
+      @page{size:A4 ${orientacao};margin:1cm;}
+      html,body{width:100%;height:100%;display:flex;justify-content:center;align-items:center;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
+      .cert{zoom:${scale};width:${largura}px;height:${altura}px;overflow:hidden;flex-shrink:0;}
+      img{display:block;}
+    </style></head><body><div class="cert">${html}</div></body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 400);
+  };
+
+  const handleImprimirCertificado = async (insc: Inscricao) => {
+    if (!eventoSelecionado) return;
+    const modeloId = eventoSelecionado.certificado_modelo_id;
+    const template = await recuperarTemplateCertificado(modeloId, eventoSelecionado.ministry_id);
 
     if (!template) {
-      showModal('Modelo não encontrado', 'Configure um modelo de certificado em Configurações > Certificados.', 'error');
+      showModal('Modelo não encontrado', 'O modelo de certificado configurado para este evento não foi encontrado. Configure o modelo em Configurações > Certificados.', 'error');
       return;
     }
 
@@ -2136,24 +2282,20 @@ export default function EventosPage() {
     setTimeout(() => { win.print(); }, 400);
   };
 
-  const handleImprimirTodosCertificados = () => {
+  const handleImprimirTodosCertificados = async () => {
     if (!eventoSelecionado) return;
     const modeloId = eventoSelecionado.certificado_modelo_id;
-    const template = certTemplatesFull.find(t =>
-      t.id === modeloId ||
-      t.template_key === modeloId ||
-      t.chave === modeloId ||
-      t.db_id === modeloId
-    ) || certTemplatesFull.find(t => isTemplateCategoriaEventos(t)) || certTemplatesFull[0];
+    const template = await recuperarTemplateCertificado(modeloId, eventoSelecionado.ministry_id);
 
     if (!template) {
-      showModal('Modelo não encontrado', 'Configure um modelo de certificado em Configurações > Certificados.', 'error');
+      showModal('Modelo não encontrado', 'O modelo de certificado configurado para este evento não foi encontrado. Configure o modelo em Configurações > Certificados.', 'error');
       return;
     }
 
     const participantesValidos = inscricoes.filter(i => i.status === 'confirmado');
     if (participantesValidos.length === 0) {
-      showModal('Nenhum participante', 'Não há participantes confirmados neste evento para emissão de certificados.', 'info');
+      // Abre a pré-visualização demonstrativa do modelo
+      abrirPreviewCertificado(modeloId, eventoSelecionado);
       return;
     }
 
@@ -2354,9 +2496,21 @@ export default function EventosPage() {
               {getBeneficiosLabels(eventoVisualizando).length > 0 && (
                 <div>
                   <span className="text-slate-500 block mb-0.5">Benefícios inclusos:</span>
-                  <span className="font-semibold text-emerald-800">
-                    {getBeneficiosLabels(eventoVisualizando).join(' · ')}
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-emerald-800">
+                      {getBeneficiosLabels(eventoVisualizando).join(' · ')}
+                    </span>
+                    {eventoVisualizando.inclui_certificado && (
+                      <button
+                        type="button"
+                        onClick={() => abrirPreviewCertificado(eventoVisualizando.certificado_modelo_id, eventoVisualizando)}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 hover:text-blue-800 hover:underline cursor-pointer ml-2"
+                      >
+                        <Eye className="w-3 h-3 text-blue-600" />
+                        <span>Ver Certificado</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -2369,6 +2523,16 @@ export default function EventosPage() {
             )}
 
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              {eventoVisualizando.inclui_certificado && (
+                <button
+                  type="button"
+                  onClick={() => abrirPreviewCertificado(eventoVisualizando.certificado_modelo_id, eventoVisualizando)}
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 transition inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <Award className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Visualizar Certificado</span>
+                </button>
+              )}
               <button
                 onClick={() => {
                   const ev = eventoVisualizando;
@@ -2385,6 +2549,101 @@ export default function EventosPage() {
               >
                 Fechar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de Pré-Visualização do Certificado em Tempo Real ── */}
+      {previewCertificadoAberto && previewCertificadoData && (
+        <div
+          className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-5 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setPreviewCertificadoAberto(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Cabeçalho */}
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-700 shadow-xs">
+                  <Award className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">
+                      {previewCertificadoData.template.nome || 'Certificado de Eventos'}
+                    </h3>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                      Modo Somente Leitura
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Modelo vinculado: <span className="font-mono text-slate-700 font-semibold">{previewCertificadoData.template.template_key || previewCertificadoData.template.id}</span> · Categoria: <strong className="text-emerald-700 uppercase">Eventos</strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setPreviewCertificadoAberto(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition"
+                title="Fechar visualização"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Banner Informativo */}
+            <div className="px-6 py-2.5 bg-blue-50/60 border-b border-blue-100 flex items-center justify-between text-xs text-blue-900">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+                <span>
+                  Visualizando o layout oficial persistido no banco com as variáveis dinâmicas do evento <strong>{previewCertificadoData.evento?.titulo}</strong>.
+                </span>
+              </div>
+              <a
+                href="/configuracoes/certificados"
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-bold text-[#1d4ed8] hover:underline inline-flex items-center gap-1 shrink-0"
+              >
+                Abrir no Editor
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+
+            {/* Área de Visualização do Certificado */}
+            <div className="flex-1 overflow-auto p-4 sm:p-6 bg-slate-100/90 flex items-center justify-center min-h-[380px]">
+              <div className="bg-white rounded-lg shadow-xl overflow-hidden border border-slate-300 max-w-full">
+                <div
+                  className="cert-preview-wrapper select-none"
+                  dangerouslySetInnerHTML={{ __html: previewCertificadoData.html }}
+                />
+              </div>
+            </div>
+
+            {/* Rodapé com Ações */}
+            <div className="px-6 py-3.5 border-t border-slate-200 flex items-center justify-between bg-slate-50/80">
+              <span className="text-[11px] text-slate-500 font-medium">
+                Dimensões: {previewCertificadoData.template.orientacao === 'portrait' ? '595 × 840 px (Retrato)' : '840 × 595 px (Paisagem)'} · Formato A4
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleImprimirTestePreview}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition shadow-xs cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Imprimir Teste</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewCertificadoAberto(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#0f3460] hover:bg-[#162a47] transition shadow-xs cursor-pointer"
+                >
+                  Concluir
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -3239,20 +3498,35 @@ export default function EventosPage() {
                                 </div>
                               </div>
                             ) : (
-                              <select
-                                value={formEvento.certificado_modelo_id}
-                                onChange={e => setFormEvento(f => ({ ...f, certificado_modelo_id: e.target.value }))}
-                                className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-semibold focus:ring-2 focus:ring-emerald-500 transition"
-                              >
-                                {(!formEvento.certificado_modelo_id || optionsCertificados.length > 1) && (
-                                  <option value="">Selecione um modelo de certificado...</option>
+                              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                <select
+                                  value={formEvento.certificado_modelo_id}
+                                  onChange={e => setFormEvento(f => ({ ...f, certificado_modelo_id: e.target.value }))}
+                                  className="flex-1 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-semibold focus:ring-2 focus:ring-emerald-500 transition"
+                                >
+                                  {(!formEvento.certificado_modelo_id || optionsCertificados.length > 1) && (
+                                    <option value="">Selecione um modelo de certificado...</option>
+                                  )}
+                                  {optionsCertificados.map(t => (
+                                    <option key={t.id} value={t.id}>
+                                      {t.nome}
+                                    </option>
+                                  ))}
+                                </select>
+
+                                {formEvento.certificado_modelo_id && (
+                                  <button
+                                    type="button"
+                                    onClick={() => abrirPreviewCertificado(formEvento.certificado_modelo_id, formEvento)}
+                                    disabled={carregandoPreviewCert}
+                                    title="Pré-visualizar o layout completo do modelo de certificado selecionado"
+                                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:border-blue-300 disabled:opacity-50 transition shadow-2xs whitespace-nowrap cursor-pointer shrink-0"
+                                  >
+                                    <Eye className="w-3.5 h-3.5 text-blue-600" />
+                                    <span>{carregandoPreviewCert ? 'Carregando...' : 'Pré-visualizar certificado'}</span>
+                                  </button>
                                 )}
-                                {optionsCertificados.map(t => (
-                                  <option key={t.id} value={t.id}>
-                                    {t.nome}
-                                  </option>
-                                ))}
-                              </select>
+                              </div>
                             )}
 
                             <p className="text-[11px] text-slate-500 font-medium">
@@ -3451,20 +3725,35 @@ export default function EventosPage() {
                                 </div>
                               </div>
                             ) : (
-                              <select
-                                value={formEvento.certificado_modelo_id}
-                                onChange={e => setFormEvento(f => ({ ...f, certificado_modelo_id: e.target.value }))}
-                                className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-semibold focus:ring-2 focus:ring-emerald-500 transition"
-                              >
-                                {(!formEvento.certificado_modelo_id || optionsCertificados.length > 1) && (
-                                  <option value="">Selecione um modelo de certificado...</option>
+                              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                <select
+                                  value={formEvento.certificado_modelo_id}
+                                  onChange={e => setFormEvento(f => ({ ...f, certificado_modelo_id: e.target.value }))}
+                                  className="flex-1 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-semibold focus:ring-2 focus:ring-emerald-500 transition"
+                                >
+                                  {(!formEvento.certificado_modelo_id || optionsCertificados.length > 1) && (
+                                    <option value="">Selecione um modelo de certificado...</option>
+                                  )}
+                                  {optionsCertificados.map(t => (
+                                    <option key={t.id} value={t.id}>
+                                      {t.nome}
+                                    </option>
+                                  ))}
+                                </select>
+
+                                {formEvento.certificado_modelo_id && (
+                                  <button
+                                    type="button"
+                                    onClick={() => abrirPreviewCertificado(formEvento.certificado_modelo_id, formEvento)}
+                                    disabled={carregandoPreviewCert}
+                                    title="Pré-visualizar o layout completo do modelo de certificado selecionado"
+                                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:border-blue-300 disabled:opacity-50 transition shadow-2xs whitespace-nowrap cursor-pointer shrink-0"
+                                  >
+                                    <Eye className="w-3.5 h-3.5 text-blue-600" />
+                                    <span>{carregandoPreviewCert ? 'Carregando...' : 'Pré-visualizar certificado'}</span>
+                                  </button>
                                 )}
-                                {optionsCertificados.map(t => (
-                                  <option key={t.id} value={t.id}>
-                                    {t.nome}
-                                  </option>
-                                ))}
-                              </select>
+                              </div>
                             )}
 
                             <p className="text-[11px] text-slate-500 font-medium">
@@ -3926,6 +4215,21 @@ export default function EventosPage() {
                       <FileBarChart2 className="w-3.5 h-3.5 text-amber-600" />
                       <span>Relatório do Evento</span>
                     </button>
+
+                    {menuEventoAtivo.inclui_certificado && (
+                      <button
+                        role="menuitem"
+                        onClick={() => {
+                          const ev = menuEventoAtivo;
+                          fecharMenuAcoes();
+                          abrirPreviewCertificado(ev.certificado_modelo_id, ev);
+                        }}
+                        className="w-full px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer transition text-left"
+                      >
+                        <Award className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Visualizar Certificado</span>
+                      </button>
+                    )}
 
                     {scope.canWrite && (
                       <button
