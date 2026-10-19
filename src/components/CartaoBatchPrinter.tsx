@@ -222,6 +222,15 @@ export default function CartaoBatchPrinter({ membros, onComplete }: CartaoBatchP
           const logoUrl = configIgreja?.logo || BRAND.logoHorizontal;
           return `<div style="${style}"><img src="${logoUrl}" style="width: 100%; height: 100%; object-fit: contain;" /></div>`;
         }
+        if (el.tipo === 'assinatura_presidente' || el.tipo === 'assinatura_secretario_geral') {
+          const isPresidente = el.tipo === 'assinatura_presidente';
+          const style = `position: absolute; left: ${el.x}px; top: ${el.y}px; width: ${el.largura}px; height: ${el.altura}px; opacity: ${el.transparencia || 1}; display: flex; align-items: center; justify-content: center;`;
+          const sigUrl = isPresidente
+            ? (configIgreja?.assinatura_presidente || '')
+            : (configIgreja?.assinatura_secretario_geral || '');
+          if (!sigUrl) return '';
+          return `<div style="${style}"><img src="${sigUrl}" alt="Assinatura" style="width: 100%; height: 100%; object-fit: contain;" /></div>`;
+        }
         if (el.tipo === 'imagem') {
           const opacity = (el.transparencia ?? 1);
           const radius = (el.borderRadius ?? 0);

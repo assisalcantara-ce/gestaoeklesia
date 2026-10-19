@@ -327,8 +327,8 @@ export default function ConfiguracoesCartasPage() {
       tipo,
       x: 100,
       y: 160 + canvasContent.elements.length * 20,
-      largura: tipo === 'linha' ? 600 : tipo === 'forma' ? 300 : tipo === 'qrcode' ? 120 : 400,
-      altura: tipo === 'linha' ? 3 : tipo === 'forma' ? 150 : tipo === 'qrcode' ? 120 : 60,
+      largura: tipo === 'linha' ? 600 : tipo === 'forma' ? 300 : tipo === 'qrcode' ? 120 : (tipo === 'assinatura_presidente' || tipo === 'assinatura_secretario_geral') ? 220 : 400,
+      altura: tipo === 'linha' ? 3 : tipo === 'forma' ? 150 : tipo === 'qrcode' ? 120 : (tipo === 'assinatura_presidente' || tipo === 'assinatura_secretario_geral') ? 80 : 60,
       fontSize: 18,
       fonte: 'Calibri',
       cor: defaultColor,
@@ -1138,6 +1138,22 @@ export default function ConfiguracoesCartasPage() {
                       </button>
                       <button
                         type="button"
+                        onClick={() => addCanvasElement('assinatura_presidente')}
+                        className="flex items-center gap-2 rounded-lg border border-teal-200 bg-teal-50/50 px-3 py-2 text-xs font-semibold text-teal-800 hover:bg-teal-100 hover:border-teal-400 transition shadow-sm"
+                      >
+                        <span className="text-sm">✍️</span>
+                        <span>Assinatura Presidente</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => addCanvasElement('assinatura_secretario_geral')}
+                        className="flex items-center gap-2 rounded-lg border border-teal-200 bg-teal-50/50 px-3 py-2 text-xs font-semibold text-teal-800 hover:bg-teal-100 hover:border-teal-400 transition shadow-sm"
+                      >
+                        <span className="text-sm">✍️</span>
+                        <span>Assinatura Secretário</span>
+                      </button>
+                      <button
+                        type="button"
                         disabled={isUploadingImage}
                         onClick={() => {
                           setCanvasImageTargetId(null);
@@ -1278,6 +1294,7 @@ export default function ConfiguracoesCartasPage() {
                                   {el.tipo === 'imagem' && <Image className="h-3.5 w-3.5" />}
                                   {el.tipo === 'qrcode' && <span>📱</span>}
                                   {el.tipo === 'forma' && <Square className="h-3.5 w-3.5" />}
+                                  {(el.tipo === 'assinatura_presidente' || el.tipo === 'assinatura_secretario_geral') && <span>✍️</span>}
                                 </span>
                                 <span className="truncate">{labelResumido}</span>
                               </div>
@@ -1659,8 +1676,8 @@ export default function ConfiguracoesCartasPage() {
                         </div>
                       )}
 
-                      {/* Transparência para Imagem e Logo */}
-                      {(selectedCanvasElement.tipo === 'imagem' || selectedCanvasElement.tipo === 'logo') && (
+                      {/* Transparência para Imagem, Logo e Assinaturas */}
+                      {(selectedCanvasElement.tipo === 'imagem' || selectedCanvasElement.tipo === 'logo' || selectedCanvasElement.tipo === 'assinatura_presidente' || selectedCanvasElement.tipo === 'assinatura_secretario_geral') && (
                         <div className="space-y-2 border-t border-gray-100 pt-3">
                           <div className="flex items-center justify-between">
                             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">

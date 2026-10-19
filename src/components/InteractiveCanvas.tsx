@@ -10,7 +10,7 @@ import { QRCodeSVG } from 'qrcode.react';
 
 interface ElementoCartao {
     id: string;
-    tipo: 'texto' | 'qrcode' | 'logo' | 'foto-membro' | 'chapa' | 'imagem' | 'linha' | 'forma';
+    tipo: 'texto' | 'qrcode' | 'logo' | 'foto-membro' | 'chapa' | 'imagem' | 'linha' | 'forma' | 'assinatura_presidente' | 'assinatura_secretario_geral';
     x: number;
     y: number;
     largura: number;
@@ -559,6 +559,90 @@ export default function InteractiveCanvas({
                     </div>
                 );
                 break;
+
+            case 'assinatura_presidente': {
+                const assinaturaUrl = configIgreja?.assinatura_presidente || elemento.imagemUrl;
+
+                conteudo = assinaturaUrl ? (
+                    <img
+                        src={assinaturaUrl}
+                        alt="Assinatura do Pastor Presidente"
+                        style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'contain',
+                            opacity: elemento.transparencia ?? 1
+                        }}
+                    />
+                ) : (
+                    <div
+                        style={{
+                            width: '100%',
+                            height: '100%',
+                            backgroundColor: 'rgba(240, 253, 250, 0.7)',
+                            border: '1px dashed #0d9488',
+                            borderRadius: '4px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '10px',
+                            fontWeight: 600,
+                            color: '#0f766e',
+                            padding: '4px',
+                            textAlign: 'center',
+                            boxSizing: 'border-box',
+                            opacity: elemento.transparencia ?? 1
+                        }}
+                    >
+                        <span>✍️ Assinatura Presidente</span>
+                        <span style={{ fontSize: '8px', fontWeight: 400, color: '#115e59' }}>(Não cadastrada)</span>
+                    </div>
+                );
+                break;
+            }
+
+            case 'assinatura_secretario_geral': {
+                const assinaturaUrl = configIgreja?.assinatura_secretario_geral || elemento.imagemUrl;
+
+                conteudo = assinaturaUrl ? (
+                    <img
+                        src={assinaturaUrl}
+                        alt="Assinatura do Secretário-Geral"
+                        style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'contain',
+                            opacity: elemento.transparencia ?? 1
+                        }}
+                    />
+                ) : (
+                    <div
+                        style={{
+                            width: '100%',
+                            height: '100%',
+                            backgroundColor: 'rgba(240, 253, 250, 0.7)',
+                            border: '1px dashed #0d9488',
+                            borderRadius: '4px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '10px',
+                            fontWeight: 600,
+                            color: '#0f766e',
+                            padding: '4px',
+                            textAlign: 'center',
+                            boxSizing: 'border-box',
+                            opacity: elemento.transparencia ?? 1
+                        }}
+                    >
+                        <span>✍️ Assinatura Secretário-Geral</span>
+                        <span style={{ fontSize: '8px', fontWeight: 400, color: '#115e59' }}>(Não cadastrada)</span>
+                    </div>
+                );
+                break;
+            }
 
             case 'foto-membro':
                 // Renderizar foto do membro se disponível

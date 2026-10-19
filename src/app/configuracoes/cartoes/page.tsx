@@ -16,7 +16,7 @@ import {
 
 interface ElementoCartao {
   id: string;
-  tipo: 'texto' | 'qrcode' | 'logo' | 'foto-membro' | 'chapa' | 'imagem' | 'linha' | 'forma';
+  tipo: 'texto' | 'qrcode' | 'logo' | 'foto-membro' | 'chapa' | 'imagem' | 'linha' | 'forma' | 'assinatura_presidente' | 'assinatura_secretario_geral';
   x: number;
   y: number;
   largura: number;
@@ -86,7 +86,9 @@ const ELEMENTOS_DISPONIVEIS = [
   { tipo: 'logo', label: 'Logo', icone: '🏛️' },
   { tipo: 'foto-membro', label: 'Foto do Membro', icone: '📸' },
   { tipo: 'imagem', label: 'Imagem', icone: '🖼️' },
-  { tipo: 'chapa', label: 'Chapa', icone: '🔴' }
+  { tipo: 'chapa', label: 'Chapa', icone: '🔴' },
+  { tipo: 'assinatura_presidente', label: 'Assinatura Presidente', icone: '✍️' },
+  { tipo: 'assinatura_secretario_geral', label: 'Assinatura Secretário', icone: '✍️' }
 ];
 
 const PLACEHOLDERS_DISPONIVEIS = [
@@ -270,6 +272,9 @@ export default function ConfiguracaoCartoesPage() {
     } else if (tipo === 'imagem') {
       larguraDefault = 80;
       alturaDefault = 80;
+    } else if (tipo === 'assinatura_presidente' || tipo === 'assinatura_secretario_geral') {
+      larguraDefault = 90;
+      alturaDefault = 35;
     }
 
     const novoElemento: ElementoCartao = {
@@ -282,7 +287,7 @@ export default function ConfiguracaoCartoesPage() {
       fontSize: fontSizeDefault,
       cor: tipo === 'chapa' ? '#ff0000' : '#000',
       fonte: 'Arial',
-      transparencia: (tipo === 'chapa' || tipo === 'logo' || tipo === 'imagem') ? 1 : undefined,
+      transparencia: (tipo === 'chapa' || tipo === 'logo' || tipo === 'imagem' || tipo === 'assinatura_presidente' || tipo === 'assinatura_secretario_geral') ? 1 : undefined,
       borderRadius: tipo === 'chapa' ? 4 : undefined,
       texto: tipo === 'chapa' ? 'CHAPA' : undefined,
       alinhamento: 'left',
@@ -1513,8 +1518,8 @@ export default function ConfiguracaoCartoesPage() {
 
 
 
-              {/* Transparência - Para Chapa, Logo e Imagem */}
-              {(elementoSelecionado.tipo === 'chapa' || elementoSelecionado.tipo === 'logo' || elementoSelecionado.tipo === 'imagem') && (
+              {/* Transparência - Para Chapa, Logo, Imagem e Assinaturas */}
+              {(elementoSelecionado.tipo === 'chapa' || elementoSelecionado.tipo === 'logo' || elementoSelecionado.tipo === 'imagem' || elementoSelecionado.tipo === 'assinatura_presidente' || elementoSelecionado.tipo === 'assinatura_secretario_geral') && (
                 <div className="mb-4">
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
                     Transparência: {Math.round((elementoSelecionado.transparencia || 1) * 100)}%

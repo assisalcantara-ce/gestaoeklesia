@@ -137,7 +137,7 @@ export type TemplateScope = 'system' | 'tenant'
 
 export type CartaCanvasElement = {
   id: string
-  tipo: 'texto' | 'qrcode' | 'logo' | 'foto-membro' | 'chapa' | 'imagem' | 'linha' | 'forma'
+  tipo: 'texto' | 'qrcode' | 'logo' | 'foto-membro' | 'chapa' | 'imagem' | 'linha' | 'forma' | 'assinatura_presidente' | 'assinatura_secretario_geral'
   x: number
   y: number
   largura: number

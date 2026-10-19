@@ -619,7 +619,9 @@ export default function CartasPage() {
   const renderCanvasHtml = (
     canvas: CartaCanvasData,
     map: Record<string, string>,
-    qrDataUrls?: Record<string, string>
+    qrDataUrls?: Record<string, string>,
+    authInfo?: { autorizado: boolean; status?: string } | null,
+    isPrintOrIssue = false
   ) => {
     const safeCanvas = normalizeCanvasData(canvas);
     const bgStyle = safeCanvas.backgroundUrl
@@ -660,6 +662,32 @@ export default function CartasPage() {
             `opacity:${el.transparencia ?? 1};`,
           ].join('');
           return `<img src="${src}" style="${style}" />`;
+        }
+
+        if (el.tipo === 'assinatura_presidente' || el.tipo === 'assinatura_secretario_geral') {
+          // Nas cartas de mudança e desligamento, a assinatura do presidente requer deliberação positiva oficial (status = 'autorizado')
+          const tipoAtual = selectedTemplate?.tipo || selectedTemplate?.template_key || '';
+          const isRestrito = tipoAtual.includes('mudanca') || tipoAtual.includes('desligamento');
+          const isPresidente = el.tipo === 'assinatura_presidente';
+
+          // Regra obrigatória: A assinatura do presidente NUNCA aparece em preview desautorizado ou emissão sem deliberação positiva
+          if (isRestrito && isPresidente) {
+            if (!isPrintOrIssue || !authInfo?.autorizado || authInfo?.status !== 'autorizado') {
+              return '';
+            }
+          }
+
+          const src = isPresidente
+            ? (configIgreja.assinatura_presidente || '')
+            : (configIgreja.assinatura_secretario_geral || '');
+
+          if (!src) return '';
+          const style = [
+            baseStyle,
+            'object-fit:contain;',
+            `opacity:${el.transparencia ?? 1};`,
+          ].join('');
+          return `<img src="${src}" alt="${isPresidente ? 'Assinatura do Pastor Presidente' : 'Assinatura do Secretário-Geral'}" style="${style}" />`;
         }
 
         if (el.tipo === 'qrcode') {
@@ -1532,7 +1560,7 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
       }
 
       const map = buildPlaceholderMap(selectedMember);
-      const renderedHtml = renderCanvasHtml(canvasContent, map, issueQrMap);
+      const renderedHtml = renderCanvasHtml(canvasContent, map, issueQrMap, authResult, true);
 
       const {
         data: { user },

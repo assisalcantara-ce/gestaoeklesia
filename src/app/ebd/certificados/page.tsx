@@ -190,6 +190,13 @@ export default function EbdCertificadosPage() {
           if (!src) return '';
           return `<img src="${src}" style="${base}object-fit:contain;opacity:${el.transparencia??1};" />`;
         }
+        if (el.tipo === 'assinatura_presidente' || el.tipo === 'assinatura_secretario_geral') {
+          const src = el.tipo === 'assinatura_presidente'
+            ? (configIgreja.assinatura_presidente || '')
+            : (configIgreja.assinatura_secretario_geral || '');
+          if (!src) return '';
+          return `<img src="${src}" alt="Assinatura" style="${base}object-fit:contain;opacity:${el.transparencia??1};" />`;
+        }
         return '';
       }).join('');
 

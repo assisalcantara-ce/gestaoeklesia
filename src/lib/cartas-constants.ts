@@ -63,6 +63,8 @@ export const CANVAS_ELEMENT_LABELS: Record<CartaCanvasElement['tipo'], string> =
   'foto-membro': 'Foto do Membro',
   chapa: 'Chapa',
   forma: 'Forma / Retângulo',
+  assinatura_presidente: 'Assinatura do Presidente',
+  assinatura_secretario_geral: 'Assinatura do Secretário-Geral',
 };
 
 export const PLACEHOLDER_GROUPS = [

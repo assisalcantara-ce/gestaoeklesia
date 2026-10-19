@@ -30,11 +30,13 @@ const ELEMENTOS_TIPOS = [
   { tipo: 'imagem', label: 'Imagem',  icone: <ImageIcon className="h-5 w-5" /> },
   { tipo: 'chapa',  label: 'Chapa',   icone: <Award className="h-5 w-5" /> },
   { tipo: 'qrcode', label: 'QR Code', icone: <QrCode className="h-5 w-5" /> },
+  { tipo: 'assinatura_presidente', label: 'Assinatura Pres.', icone: <span className="text-lg">✍️</span> },
+  { tipo: 'assinatura_secretario_geral', label: 'Assinatura Sec.', icone: <span className="text-lg">✍️</span> },
 ];
 
 interface CertificadoElemento {
   id: string;
-  tipo: 'texto' | 'logo' | 'imagem' | 'chapa' | 'foto-membro' | 'qrcode' | 'linha' | 'forma';
+  tipo: 'texto' | 'logo' | 'imagem' | 'chapa' | 'foto-membro' | 'qrcode' | 'linha' | 'forma' | 'assinatura_presidente' | 'assinatura_secretario_geral';
   x: number;
   y: number;
   largura: number;
@@ -255,8 +257,8 @@ export default function ConfiguracoesCertificadosPage() {
       tipo,
       x: 40,
       y: 40,
-      largura: tipo === 'logo' || tipo === 'qrcode' ? 90 : tipo === 'imagem' ? 160 : tipo === 'chapa' ? 200 : 320,
-      altura:  tipo === 'logo' || tipo === 'qrcode' ? 90 : tipo === 'imagem' ? 120 : tipo === 'chapa' ? 40  : 40,
+      largura: tipo === 'logo' || tipo === 'qrcode' ? 90 : (tipo === 'assinatura_presidente' || tipo === 'assinatura_secretario_geral') ? 180 : tipo === 'imagem' ? 160 : tipo === 'chapa' ? 200 : 320,
+      altura:  tipo === 'logo' || tipo === 'qrcode' ? 90 : (tipo === 'assinatura_presidente' || tipo === 'assinatura_secretario_geral') ? 60  : tipo === 'imagem' ? 120 : tipo === 'chapa' ? 40  : 40,
       fontSize: 16,
       cor: '#111827',
       fonte: 'Arial',
@@ -791,19 +793,21 @@ export default function ConfiguracoesCertificadosPage() {
                     </button>
                   )}
 
-                  {elementoSelecionado.tipo === 'chapa' && (
+                  {(elementoSelecionado.tipo === 'chapa' || elementoSelecionado.tipo === 'logo' || elementoSelecionado.tipo === 'imagem' || elementoSelecionado.tipo === 'assinatura_presidente' || elementoSelecionado.tipo === 'assinatura_secretario_geral') && (
                     <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-xs font-semibold text-gray-600">Cor</label>
-                        <input
-                          type="color"
-                          className="mt-1 w-full border rounded h-8"
-                          value={elementoSelecionado.cor || '#ef4444'}
-                          onChange={(e) => updateEl(elementoSelecionado.id, { cor: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-semibold text-gray-600">Opacidade</label>
+                      {elementoSelecionado.tipo === 'chapa' && (
+                        <div>
+                          <label className="text-xs font-semibold text-gray-600">Cor</label>
+                          <input
+                            type="color"
+                            className="mt-1 w-full border rounded h-8"
+                            value={elementoSelecionado.cor || '#ef4444'}
+                            onChange={(e) => updateEl(elementoSelecionado.id, { cor: e.target.value })}
+                          />
+                        </div>
+                      )}
+                      <div className={elementoSelecionado.tipo === 'chapa' ? '' : 'col-span-2'}>
+                        <label className="text-xs font-semibold text-gray-600">Opacidade / Transparência</label>
                         <input
                           type="number"
                           min="0" max="1" step="0.05"
