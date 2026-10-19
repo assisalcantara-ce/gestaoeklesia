@@ -39,6 +39,37 @@ export interface FeatureMetadata {
 }
 
 /**
+ * ==============================================================================
+ * [TEMPORÁRIO PARA TESTES]
+ * Liberação provisória do módulo Eventos para o 3º plano comercial oficial ('intermediario' / Intermediário).
+ * Permite a realização de testes operacionais da Central de Eventos no plano intermediário.
+ * 
+ * Para reverter:
+ * Altere LIBERACAO_TEMPORARIA_EVENTOS_PLANO_3 para false (ou restaure a configuração padrão).
+ * ==============================================================================
+ */
+export const LIBERACAO_TEMPORARIA_EVENTOS_PLANO_3 = true;
+
+/**
+ * [TEMPORÁRIO PARA TESTES]
+ * Identifica se um plano fornecido corresponde ao 3º plano comercial oficial ('intermediario' / 'Intermediário').
+ */
+export function isPlanoIntermediario(plan?: any): boolean {
+  if (!plan) return false;
+  const slug = String(plan.slug ?? plan.plan ?? '').toLowerCase().trim();
+  const name = String(plan.name ?? '').toLowerCase().trim();
+  const id = String(plan.id ?? plan.subscription_plan_id ?? '').toLowerCase().trim();
+  return (
+    slug === 'intermediario' ||
+    slug === 'intermediário' ||
+    slug.includes('intermediar') ||
+    name === 'intermediário' ||
+    name === 'intermediario' ||
+    id === '39c12fb2-dd08-4327-9411-f8bf4c0a226d'
+  );
+}
+
+/**
  * Catálogo central de metadados das Features da Plataforma.
  */
 export const FEATURE_CATALOG: Record<FeatureFlag, FeatureMetadata> = {
@@ -64,7 +95,8 @@ export const FEATURE_CATALOG: Record<FeatureFlag, FeatureMetadata> = {
     key: 'events_module',
     label: 'Módulo de Eventos',
     description: 'Gestão de inscrições, lotes de ingressos e check-in.',
-    minTier: 'professional',
+    // [TEMPORÁRIO PARA TESTES]: Provisoriamente liberado para o 3º plano comercial ('intermediate')
+    minTier: LIBERACAO_TEMPORARIA_EVENTOS_PLANO_3 ? 'intermediate' : 'professional',
   },
   meetings_module: {
     key: 'meetings_module',
@@ -275,54 +307,74 @@ export function getPlanTierRank(plan?: any): number {
   const slug = String(plan.slug ?? plan.plan ?? '').toLowerCase().trim();
 
   // Tier 4: Expert / Enterprise / Suporte a grandes igrejas
-  if (price >= 900 || maxUsers >= 500 || slug.includes('expert') || slug.includes('enterprise')) {
+  if (price >= 900 && !slug.includes('profissional') && !slug.includes('intermediar') || maxUsers >= 500 || slug.includes('expert') || slug.includes('enterprise')) {
     return 4;
   }
 
   // Tier 3: Profissional / Expansão
   if (
-    price >= 400 ||
-    maxUsers >= 20 ||
-    slug.includes('profissional') ||
-    slug.includes('professional') ||
-    plan.has_modulo_eventos ||
-    modulosList.includes('presidência') ||
-    modulosList.includes('presidencia') ||
-    modulosList.includes('conselho fiscal') ||
-    modulosList.includes('conselho_fiscal') ||
-    modulosList.includes('contabilidade') ||
-    modulosList.includes('prestação de contas') ||
-    modulosList.includes('prestacao de contas')
+    !isPlanoIntermediario(plan) &&
+    (
+      price >= 900 ||
+      slug.includes('profissional') ||
+      slug.includes('professional') ||
+      plan.has_modulo_eventos ||
+      modulosList.includes('presidência') ||
+      modulosList.includes('presidencia') ||
+      modulosList.includes('conselho fiscal') ||
+      modulosList.includes('conselho_fiscal') ||
+      modulosList.includes('contabilidade') ||
+      modulosList.includes('prestação de contas') ||
+      modulosList.includes('prestacao de contas')
+    )
   ) {
     return 3;
   }
 
   // Tier 2: Intermediário
   if (
-    price >= 200 ||
-    maxUsers >= 8 ||
-    slug.includes('intermediar') ||
-    modulosList.includes('arrecadação digital') ||
-    modulosList.includes('arrecadacao digital') ||
-    modulosList.includes('funcionários') ||
-    modulosList.includes('funcionarios') ||
-    modulosList.includes('comissão') ||
-    modulosList.includes('comissao') ||
-    modulosList.includes('consagração') ||
-    modulosList.includes('consagracao') ||
-    modulosList.includes('área kids') ||
-    modulosList.includes('area kids') ||
-    modulosList.includes('kids') ||
-    modulosList.includes('apresentação de crianças') ||
-    modulosList.includes('apresentacao de criancas') ||
-    modulosList.includes('reuniões') ||
-    modulosList.includes('reunioes')
+    !slug.includes('starter') &&
+    !slug.includes('basic') &&
+    !slug.includes('basico') &&
+    (
+      isPlanoIntermediario(plan) ||
+      slug.includes('intermediar') ||
+      (price >= 500 && maxUsers >= 15) ||
+      modulosList.includes('arrecadação digital') ||
+      modulosList.includes('arrecadacao digital') ||
+      modulosList.includes('funcionários') ||
+      modulosList.includes('funcionarios') ||
+      modulosList.includes('comissão') ||
+      modulosList.includes('comissao') ||
+      modulosList.includes('consagração') ||
+      modulosList.includes('consagracao') ||
+      modulosList.includes('área kids') ||
+      modulosList.includes('area kids') ||
+      modulosList.includes('kids') ||
+      modulosList.includes('apresentação de crianças') ||
+      modulosList.includes('apresentacao de criancas') ||
+      modulosList.includes('reuniões') ||
+      modulosList.includes('reunioes')
+    )
   ) {
     return 2;
   }
 
   // Tier 1: Starter
-  if (price >= 100 || maxUsers >= 3 || slug.includes('starter') || modulosList.includes('agenda') || modulosList.includes('ebd') || modulosList.includes('escola bíblica') || modulosList.includes('missões') || modulosList.includes('missoes')) {
+  if (
+    !slug.includes('basic') &&
+    !slug.includes('basico') &&
+    (
+      price >= 100 ||
+      maxUsers >= 3 ||
+      slug.includes('starter') ||
+      modulosList.includes('agenda') ||
+      modulosList.includes('ebd') ||
+      modulosList.includes('escola bíblica') ||
+      modulosList.includes('missões') ||
+      modulosList.includes('missoes')
+    )
+  ) {
     return 1;
   }
 
@@ -354,7 +406,8 @@ export function resolvePlanFeatures(plan?: any): Record<FeatureFlag, boolean> {
     fiscal_council_module:tierRank >= 3, // Profissional e superiores
     accounting_module:    tierRank >= 3, // Profissional e superiores (Básico, Starter e Intermediário = false)
     advanced_finance:     tierRank >= 3,
-    events_module:        tierRank >= 3,
+    // [TEMPORÁRIO PARA TESTES]: Liberado provisoriamente para o 3º plano comercial (Intermediário / Tier >= 2) e superiores
+    events_module:        LIBERACAO_TEMPORARIA_EVENTOS_PLANO_3 ? (tierRank >= 2 || isPlanoIntermediario(plan)) : tierRank >= 3,
     mobile_app:           tierRank >= 3,
     whatsapp_integration: tierRank >= 3,
     integrations:         tierRank >= 3,
@@ -370,7 +423,15 @@ export function resolvePlanFeatures(plan?: any): Record<FeatureFlag, boolean> {
   // 1. Sobrescritas por colunas explícitas no banco (se presentes)
   if (typeof plan.has_modulo_financeiro === 'boolean') resolved.financial_module = plan.has_modulo_financeiro;
   if (typeof plan.has_modulo_financeiro_avancado === 'boolean') resolved.advanced_finance = plan.has_modulo_financeiro_avancado;
-  if (typeof plan.has_modulo_eventos === 'boolean') resolved.events_module = plan.has_modulo_eventos;
+  if (typeof plan.has_modulo_eventos === 'boolean') {
+    // [TEMPORÁRIO PARA TESTES]: Se a liberação provisória estiver ativa e o tenant pertencer ao 3º plano comercial (Intermediário),
+    // garante acesso liberado a Eventos mesmo que a coluna has_modulo_eventos do registro no banco ainda seja false.
+    if (LIBERACAO_TEMPORARIA_EVENTOS_PLANO_3 && (isPlanoIntermediario(plan) || tierRank >= 2)) {
+      resolved.events_module = true;
+    } else {
+      resolved.events_module = plan.has_modulo_eventos;
+    }
+  }
   if (typeof plan.has_modulo_reunioes === 'boolean') resolved.meetings_module = plan.has_modulo_reunioes;
 
   // 2. Sobrescritas por array de módulos customizados (modulos: string[])
