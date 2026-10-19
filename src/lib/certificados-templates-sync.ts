@@ -183,7 +183,6 @@ export async function loadCertificadosTemplatesForCurrentUser(
         n === 'Certificado de Participação - Padrão' ||
         n === 'Certificado de Participacao — Padrao' ||
         n === 'Certificado de Participacao - Padrao' ||
-        ((normalizeStr(n) === 'eventos' || normalizeStr(n) === 'evento') && k !== 'evento-padrao') ||
         (n.length > 3 && n === n.toUpperCase() && CERTIFICADOS_TEMPLATES_PADRAO.some((p) => normalizeStr(p.nome) === normalizeStr(n)))
       );
     });
@@ -232,7 +231,7 @@ export async function loadCertificadosTemplatesForCurrentUser(
         (!existente.backgroundUrl ||
           existente.backgroundUrl !== padrao.backgroundUrl ||
           (existente.nome && existente.nome !== padrao.nome) ||
-          ((padrao.id === 'casamento-padrao' || padrao.id === 'batismo-aguas-padrao' || padrao.id === 'diaconisa-padrao' || padrao.id === 'ministerial-evangelista-padrao' || padrao.id === 'consagracao-obreiro-padrao' || padrao.id === 'ministerial-pastor-padrao' || padrao.id === 'ministerial-pastora-padrao' || padrao.id === 'consagracao-diacono-padrao' || padrao.id === 'ministerial-presbitero-padrao' || padrao.id === 'ministerial-missionario-padrao' || padrao.id === 'evento-padrao') && JSON.stringify(existente.elementos) !== JSON.stringify(padrao.elementos)))
+          ((padrao.id === 'casamento-padrao' || padrao.id === 'batismo-aguas-padrao' || padrao.id === 'diaconisa-padrao' || padrao.id === 'ministerial-evangelista-padrao' || padrao.id === 'consagracao-obreiro-padrao' || padrao.id === 'ministerial-pastor-padrao' || padrao.id === 'ministerial-pastora-padrao' || padrao.id === 'consagracao-diacono-padrao' || padrao.id === 'ministerial-presbitero-padrao' || padrao.id === 'ministerial-missionario-padrao') && JSON.stringify(existente.elementos) !== JSON.stringify(padrao.elementos)))
       ) {
         // Template existente com background, nome ou elementos desatualizados — atualizar para o modelo nativo oficial
         const updatedData = {

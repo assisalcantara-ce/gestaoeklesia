@@ -19,6 +19,44 @@ export const CERTIFICADO_CATEGORIAS: Array<{ value: CertificadoCategoria; label:
   { value: 'evento', label: 'Eventos & Participação' },
 ];
 
+/**
+ * Determina se um modelo de certificado pertence especificamente à categoria de Eventos.
+ * Exclui modelos ministeriais, casamento, batismo, ebd e apresentação de crianças.
+ */
+export function isTemplateCategoriaEventos(template: any): boolean {
+  if (!template) return false;
+  const rawCat = (template.categoria || template.category || '').toString().trim().toLowerCase();
+  const cat = rawCat.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  const outrasCategorias = [
+    'ministerial',
+    'consagracao-obreiro',
+    'apresentacao-criancas',
+    'batismo-aguas',
+    'casamento',
+    'ebd',
+  ];
+  if (outrasCategorias.includes(cat)) {
+    return false;
+  }
+
+  if (cat === 'eventos' || cat === 'evento' || cat.startsWith('evento')) {
+    return true;
+  }
+
+  const key = (template.template_key || template.id || template.chave || '').toString().trim().toLowerCase();
+  if (key === 'evento-padrao' || key === 'cert-eventos' || key.startsWith('evento-')) {
+    return true;
+  }
+
+  const nomeNorm = (template.nome || template.name || '').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (nomeNorm.includes('evento') && (cat === '' || cat === 'eventos' || cat === 'evento')) {
+    return true;
+  }
+
+  return false;
+}
+
 export interface CertificadoPlaceholderItem {
   campo: string;
   placeholder: string;

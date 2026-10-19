@@ -14,9 +14,10 @@ import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import { loadCertificadosTemplatesForCurrentUser } from '@/lib/certificados-templates-sync';
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
-import { substituirPlaceholdersCertificado } from '@/lib/certificados-utils';
+import { substituirPlaceholdersCertificado, isTemplateCategoriaEventos } from '@/lib/certificados-utils';
 import { QRCodeSVG } from 'qrcode.react';
 import {
+  AlertCircle,
   Award,
   Bed,
   Calendar,
@@ -146,6 +147,94 @@ export function formatarEnderecoCongregacao(cong?: {
 interface Membro {
   id: string;
   nome_completo: string;
+}
+
+export function buildEventoPlaceholderMap(
+  evento: Partial<Evento> & { titulo?: string; local_nome?: string | null; local_endereco?: string | null; tipo?: any; congregacao_nome?: string | null; data_inicio?: string; data_fim?: string | null; descricao?: string | null; carga_horaria?: number | string | null },
+  insc: { id?: string; nome_display?: string; nome_externo?: string | null; nome?: string | null; cpf?: string | null; telefone?: string | null; email?: string | null; data_confirmacao?: string | null; data_inscricao?: string | null; status?: string | null },
+  configIgreja?: Partial<ConfiguracaoIgreja> & { nome?: string; endereco?: string; cnpj?: string; responsavel?: string; cidade?: string; uf?: string }
+): Record<string, string> {
+  const cfg = configIgreja || {};
+  const endParts = (cfg.endereco || '').split(',');
+  const cidadeUf = endParts.length > 1 ? endParts[endParts.length - 2]?.trim() : (cfg.endereco || '');
+  const cidadeParts = cidadeUf.split('-');
+  const cidade = cfg.cidade || cidadeParts[0]?.trim() || '';
+  const estado = cfg.uf || cidadeParts[1]?.trim() || '';
+
+  const localResolvido = evento.local_nome && evento.local_endereco
+    ? `${evento.local_nome} - ${evento.local_endereco}`
+    : (evento.local_nome || evento.local_endereco || 'Templo Sede');
+
+  const dtInicio = evento.data_inicio
+    ? new Date(evento.data_inicio).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+    : '';
+  const dtFim = evento.data_fim
+    ? new Date(evento.data_fim).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+    : '';
+
+  const nomeParticipante = insc.nome_display || insc.nome_externo || (insc as any).nome || '';
+  const cargaHorariaStr = evento.carga_horaria ? `${evento.carga_horaria} horas` : '';
+
+  return {
+    participante_nome: nomeParticipante,
+    nome: nomeParticipante,
+    membro_nome: nomeParticipante,
+    participante: nomeParticipante,
+    '{{NOME}}': nomeParticipante,
+    '{{NOME_PARTICIPANTE}}': nomeParticipante,
+    '{{CPF}}': insc.cpf || '',
+    '{{CPF_PARTICIPANTE}}': insc.cpf || '',
+    '{{TELEFONE}}': insc.telefone || '',
+    '{{EMAIL}}': (insc as any).email_externo || insc.email || '',
+    evento_nome: evento.titulo || '',
+    evento_titulo: evento.titulo || '',
+    titulo: evento.titulo || '',
+    '{{NOME_EVENTO}}': evento.titulo || '',
+    '{{TITULO_EVENTO}}': evento.titulo || '',
+    evento_tipo: evento.tipo ? String(evento.tipo) : '',
+    tipo_evento: evento.tipo ? String(evento.tipo) : '',
+    tipo: evento.tipo ? String(evento.tipo) : '',
+    evento_data: dtInicio,
+    data_evento: dtInicio,
+    data: dtInicio,
+    evento_data_inicio: dtInicio,
+    data_inicio: dtInicio,
+    evento_data_fim: dtFim,
+    data_fim: dtFim,
+    evento_local: localResolvido,
+    local_evento: evento.local_nome || localResolvido,
+    local: localResolvido,
+    local_nome: evento.local_nome || '',
+    local_endereco: evento.local_endereco || '',
+    '{{LOCAL}}': localResolvido,
+    '{{LOCAL_NOME}}': evento.local_nome || localResolvido,
+    '{{ENDERECO}}': evento.local_endereco || localResolvido,
+    evento_congregacao: evento.congregacao_nome || 'Templo Sede',
+    congregacao: evento.congregacao_nome || 'Templo Sede',
+    evento_descricao: evento.descricao || '',
+    descricao: evento.descricao || '',
+    evento_carga_horaria: cargaHorariaStr,
+    carga_horaria: cargaHorariaStr,
+    '{{CARGA_HORARIA}}': cargaHorariaStr,
+    responsavel_evento: cfg.responsavel || '',
+    pastor_nome: cfg.responsavel || '',
+    responsavel: cfg.responsavel || '',
+    ministerio_nome: cfg.nome || 'Igreja',
+    nome_igreja: cfg.nome || 'Igreja',
+    igreja_nome: cfg.nome || 'Igreja',
+    '{{NOME_IGREJA}}': cfg.nome || 'Igreja',
+    ministerio_cnpj: cfg.cnpj || '',
+    cnpj: cfg.cnpj || '',
+    cidade,
+    '{{CIDADE_IGREJA}}': cidade,
+    estado,
+    uf: estado,
+    '{{UF_IGREJA}}': estado,
+    '{{CIDADE_UF_IGREJA}}': cidade && estado ? `${cidade} - ${estado}` : (cidade || estado),
+    evento_protocolo: insc.id ? insc.id.substring(0, 8).toUpperCase() : '',
+    protocolo: insc.id ? insc.id.substring(0, 8).toUpperCase() : '',
+    data_emissao: new Date().toLocaleDateString('pt-BR'),
+  };
 }
 
 interface Evento {
@@ -597,6 +686,24 @@ export default function EventosPage() {
   const [salvando, setSalvando] = useState(false);
   const [templatesCertificados, setTemplatesCertificados] = useState<{ id: string; nome: string }[]>([]);
   const [certTemplatesFull, setCertTemplatesFull] = useState<any[]>([]);
+
+  const optionsCertificados = useMemo(() => {
+    const list = [...templatesCertificados];
+    if (formEvento.certificado_modelo_id && !list.some(t => t.id === formEvento.certificado_modelo_id)) {
+      const match = certTemplatesFull.find(t =>
+        t.id === formEvento.certificado_modelo_id ||
+        t.template_key === formEvento.certificado_modelo_id ||
+        t.db_id === formEvento.certificado_modelo_id
+      );
+      if (match) {
+        list.unshift({
+          id: formEvento.certificado_modelo_id,
+          nome: match.nome || match.name || 'Certificado Selecionado',
+        });
+      }
+    }
+    return list;
+  }, [templatesCertificados, formEvento.certificado_modelo_id, certTemplatesFull]);
   const [configIgreja, setConfigIgreja] = useState<ConfiguracaoIgreja>({
     nome: '',
     endereco: '',
@@ -838,27 +945,69 @@ export default function EventosPage() {
 
       // Carregar configurações institucionais e modelos de certificados disponíveis para o tenant
       try {
-        const [config, certRes] = await Promise.all([
+        const [config, { data: certRows, error: certErr }] = await Promise.all([
           fetchConfiguracaoIgrejaFromSupabase(supabase, mid),
-          loadCertificadosTemplatesForCurrentUser(supabase),
+          supabase
+            .from('certificados_templates')
+            .select('id, template_key, name, template_data, is_active, created_at, updated_at')
+            .eq('ministry_id', mid)
+            .order('name'),
         ]);
         if (config) setConfigIgreja(config);
 
-        const certList = certRes?.templates || [];
-        setCertTemplatesFull(certList);
-        if (Array.isArray(certList)) {
-          // Filtrar modelos de categoria 'eventos' / 'evento' ou permitir todos os modelos do ministério
-          const templatesEvento = certList.filter(
-            (t: any) => t.categoria === 'eventos' || t.categoria === 'evento' || !t.categoria
-          );
-          const listaFinal = templatesEvento.length > 0 ? templatesEvento : certList;
-          setTemplatesCertificados(
-            listaFinal.map((t: any) => ({
-              id: t.template_key || t.id,
-              nome: t.nome || t.name,
-            }))
-          );
+        let rows = (certRows as any[]) || [];
+
+        // Se ainda não houver templates salvos no banco para o tenant (primeiro acesso),
+        // acionar a rotina oficial de carga/semeadura como fallback seguro
+        if (rows.length === 0 && !certErr) {
+          try {
+            const syncRes = await loadCertificadosTemplatesForCurrentUser(supabase);
+            if (syncRes?.templates && Array.isArray(syncRes.templates)) {
+              const { data: refetched } = await supabase
+                .from('certificados_templates')
+                .select('id, template_key, name, template_data, is_active, created_at, updated_at')
+                .eq('ministry_id', mid)
+                .order('name');
+              rows = (refetched as any[]) || syncRes.templates.map((t: any) => ({
+                id: t.id,
+                template_key: t.template_key || t.id,
+                name: t.nome || t.name,
+                template_data: t,
+                is_active: t.ativo !== false,
+              }));
+            }
+          } catch {
+            // fallback silencioso
+          }
         }
+
+        const fullTemplates = rows.map((r: any) => {
+          const td = r.template_data || {};
+          const key = r.template_key || td.id || r.id;
+          const nome = td.nome || r.name || 'Certificado';
+          const categoria = (td.categoria || td.category || '').toString().trim().toLowerCase();
+          return {
+            ...td,
+            db_id: r.id,
+            template_key: key,
+            id: key,
+            nome,
+            categoria,
+            ativo: r.is_active ?? td.ativo ?? true,
+          };
+        });
+
+        setCertTemplatesFull(fullTemplates);
+
+        // Filtrar estritamente templates pertencentes à categoria 'eventos' / 'evento'
+        const elegiveis = fullTemplates.filter((t: any) => isTemplateCategoriaEventos(t));
+
+        setTemplatesCertificados(
+          elegiveis.map((t: any) => ({
+            id: t.id,
+            nome: t.nome,
+          }))
+        );
       } catch (err) {
         console.warn('Erro ao carregar configurações/templates de certificados:', err);
       }
@@ -1280,6 +1429,7 @@ export default function EventosPage() {
       ...FORM_EVENTO_INICIAL,
       congregacao_id: '',
       local_endereco: endInicial,
+      certificado_modelo_id: templatesCertificados.length === 1 ? templatesCertificados[0].id : '',
     });
     setShowForm(true);
     if (aba !== 'eventos') setAba('eventos');
@@ -1343,10 +1493,18 @@ export default function EventosPage() {
       }
     }
 
-    // Modelo de Certificado
+    // Modelo de Certificado: validação e resolução precisa
     let modeloCertId = formEvento.certificado_modelo_id;
-    if (formEvento.inclui_certificado && !modeloCertId && templatesCertificados.length > 0) {
-      modeloCertId = templatesCertificados[0].id;
+    if (formEvento.inclui_certificado) {
+      if (!modeloCertId && templatesCertificados.length === 1) {
+        modeloCertId = templatesCertificados[0].id;
+      } else if (!modeloCertId && templatesCertificados.length > 1) {
+        showModal('Modelo de Certificado obrigatório', 'Por favor, selecione qual modelo de certificado deseja utilizar para este evento.', 'error');
+        return;
+      } else if (!modeloCertId && templatesCertificados.length === 0) {
+        showModal('Nenhum modelo disponível', 'Não há modelos de certificado disponíveis na categoria Eventos. Cadastre um modelo em Configurações > Certificados antes de habilitar a emissão de certificados.', 'error');
+        return;
+      }
     }
 
     // Resolução oficial do nome do local para preservar compatibilidade com APIs/DB/Relatórios
@@ -1939,33 +2097,6 @@ export default function EventosPage() {
     if (eventoSelecionado) carregarInscricoes(eventoSelecionado.id);
   };
 
-  const buildEventoPlaceholderMap = (evento: Evento, insc: Inscricao) => ({
-    participante_nome: insc.nome_display || '',
-    evento_nome: evento.titulo || '',
-    evento_titulo: evento.titulo || '',
-    evento_tipo: tipoInfo(evento.tipo).label,
-    tipo_evento: tipoInfo(evento.tipo).label,
-    evento_data: fmtDateTime(evento.data_inicio),
-    data_evento: fmtDateTime(evento.data_inicio),
-    evento_data_inicio: fmtDateTime(evento.data_inicio),
-    evento_data_fim: evento.data_fim ? fmtDateTime(evento.data_fim) : '',
-    evento_local: evento.local_nome || evento.local_endereco || '',
-    local_evento: evento.local_nome || '',
-    evento_congregacao: evento.congregacao_nome || 'Templo Sede',
-    congregacao: evento.congregacao_nome || 'Templo Sede',
-    evento_descricao: evento.descricao || '',
-    evento_carga_horaria: '',
-    carga_horaria: '',
-    responsavel_evento: configIgreja.responsavel || '',
-    pastor_nome: configIgreja.responsavel || '',
-    ministerio_nome: configIgreja.nome || 'Igreja',
-    nome_igreja: configIgreja.nome || 'Igreja',
-    ministerio_cnpj: configIgreja.cnpj || '',
-    cidade: configIgreja.endereco ? configIgreja.endereco.split('-')[0]?.trim() : '',
-    estado: '',
-    evento_protocolo: insc.id ? insc.id.substring(0, 8).toUpperCase() : '',
-    data_emissao: new Date().toLocaleDateString('pt-BR'),
-  });
 
   const renderCertificadoHtml = (template: any, map: Record<string, string>) => {
     const orientacao = template.orientacao === 'portrait' ? 'portrait' : 'landscape';
@@ -1995,15 +2126,25 @@ export default function EventosPage() {
           ].join('');
           return `<div style="${style}">${texto}</div>`;
         }
-        if (el.tipo === 'chapa') {
+        if (el.tipo === 'chapa' || el.tipo === 'forma') {
           const style = [baseStyle, `background-color:${el.cor || '#111'};`, `opacity:${el.transparencia ?? 1};`].join('');
           return `<div style="${style}"></div>`;
         }
-        if (el.tipo === 'logo' || el.tipo === 'imagem') {
+        if (el.tipo === 'linha') {
+          const style = [baseStyle, `border-top: 2px solid ${el.cor || '#111'};`, `opacity:${el.transparencia ?? 1};`].join('');
+          return `<div style="${style}"></div>`;
+        }
+        if (el.tipo === 'logo' || el.tipo === 'imagem' || el.tipo === 'foto-membro') {
           const src = el.tipo === 'logo' ? (configIgreja.logo || el.imagemUrl || '') : (el.imagemUrl || '');
           if (!src) return '';
           const style = [baseStyle, 'object-fit:contain;', `opacity:${el.transparencia ?? 1};`].join('');
           return `<img src="${src}" style="${style}" />`;
+        }
+        if (el.tipo === 'qrcode') {
+          const qrVal = map.evento_protocolo || map.participante_nome || 'CERTIFICADO';
+          const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${el.largura}x${el.altura}&data=${encodeURIComponent(qrVal)}`;
+          const style = [baseStyle, 'object-fit:contain;', `opacity:${el.transparencia ?? 1};`].join('');
+          return `<img src="${qrUrl}" style="${style}" />`;
         }
         return '';
       })
@@ -2015,14 +2156,28 @@ export default function EventosPage() {
   const handleImprimirCertificado = (insc: Inscricao) => {
     if (!eventoSelecionado) return;
     const modeloId = eventoSelecionado.certificado_modelo_id;
-    const template = certTemplatesFull.find(t => t.id === modeloId || t.template_key === modeloId) || certTemplatesFull[0];
+    const template = certTemplatesFull.find(t =>
+      t.id === modeloId ||
+      t.template_key === modeloId ||
+      t.chave === modeloId ||
+      t.db_id === modeloId
+    ) || certTemplatesFull.find(t => isTemplateCategoriaEventos(t)) || certTemplatesFull[0];
 
     if (!template) {
       showModal('Modelo não encontrado', 'Configure um modelo de certificado em Configurações > Certificados.', 'error');
       return;
     }
 
-    const map = buildEventoPlaceholderMap(eventoSelecionado, insc);
+    const orientacao = template.orientacao === 'portrait' ? 'portrait' : 'landscape';
+    const largura = orientacao === 'portrait' ? 595 : 840;
+    const altura = orientacao === 'portrait' ? 840 : 595;
+    const pageW = orientacao === 'portrait' ? 190 : 277;
+    const pageH = orientacao === 'portrait' ? 277 : 190;
+    const scaleX = (pageW * 3.7795) / largura;
+    const scaleY = (pageH * 3.7795) / altura;
+    const scale = Math.min(scaleX, scaleY).toFixed(4);
+
+    const map = buildEventoPlaceholderMap(eventoSelecionado, insc, configIgreja);
     const html = renderCertificadoHtml(template, map);
 
     const win = window.open('', '_blank');
@@ -2030,15 +2185,12 @@ export default function EventosPage() {
       showModal('Aviso', 'Permita a abertura de pop-ups para imprimir o certificado.', 'info');
       return;
     }
-    const scaleX = (277 * 3.7795) / 840;
-    const scaleY = (190 * 3.7795) / 595;
-    const scale = Math.min(scaleX, scaleY).toFixed(4);
 
     win.document.write(`<!DOCTYPE html><html><head><title>Certificado - ${insc.nome_display}</title><style>
       *{box-sizing:border-box;margin:0;padding:0;}
-      @page{size:A4 landscape;margin:1cm;}
+      @page{size:A4 ${orientacao};margin:1cm;}
       html,body{width:100%;height:100%;display:flex;justify-content:center;align-items:center;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
-      .cert{zoom:${scale};width:840px;height:595px;overflow:hidden;flex-shrink:0;}
+      .cert{zoom:${scale};width:${largura}px;height:${altura}px;overflow:hidden;flex-shrink:0;}
       img{display:block;}
     </style></head><body><div class="cert">${html}</div></body></html>`);
     win.document.close();
@@ -2049,7 +2201,12 @@ export default function EventosPage() {
   const handleImprimirTodosCertificados = () => {
     if (!eventoSelecionado) return;
     const modeloId = eventoSelecionado.certificado_modelo_id;
-    const template = certTemplatesFull.find(t => t.id === modeloId || t.template_key === modeloId) || certTemplatesFull[0];
+    const template = certTemplatesFull.find(t =>
+      t.id === modeloId ||
+      t.template_key === modeloId ||
+      t.chave === modeloId ||
+      t.db_id === modeloId
+    ) || certTemplatesFull.find(t => isTemplateCategoriaEventos(t)) || certTemplatesFull[0];
 
     if (!template) {
       showModal('Modelo não encontrado', 'Configure um modelo de certificado em Configurações > Certificados.', 'error');
@@ -2062,12 +2219,17 @@ export default function EventosPage() {
       return;
     }
 
-    const scaleX = (277 * 3.7795) / 840;
-    const scaleY = (190 * 3.7795) / 595;
+    const orientacao = template.orientacao === 'portrait' ? 'portrait' : 'landscape';
+    const largura = orientacao === 'portrait' ? 595 : 840;
+    const altura = orientacao === 'portrait' ? 840 : 595;
+    const pageW = orientacao === 'portrait' ? 190 : 277;
+    const pageH = orientacao === 'portrait' ? 277 : 190;
+    const scaleX = (pageW * 3.7795) / largura;
+    const scaleY = (pageH * 3.7795) / altura;
     const scale = Math.min(scaleX, scaleY).toFixed(4);
 
     const allPages = participantesValidos.map(insc => {
-      const map = buildEventoPlaceholderMap(eventoSelecionado, insc);
+      const map = buildEventoPlaceholderMap(eventoSelecionado, insc, configIgreja);
       return `<div class="page"><div class="cert">${renderCertificadoHtml(template, map)}</div></div>`;
     }).join('');
 
@@ -2079,10 +2241,10 @@ export default function EventosPage() {
 
     win.document.write(`<!DOCTYPE html><html><head><title>Certificados - ${eventoSelecionado.titulo}</title><style>
       *{box-sizing:border-box;margin:0;padding:0;}
-      @page{size:A4 landscape;margin:1cm;}
+      @page{size:A4 ${orientacao};margin:1cm;}
       html,body{margin:0;padding:0;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
       .page{width:100%;height:100vh;display:flex;justify-content:center;align-items:center;page-break-after:always;}
-      .cert{zoom:${scale};width:840px;height:595px;overflow:hidden;flex-shrink:0;}
+      .cert{zoom:${scale};width:${largura}px;height:${altura}px;overflow:hidden;flex-shrink:0;}
       img{display:block;}
     </style></head><body>${allPages}</body></html>`);
     win.document.close();
@@ -3071,7 +3233,7 @@ export default function EventosPage() {
                           <div className="p-3.5 bg-white border border-emerald-200/80 rounded-xl space-y-2 animate-in fade-in duration-150">
                             <div className="flex items-center justify-between">
                               <label className="text-[11px] font-bold text-slate-800 uppercase tracking-wider block">
-                                Modelo de Certificado
+                                Modelo de Certificado <span className="text-rose-500">*</span>
                               </label>
                               <a
                                 href="/configuracoes/certificados"
@@ -3084,21 +3246,42 @@ export default function EventosPage() {
                               </a>
                             </div>
 
-                            <select
-                              value={formEvento.certificado_modelo_id}
-                              onChange={e => setFormEvento(f => ({ ...f, certificado_modelo_id: e.target.value }))}
-                              className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-semibold focus:ring-2 focus:ring-emerald-500 transition"
-                            >
-                              {templatesCertificados.length === 0 ? (
-                                <option value="evento-padrao">Certificado de Eventos (Padrão)</option>
-                              ) : (
-                                templatesCertificados.map(t => (
+                            {optionsCertificados.length === 0 ? (
+                              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2.5 text-xs text-amber-900">
+                                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                <div>
+                                  <p className="font-bold">Nenhum modelo de certificado encontrado na categoria &quot;Eventos&quot;.</p>
+                                  <p className="text-amber-800 text-[11px] mt-0.5">
+                                    Cadastre ou configure um modelo em{' '}
+                                    <a
+                                      href="/configuracoes/certificados"
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="underline font-bold text-[#1d4ed8] hover:text-[#1e40af]"
+                                    >
+                                      Configurações &gt; Certificados
+                                    </a>{' '}
+                                    classificado como <strong>Eventos</strong> para poder associá-lo a este evento.
+                                  </p>
+                                </div>
+                              </div>
+                            ) : (
+                              <select
+                                value={formEvento.certificado_modelo_id}
+                                onChange={e => setFormEvento(f => ({ ...f, certificado_modelo_id: e.target.value }))}
+                                className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-semibold focus:ring-2 focus:ring-emerald-500 transition"
+                              >
+                                {optionsCertificados.length > 1 && (
+                                  <option value="">Selecione um modelo de certificado...</option>
+                                )}
+                                {optionsCertificados.map(t => (
                                   <option key={t.id} value={t.id}>
                                     {t.nome}
                                   </option>
-                                ))
-                              )}
-                            </select>
+                                ))}
+                              </select>
+                            )}
+
                             <p className="text-[11px] text-slate-500 font-medium">
                               Selecione o modelo configurado em Configurações &gt; Certificados que será gerado para os participantes com presença confirmada.
                             </p>
@@ -3251,7 +3434,7 @@ export default function EventosPage() {
                           <div className="p-3.5 bg-white border border-emerald-200/80 rounded-xl space-y-2 animate-in fade-in duration-150">
                             <div className="flex items-center justify-between">
                               <label className="text-[11px] font-bold text-slate-800 uppercase tracking-wider block">
-                                Modelo de Certificado
+                                Modelo de Certificado <span className="text-rose-500">*</span>
                               </label>
                               <a
                                 href="/configuracoes/certificados"
@@ -3264,21 +3447,42 @@ export default function EventosPage() {
                               </a>
                             </div>
 
-                            <select
-                              value={formEvento.certificado_modelo_id}
-                              onChange={e => setFormEvento(f => ({ ...f, certificado_modelo_id: e.target.value }))}
-                              className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-semibold focus:ring-2 focus:ring-emerald-500 transition"
-                            >
-                              {templatesCertificados.length === 0 ? (
-                                <option value="evento-padrao">Certificado de Eventos (Padrão)</option>
-                              ) : (
-                                templatesCertificados.map(t => (
+                            {optionsCertificados.length === 0 ? (
+                              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2.5 text-xs text-amber-900">
+                                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                <div>
+                                  <p className="font-bold">Nenhum modelo de certificado encontrado na categoria &quot;Eventos&quot;.</p>
+                                  <p className="text-amber-800 text-[11px] mt-0.5">
+                                    Cadastre ou configure um modelo em{' '}
+                                    <a
+                                      href="/configuracoes/certificados"
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="underline font-bold text-[#1d4ed8] hover:text-[#1e40af]"
+                                    >
+                                      Configurações &gt; Certificados
+                                    </a>{' '}
+                                    classificado como <strong>Eventos</strong> para poder associá-lo a este evento.
+                                  </p>
+                                </div>
+                              </div>
+                            ) : (
+                              <select
+                                value={formEvento.certificado_modelo_id}
+                                onChange={e => setFormEvento(f => ({ ...f, certificado_modelo_id: e.target.value }))}
+                                className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-semibold focus:ring-2 focus:ring-emerald-500 transition"
+                              >
+                                {optionsCertificados.length > 1 && (
+                                  <option value="">Selecione um modelo de certificado...</option>
+                                )}
+                                {optionsCertificados.map(t => (
                                   <option key={t.id} value={t.id}>
                                     {t.nome}
                                   </option>
-                                ))
-                              )}
-                            </select>
+                                ))}
+                              </select>
+                            )}
+
                             <p className="text-[11px] text-slate-500 font-medium">
                               Selecione o modelo configurado em Configurações &gt; Certificados que será gerado para os participantes com presença confirmada.
                             </p>
