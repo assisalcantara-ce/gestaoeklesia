@@ -59,6 +59,13 @@ export async function GET(request: NextRequest) {
       slug: ministryData?.slug || '',
       nome: ministryData?.name || CONFIGURACAO_PADRAO.nome,
       endereco: churchProfile.endereco || CONFIGURACAO_PADRAO.endereco,
+      cep: churchProfile.cep || '',
+      logradouro: churchProfile.logradouro || '',
+      numero: churchProfile.numero || '',
+      complemento: churchProfile.complemento || '',
+      bairro: churchProfile.bairro || '',
+      cidade: churchProfile.cidade || '',
+      estado: churchProfile.estado || '',
       cnpj: ministryData?.cnpj_cpf || '',
       telefone: ministryData?.phone || '',
       email: ministryData?.email_admin || '',
@@ -109,6 +116,13 @@ export async function PUT(request: NextRequest) {
       descricao,
       logo,
       endereco,
+      cep,
+      logradouro,
+      numero,
+      complemento,
+      bairro,
+      cidade,
+      estado,
       responsavel,
       mensagem_aniversario,
       imagem_aniversario,
@@ -139,6 +153,13 @@ export async function PUT(request: NextRequest) {
     // 2. Atualizar tabela configurations com service_role (ctx.admin)
     const hasConfigChanges =
       typeof endereco === 'string' ||
+      typeof cep === 'string' ||
+      typeof logradouro === 'string' ||
+      typeof numero === 'string' ||
+      typeof complemento === 'string' ||
+      typeof bairro === 'string' ||
+      typeof cidade === 'string' ||
+      typeof estado === 'string' ||
       typeof responsavel === 'string' ||
       typeof mensagem_aniversario === 'string' ||
       imagem_aniversario !== undefined;
@@ -154,6 +175,13 @@ export async function PUT(request: NextRequest) {
       const nextProfile = {
         ...existingProfile,
         ...(typeof endereco === 'string' ? { endereco } : {}),
+        ...(typeof cep === 'string' ? { cep } : {}),
+        ...(typeof logradouro === 'string' ? { logradouro } : {}),
+        ...(typeof numero === 'string' ? { numero } : {}),
+        ...(typeof complemento === 'string' ? { complemento } : {}),
+        ...(typeof bairro === 'string' ? { bairro } : {}),
+        ...(typeof cidade === 'string' ? { cidade } : {}),
+        ...(typeof estado === 'string' ? { estado } : {}),
         ...(typeof responsavel === 'string' ? { responsavel } : {}),
         ...(typeof mensagem_aniversario === 'string' ? { mensagem_aniversario } : {}),
         ...(imagem_aniversario !== undefined ? { imagem_aniversario } : {}),

@@ -9,6 +9,14 @@ export interface ConfiguracaoIgreja {
     slug?: string;
     nome: string;
     endereco: string;
+    // Campos estruturados de endereço
+    cep?: string;
+    logradouro?: string;
+    numero?: string;
+    complemento?: string;
+    bairro?: string;
+    cidade?: string;
+    estado?: string;
     cnpj: string;
     telefone: string;
     email: string;
@@ -25,6 +33,13 @@ export interface ConfiguracaoIgreja {
 const CONFIGURACAO_PADRAO: ConfiguracaoIgreja = {
     nome: 'Igreja/Ministério',
     endereco: 'Endereço não configurado',
+    cep: '',
+    logradouro: '',
+    numero: '',
+    complemento: '',
+    bairro: '',
+    cidade: '',
+    estado: '',
     cnpj: '',
     telefone: '',
     email: '',
@@ -35,6 +50,42 @@ const CONFIGURACAO_PADRAO: ConfiguracaoIgreja = {
     mensagem_aniversario: '',
     imagem_aniversario: null,
 };
+
+/**
+ * Monta o endereço institucional completo e formatado a partir dos campos estruturados,
+ * garantindo compatibilidade total com módulos como Eventos, Certificados e Documentos.
+ */
+export function formatarEnderecoCompleto(partes: {
+    logradouro?: string;
+    numero?: string;
+    complemento?: string;
+    bairro?: string;
+    cidade?: string;
+    estado?: string;
+    cep?: string;
+}): string {
+    const logradouroComNumero = partes.logradouro
+        ? partes.numero
+            ? `${partes.logradouro.trim()}, ${partes.numero.trim()}`
+            : partes.logradouro.trim()
+        : '';
+
+    const cidadeEstado = [partes.cidade?.trim(), partes.estado?.trim()]
+        .filter(Boolean)
+        .join(' - ');
+
+    const cepFormatado = partes.cep?.trim() ? `CEP: ${partes.cep.trim()}` : '';
+
+    const segmentos = [
+        logradouroComNumero,
+        partes.complemento?.trim(),
+        partes.bairro?.trim(),
+        cidadeEstado,
+        cepFormatado,
+    ].filter(Boolean);
+
+    return segmentos.join(', ');
+}
 
 /**
  * Busca as configurações da igreja/ministério via API Backend (/api/v1/configuracoes/perfil)

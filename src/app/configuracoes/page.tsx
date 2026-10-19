@@ -12,7 +12,8 @@ import type { SubscriptionPlan } from '@/types/admin';
 import { NOMENCLATURAS_SCHEMA_VERSION, NOMENCLATURAS_SCHEMA_VERSION_KEY } from '@/lib/org-nomenclaturas';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { useUserContext } from '@/hooks/useUserContext';
-import { fetchConfiguracaoIgrejaFromSupabase, updateConfiguracaoIgrejaInSupabase } from '@/lib/igreja-config-utils';
+import { fetchConfiguracaoIgrejaFromSupabase, updateConfiguracaoIgrejaInSupabase, formatarEnderecoCompleto } from '@/lib/igreja-config-utils';
+import { EnderecoForm } from '@/components/configuracoes/EnderecoForm';
 
 export const dynamic = 'force-dynamic';
 
@@ -154,6 +155,13 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
     telefone: '',
     website: '',
     endereco: '',
+    cep: '',
+    logradouro: '',
+    numero: '',
+    complemento: '',
+    bairro: '',
+    cidade: '',
+    estado: '',
     descricao: '',
     responsavel: '',
     dataCadastro: ''
@@ -172,6 +180,13 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
           telefone: config.telefone || '',
           website: config.website || '',
           endereco: config.endereco || '',
+          cep: config.cep || '',
+          logradouro: config.logradouro || '',
+          numero: config.numero || '',
+          complemento: config.complemento || '',
+          bairro: config.bairro || '',
+          cidade: config.cidade || '',
+          estado: config.estado || '',
           descricao: config.descricao || '',
           responsavel: config.responsavel || '',
           dataCadastro: config.dataCadastro || ''
@@ -198,14 +213,69 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
     }));
   };
 
+  const handleAddressChange = (field: string, value: string) => {
+    setFormData(prev => {
+      const next = { ...prev, [field]: value };
+      const computedEndereco = formatarEnderecoCompleto({
+        logradouro: next.logradouro,
+        numero: next.numero,
+        complemento: next.complemento,
+        bairro: next.bairro,
+        cidade: next.cidade,
+        estado: next.estado,
+        cep: next.cep,
+      });
+      return {
+        ...next,
+        endereco: computedEndereco || next.endereco,
+      };
+    });
+  };
+
+  const handleAddressBulkChange = (updates: Partial<{ cep: string; logradouro: string; numero: string; complemento: string; bairro: string; cidade: string; estado: string }>) => {
+    setFormData(prev => {
+      const next = { ...prev, ...updates };
+      const computedEndereco = formatarEnderecoCompleto({
+        logradouro: next.logradouro,
+        numero: next.numero,
+        complemento: next.complemento,
+        bairro: next.bairro,
+        cidade: next.cidade,
+        estado: next.estado,
+        cep: next.cep,
+      });
+      return {
+        ...next,
+        endereco: computedEndereco || next.endereco,
+      };
+    });
+  };
+
   const handleSave = async () => {
     try {
+      const enderecoSincronizado = formatarEnderecoCompleto({
+        logradouro: formData.logradouro,
+        numero: formData.numero,
+        complemento: formData.complemento,
+        bairro: formData.bairro,
+        cidade: formData.cidade,
+        estado: formData.estado,
+        cep: formData.cep,
+      }) || formData.endereco;
+
       await updateConfiguracaoIgrejaInSupabase(supabase, {
         nome: formData.nomeMinisterio,
         cnpj: formData.cnpj,
         email: formData.email,
         telefone: formData.telefone,
-        endereco: formData.endereco,
+        endereco: enderecoSincronizado,
+        cep: formData.cep,
+        logradouro: formData.logradouro,
+        numero: formData.numero,
+        complemento: formData.complemento,
+        bairro: formData.bairro,
+        cidade: formData.cidade,
+        estado: formData.estado,
         descricao: formData.descricao,
         website: formData.website,
         responsavel: formData.responsavel
@@ -325,15 +395,21 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Endereço</label>
-          <textarea
-            name="endereco"
-            value={formData.endereco}
-            onChange={handleChange}
-            disabled={!isEditing}
-            rows={2}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg disabled:bg-gray-100 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-teal-500"
+        <div className="pt-2 border-t border-gray-100">
+          <h3 className="text-base font-bold text-gray-800 mb-3">Endereço da Sede</h3>
+          <EnderecoForm
+            values={{
+              cep: formData.cep,
+              logradouro: formData.logradouro,
+              numero: formData.numero,
+              complemento: formData.complemento,
+              bairro: formData.bairro,
+              cidade: formData.cidade,
+              estado: formData.estado,
+            }}
+            onChange={handleAddressChange}
+            onBulkChange={handleAddressBulkChange}
+            isEditing={isEditing}
           />
         </div>
 
