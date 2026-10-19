@@ -74,6 +74,8 @@ export async function GET(request: NextRequest) {
       responsavel: churchProfile.responsavel || CONFIGURACAO_PADRAO.responsavel || '',
       mensagem_aniversario: churchProfile.mensagem_aniversario || '',
       imagem_aniversario: churchProfile.imagem_aniversario || null,
+      assinatura_presidente: churchProfile.assinatura_presidente || null,
+      assinatura_secretario_geral: churchProfile.assinatura_secretario_geral || null,
       dataCadastro: ministryData?.created_at ? new Date(ministryData.created_at).toISOString().split('T')[0] : '',
       logo: ministryData?.logo_url || '',
     };
@@ -126,6 +128,8 @@ export async function PUT(request: NextRequest) {
       responsavel,
       mensagem_aniversario,
       imagem_aniversario,
+      assinatura_presidente,
+      assinatura_secretario_geral,
     } = body || {};
 
     // 1. Atualizar tabela ministries com service_role (ctx.admin)
@@ -162,7 +166,9 @@ export async function PUT(request: NextRequest) {
       typeof estado === 'string' ||
       typeof responsavel === 'string' ||
       typeof mensagem_aniversario === 'string' ||
-      imagem_aniversario !== undefined;
+      imagem_aniversario !== undefined ||
+      assinatura_presidente !== undefined ||
+      assinatura_secretario_geral !== undefined;
 
     if (hasConfigChanges) {
       const { data: configRow } = await ctx.admin
@@ -185,6 +191,8 @@ export async function PUT(request: NextRequest) {
         ...(typeof responsavel === 'string' ? { responsavel } : {}),
         ...(typeof mensagem_aniversario === 'string' ? { mensagem_aniversario } : {}),
         ...(imagem_aniversario !== undefined ? { imagem_aniversario } : {}),
+        ...(assinatura_presidente !== undefined ? { assinatura_presidente } : {}),
+        ...(assinatura_secretario_geral !== undefined ? { assinatura_secretario_geral } : {}),
       };
 
       const { error: upsertErr } = await ctx.admin

@@ -467,6 +467,9 @@ function BrandingContent({ onNotification }: { onNotification: (title: string, m
   const { ministryId } = useUserContext();
 
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [assinaturaPresidente, setAssinaturaPresidente] = useState<string | null>(null);
+  const [assinaturaSecretarioGeral, setAssinaturaSecretarioGeral] = useState<string | null>(null);
+  const [salvandoAssinaturas, setSalvandoAssinaturas] = useState(false);
 
   useEffect(() => {
     console.log('[DIAGNOSTICO FRONT BRANDING] useEffect disparado. ministryId:', ministryId);
@@ -476,6 +479,8 @@ function BrandingContent({ onNotification }: { onNotification: (title: string, m
         console.log('[DIAGNOSTICO FRONT BRANDING] Objeto config recebido em .then():', config);
         console.log('[DIAGNOSTICO FRONT BRANDING] Chamando setLogoPreview() com:', config.logo || null);
         setLogoPreview(config.logo || null);
+        setAssinaturaPresidente(config.assinatura_presidente || null);
+        setAssinaturaSecretarioGeral(config.assinatura_secretario_geral || null);
       })
       .catch((err) => console.error('[DIAGNOSTICO FRONT BRANDING] Erro em fetchConfiguracaoIgrejaFromSupabase:', err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -531,60 +536,389 @@ function BrandingContent({ onNotification }: { onNotification: (title: string, m
     }
   };
 
+  // Upload e Validação de Assinaturas Institucionais (PNG com transparência, máx 2MB)
+  const processarArquivoAssinatura = (
+    file: File,
+    onSuccess: (base64: string) => void
+  ) => {
+    // 1. Validação de formato (PNG estrito)
+    if (file.type !== 'image/png') {
+      onNotification(
+        'Formato Inválido',
+        'Envie a assinatura exclusivamente em formato PNG com fundo transparente.',
+        'warning'
+      );
+      return;
+    }
+
+    // 2. Validação de tamanho (máximo 2MB)
+    const MAX_SIZE = 2 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      onNotification(
+        'Arquivo Muito Grande',
+        'A assinatura deve ter no máximo 2MB.',
+        'warning'
+      );
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        // Validação de dimensões mínimas para nitidez
+        if (img.width < 100 || img.height < 30) {
+          onNotification(
+            'Resolução Baixa',
+            'A assinatura deve possuir no mínimo 100x30 pixels para garantir nitidez em impressões.',
+            'warning'
+          );
+          return;
+        }
+        onSuccess(base64);
+      };
+      img.onerror = () => {
+        onNotification('Erro de Leitura', 'Não foi possível carregar o arquivo da assinatura.', 'error');
+      };
+      img.src = base64;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSalvarAssinatura = async (
+    tipo: 'assinatura_presidente' | 'assinatura_secretario_geral',
+    novaImagem: string | null
+  ) => {
+    setSalvandoAssinaturas(true);
+    try {
+      await updateConfiguracaoIgrejaInSupabase(
+        supabase,
+        { [tipo]: novaImagem },
+        ministryId
+      );
+
+      if (tipo === 'assinatura_presidente') {
+        setAssinaturaPresidente(novaImagem);
+      } else {
+        setAssinaturaSecretarioGeral(novaImagem);
+      }
+
+      await registrarAcao({
+        acao: novaImagem ? 'editar' : 'deletar',
+        modulo: 'configuracoes',
+        area: 'branding',
+        tabela_afetada: 'configurations',
+        descricao: novaImagem
+          ? `Assinatura institucional (${tipo === 'assinatura_presidente' ? 'Pastor Presidente' : 'Secretário-Geral'}) atualizada`
+          : `Assinatura institucional (${tipo === 'assinatura_presidente' ? 'Pastor Presidente' : 'Secretário-Geral'}) removida`,
+        status: 'sucesso',
+      });
+
+      onNotification(
+        'Sucesso',
+        novaImagem ? 'Assinatura salva com sucesso!' : 'Assinatura removida com sucesso.',
+        'success'
+      );
+    } catch (err: any) {
+      await registrarAcao({
+        acao: 'editar',
+        modulo: 'configuracoes',
+        area: 'branding',
+        tabela_afetada: 'configurations',
+        descricao: `Falha ao gerenciar assinatura institucional (${tipo})`,
+        status: 'erro',
+        mensagem_erro: err?.message,
+      });
+      onNotification('Erro', err?.message || 'Falha ao salvar assinatura. Tente novamente.', 'error');
+    } finally {
+      setSalvandoAssinaturas(false);
+    }
+  };
+
   return (
-    <div>
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">Identidade Visual - Logomarca</h2>
+    <div className="space-y-10">
+      {/* ── SEÇÃO 1: LOGOMARCA ────────────────────────────────────────── */}
+      <div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-6">Identidade Visual - Logomarca</h2>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div>
-          <h3 className="text-lg font-bold text-gray-800 mb-4">Upload da Logomarca</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div>
+            <h3 className="text-lg font-bold text-gray-800 mb-4">Upload da Logomarca</h3>
 
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center bg-gray-50 mb-4">
-            <div className="text-5xl mb-3">📤</div>
-            <p className="text-gray-600 text-sm mb-3">Clique ou arraste a imagem aqui</p>
-            <p className="text-gray-500 text-xs mb-4">Dimensões recomendadas: 500x500px<br />Formatos: PNG, JPG, SVG | Máximo: 5MB</p>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleLogoChange}
-              className="hidden"
-              id="logo-input"
-            />
-            <label
-              htmlFor="logo-input"
-              className="inline-block px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 cursor-pointer font-semibold"
-            >
-              📁 Escolher Imagem
-            </label>
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center bg-gray-50 mb-4">
+              <div className="text-5xl mb-3">📤</div>
+              <p className="text-gray-600 text-sm mb-3">Clique ou arraste a imagem aqui</p>
+              <p className="text-gray-500 text-xs mb-4">Dimensões recomendadas: 500x500px<br />Formatos: PNG, JPG, SVG | Máximo: 5MB</p>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleLogoChange}
+                className="hidden"
+                id="logo-input"
+              />
+              <label
+                htmlFor="logo-input"
+                className="inline-block px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 cursor-pointer font-semibold"
+              >
+                📁 Escolher Imagem
+              </label>
+            </div>
           </div>
-        </div>
 
-        <div>
-          <h3 className="text-lg font-bold text-gray-800 mb-4">Prévia da Logomarca</h3>
+          <div>
+            <h3 className="text-lg font-bold text-gray-800 mb-4">Prévia da Logomarca</h3>
 
-          <div className="border border-gray-300 rounded-lg p-8 text-center bg-gray-50 mb-4 h-64 flex items-center justify-center">
-            {logoPreview ? (
-              <img src={logoPreview} alt="Logo Preview" className="max-h-full max-w-full object-contain" />
-            ) : (
-              <div className="text-gray-400">
-                <div className="text-5xl mb-2">🖼️</div>
-                <p>Nenhuma imagem selecionada</p>
-              </div>
+            <div className="border border-gray-300 rounded-lg p-8 text-center bg-gray-50 mb-4 h-64 flex items-center justify-center">
+              {logoPreview ? (
+                <img src={logoPreview} alt="Logo Preview" className="max-h-full max-w-full object-contain" />
+              ) : (
+                <div className="text-gray-400">
+                  <div className="text-5xl mb-2">🖼️</div>
+                  <p>Nenhuma imagem selecionada</p>
+                </div>
+              )}
+            </div>
+
+            {logoPreview && (
+              <button
+                onClick={handleSaveLogo}
+                className="w-full px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
+              >
+                ✓ Salvar Logomarca
+              </button>
             )}
           </div>
-
-          {logoPreview && (
-            <button
-              onClick={handleSaveLogo}
-              className="w-full px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
-            >
-              ✓ Salvar Logomarca
-            </button>
-          )}
         </div>
       </div>
 
-      <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+      <hr className="border-gray-200" />
+
+      {/* ── SEÇÃO 2: ASSINATURAS INSTITUCIONAIS DINÂMICAS ────────────── */}
+      <div>
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xl">✍️</span>
+            <h2 className="text-2xl font-bold text-gray-800">Assinaturas Institucionais</h2>
+          </div>
+          <p className="text-sm text-gray-600">
+            Cadastre as assinaturas digitais dos representantes institucionais para inclusão automática e governança em documentos oficiais, cartas e certificados.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Card: Assinatura do Pastor Presidente */}
+          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-bold text-gray-900">Assinatura do Pastor Presidente</h3>
+                {assinaturaPresidente ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    Cadastrada
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                    Não cadastrada
+                  </span>
+                )}
+              </div>
+
+              <p className="text-xs text-gray-500 mb-4">
+                Envie a assinatura com fundo transparente, preferencialmente em PNG.
+              </p>
+
+              {/* Prévia sobre fundo quadriculado (checkerboard) */}
+              <div
+                className="w-full h-36 rounded-lg border border-gray-300 flex items-center justify-center p-3 relative overflow-hidden mb-4"
+                style={{
+                  backgroundColor: '#ffffff',
+                  backgroundImage: `
+                    linear-gradient(45deg, #f0f0f0 25%, transparent 25%),
+                    linear-gradient(-45deg, #f0f0f0 25%, transparent 25%),
+                    linear-gradient(45deg, transparent 75%, #f0f0f0 75%),
+                    linear-gradient(-45deg, transparent 75%, #f0f0f0 75%)
+                  `,
+                  backgroundSize: '16px 16px',
+                  backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px',
+                }}
+              >
+                {assinaturaPresidente ? (
+                  <img
+                    src={assinaturaPresidente}
+                    alt="Assinatura Pastor Presidente"
+                    className="max-h-full max-w-full object-contain filter drop-shadow-xs"
+                  />
+                ) : (
+                  <div className="text-center text-gray-400">
+                    <div className="text-3xl mb-1">✍️</div>
+                    <span className="text-xs font-medium">Nenhuma assinatura cadastrada</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-gray-100">
+              <input
+                type="file"
+                accept="image/png"
+                id="assinatura-presidente-input"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    processarArquivoAssinatura(file, (base64) => {
+                      handleSalvarAssinatura('assinatura_presidente', base64);
+                    });
+                  }
+                  e.target.value = '';
+                }}
+              />
+
+              <div className="flex gap-2">
+                <label
+                  htmlFor="assinatura-presidente-input"
+                  className={`flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer transition ${
+                    assinaturaPresidente
+                      ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300'
+                      : 'bg-[#123b63] hover:bg-[#0f2a45] text-white shadow-xs'
+                  }`}
+                >
+                  {assinaturaPresidente ? '🔄 Substituir' : '📤 Enviar Assinatura'}
+                </label>
+
+                {assinaturaPresidente && (
+                  <button
+                    type="button"
+                    disabled={salvandoAssinaturas}
+                    onClick={() => {
+                      if (confirm('Deseja realmente remover a assinatura do Pastor Presidente?')) {
+                        handleSalvarAssinatura('assinatura_presidente', null);
+                      }
+                    }}
+                    className="px-3 py-2 rounded-lg text-xs font-semibold border border-red-200 text-red-600 hover:bg-red-50 transition disabled:opacity-50"
+                  >
+                    🗑️ Remover
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Card: Assinatura do Secretário-Geral */}
+          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-bold text-gray-900">Assinatura do Secretário-Geral</h3>
+                {assinaturaSecretarioGeral ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    Cadastrada
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                    Não cadastrada
+                  </span>
+                )}
+              </div>
+
+              <p className="text-xs text-gray-500 mb-4">
+                Envie a assinatura com fundo transparente, preferencialmente em PNG.
+              </p>
+
+              {/* Prévia sobre fundo quadriculado (checkerboard) */}
+              <div
+                className="w-full h-36 rounded-lg border border-gray-300 flex items-center justify-center p-3 relative overflow-hidden mb-4"
+                style={{
+                  backgroundColor: '#ffffff',
+                  backgroundImage: `
+                    linear-gradient(45deg, #f0f0f0 25%, transparent 25%),
+                    linear-gradient(-45deg, #f0f0f0 25%, transparent 25%),
+                    linear-gradient(45deg, transparent 75%, #f0f0f0 75%),
+                    linear-gradient(-45deg, transparent 75%, #f0f0f0 75%)
+                  `,
+                  backgroundSize: '16px 16px',
+                  backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px',
+                }}
+              >
+                {assinaturaSecretarioGeral ? (
+                  <img
+                    src={assinaturaSecretarioGeral}
+                    alt="Assinatura Secretário-Geral"
+                    className="max-h-full max-w-full object-contain filter drop-shadow-xs"
+                  />
+                ) : (
+                  <div className="text-center text-gray-400">
+                    <div className="text-3xl mb-1">✍️</div>
+                    <span className="text-xs font-medium">Nenhuma assinatura cadastrada</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-gray-100">
+              <input
+                type="file"
+                accept="image/png"
+                id="assinatura-secretario-input"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    processarArquivoAssinatura(file, (base64) => {
+                      handleSalvarAssinatura('assinatura_secretario_geral', base64);
+                    });
+                  }
+                  e.target.value = '';
+                }}
+              />
+
+              <div className="flex gap-2">
+                <label
+                  htmlFor="assinatura-secretario-input"
+                  className={`flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer transition ${
+                    assinaturaSecretarioGeral
+                      ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300'
+                      : 'bg-[#123b63] hover:bg-[#0f2a45] text-white shadow-xs'
+                  }`}
+                >
+                  {assinaturaSecretarioGeral ? '🔄 Substituir' : '📤 Enviar Assinatura'}
+                </label>
+
+                {assinaturaSecretarioGeral && (
+                  <button
+                    type="button"
+                    disabled={salvandoAssinaturas}
+                    onClick={() => {
+                      if (confirm('Deseja realmente remover a assinatura do Secretário-Geral?')) {
+                        handleSalvarAssinatura('assinatura_secretario_geral', null);
+                      }
+                    }}
+                    className="px-3 py-2 rounded-lg text-xs font-semibold border border-red-200 text-red-600 hover:bg-red-50 transition disabled:opacity-50"
+                  >
+                    🗑️ Remover
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Alerta de Governança e Segurança */}
+        <div className="mt-6 p-4 bg-amber-50/80 border border-amber-200 rounded-xl flex items-start gap-3 text-xs text-amber-900">
+          <span className="text-base shrink-0">🛡️</span>
+          <div className="space-y-1 leading-relaxed">
+            <p className="font-bold">Regra de Segurança e Governança Institucional:</p>
+            <p>
+              As assinaturas institucionais são elementos gráficos protegidos e restritos ao ministério. Em documentos de alto impacto (como <strong>Cartas de Mudança e Desligamento</strong>), a assinatura do Pastor Presidente somente é inserida na emissão oficial após deliberação favorável registrada na Presidência, permanecendo bloqueada em pré-visualizações não autorizadas.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <p className="text-sm text-gray-700">
           💡 <strong>Dica:</strong> As informações do ministério (nome, endereço, CNPJ, telefone, email) são configuradas na aba <strong>"Perfil do Ministério"</strong> e serão exibidas automaticamente no cabeçalho dos relatórios em PDF.
         </p>

@@ -25,6 +25,8 @@ export interface ConfiguracaoIgreja {
     responsavel?: string;
     dataCadastro?: string;
     logo: string; // Base64 da imagem
+    assinatura_presidente?: string | null; // Base64 PNG transparente
+    assinatura_secretario_geral?: string | null; // Base64 PNG transparente
     mensagem_aniversario?: string;
     imagem_aniversario?: string | null;
 }
@@ -47,6 +49,8 @@ const CONFIGURACAO_PADRAO: ConfiguracaoIgreja = {
     descricao: '',
     responsavel: '',
     logo: '',
+    assinatura_presidente: null,
+    assinatura_secretario_geral: null,
     mensagem_aniversario: '',
     imagem_aniversario: null,
 };
