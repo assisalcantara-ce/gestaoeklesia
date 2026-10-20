@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { AppDialogProvider } from '@/providers/AppDialogProvider';
 import { AuthProvider } from '@/providers/AuthProvider';
@@ -9,6 +9,12 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import AppShell from '@/components/AppShell';
 
 export const dynamic = 'force-dynamic';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+};
 
 export const metadata: Metadata = {
   title: 'Gestão Eklesia — Gestão que fortalece sua igreja',

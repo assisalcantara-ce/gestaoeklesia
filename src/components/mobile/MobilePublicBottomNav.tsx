@@ -41,7 +41,7 @@ export default function MobilePublicBottomNav({
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50">
-      <div className="max-w-md mx-auto bg-[#111827]/95 backdrop-blur-md border-t border-slate-800/80 shadow-[0_-4px_20px_rgba(0,0,0,0.3)]">
+      <div className="max-w-md mx-auto bg-[#111827]/95 backdrop-blur-md border-t border-slate-800/80 shadow-[0_-4px_20px_rgba(0,0,0,0.3)] pb-[env(safe-area-inset-bottom,0px)]">
         <div className="flex items-center justify-around h-16 px-1">
           {items.map((item) => {
             const Icon = item.icon;
