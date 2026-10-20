@@ -21,11 +21,9 @@ import React, {
   useCallback,
 } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import Image from 'next/image';
-import { BRAND } from '@/config/brand';
-import { GRADIENTS } from '@/config/tokens';
 import { useAuth } from '@/providers/AuthProvider';
 import { createClient } from '@/lib/supabase-client';
+import MobileSplashScreen from '@/components/mobile/MobileSplashScreen';
 
 // Rotas acessíveis sem member vinculado
 const PUBLIC_MOBILE_PATHS = ['/app/login', '/app/vincular', '/app/auth/callback', '/app'];
@@ -166,28 +164,7 @@ export function MobileMemberProvider({ children }: { children: React.ReactNode }
   return (
     <MobileMemberContext.Provider value={{ member, isLoading, isLinked, refresh }}>
       {isLoading && !isPublic ? (
-        <div className="min-h-screen w-full flex items-center justify-center" style={{ background: GRADIENTS.APP_BACKGROUND }}>
-          <div className="flex flex-col items-center gap-4">
-            <Image
-              src={BRAND.logoWhite}
-              alt="Gestão Eklésia"
-              width={280}
-              height={80}
-              priority
-              sizes="280px"
-              className="h-[80px] w-auto object-contain animate-pulse select-none"
-            />
-            <div className="w-24 h-1 bg-white/20 rounded-full overflow-hidden relative">
-              <div className="w-1/2 h-full bg-[#5A9DDC] rounded-full absolute left-0 top-0 animate-[loading_1s_infinite_ease-in-out]"></div>
-            </div>
-            <style jsx>{`
-              @keyframes loading {
-                0% { left: -50%; }
-                100% { left: 100%; }
-              }
-            `}</style>
-          </div>
-        </div>
+        <MobileSplashScreen />
       ) : (
         children
       )}

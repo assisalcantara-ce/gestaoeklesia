@@ -31,13 +31,13 @@ import {
   ChevronRight,
   Clock,
   AlertCircle,
-  Loader2,
   RefreshCw,
   Check,
 } from 'lucide-react';
 import MobilePublicBottomNav from '@/components/mobile/MobilePublicBottomNav';
 import AuthGateModal from '@/components/mobile/AuthGateModal';
 import ModalPedidoOracaoPublico from '@/components/mobile/ModalPedidoOracaoPublico';
+import MobileSplashScreen from '@/components/mobile/MobileSplashScreen';
 
 interface PageProps {
   params: Promise<{
@@ -228,16 +228,7 @@ export default function IgrejaPublicaPage({ params }: PageProps) {
 
   // Estado: Carregando
   if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[#0f172a] text-slate-100">
-        <div className="w-16 h-16 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-4 animate-pulse">
-          <Church size={32} />
-        </div>
-        <Loader2 size={30} className="text-blue-500 animate-spin mb-3" />
-        <p className="text-sm font-semibold text-slate-300">Carregando a sua igreja...</p>
-        <span className="text-xs text-slate-500 mt-1">Conectando ao Eklésia</span>
-      </div>
-    );
+    return <MobileSplashScreen />;
   }
 
   // Estado: Erro / Igreja Não Encontrada
