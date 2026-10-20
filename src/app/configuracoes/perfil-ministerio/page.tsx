@@ -8,11 +8,14 @@ import { fetchConfiguracaoIgrejaFromSupabase, updateConfiguracaoIgrejaInSupabase
 import { formatCnpj, formatPhone } from '@/lib/mascaras';
 import { useUserContext } from '@/hooks/useUserContext';
 import { EnderecoForm } from '@/components/configuracoes/EnderecoForm';
+import AppMembroLinkModal from '@/components/configuracoes/AppMembroLinkModal';
+import { Smartphone } from 'lucide-react';
 
 export default function PerfilMinisterioPage() {
 
   const [formData, setFormData] = useState({
     nomeMinisterio: '',
+    slug: '',
     cnpj: '',
     email: '',
     telefone: '',
@@ -26,8 +29,11 @@ export default function PerfilMinisterioPage() {
     cidade: '',
     estado: '',
     responsavel: '',
-    dataCadastro: ''
+    dataCadastro: '',
+    logo: ''
   });
+
+  const [linkModalOpen, setLinkModalOpen] = useState(false);
 
   const supabase = createClient();
   // Fonte oficial do tenant — garantida pelo contexto da aplicação.
@@ -42,6 +48,7 @@ export default function PerfilMinisterioPage() {
         console.log('[DIAGNOSTICO ROTA DEDICADA PERFIL] Config recebido:', config);
         const novoState = {
           nomeMinisterio: config.nome || 'Ministério',
+          slug: config.slug || '',
           cnpj: config.cnpj || '',
           email: config.email || '',
           telefone: config.telefone || '',
@@ -55,7 +62,8 @@ export default function PerfilMinisterioPage() {
           cidade: config.cidade || '',
           estado: config.estado || '',
           responsavel: config.responsavel || '',
-          dataCadastro: ''
+          dataCadastro: '',
+          logo: config.logo || ''
         };
         console.log('[DIAGNOSTICO ROTA DEDICADA PERFIL] setFormData com:', novoState);
         setFormData(novoState);
@@ -159,18 +167,38 @@ export default function PerfilMinisterioPage() {
     <div className="flex-1 overflow-auto">
         <div className="p-6">
           {/* Header */}
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-bold text-gray-800">🏛️ Perfil do Ministério</h1>
-            <button
-              onClick={() => setIsEditing(!isEditing)}
-              className={`px-6 py-2 rounded-lg transition font-semibold ${
-                isEditing
-                  ? 'bg-gray-500 text-white hover:bg-gray-600'
-                  : 'bg-teal-600 text-white hover:bg-teal-700'
-              }`}
-            >
-              {isEditing ? '❌ Cancelar' : '✏️ Editar'}
-            </button>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-800">🏛️ Perfil do Ministério</h1>
+              {formData.slug && (
+                <p className="text-xs text-gray-500 font-mono mt-1">
+                  Slug público: <strong className="text-teal-700">{formData.slug}</strong>
+                </p>
+              )}
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {formData.slug && (
+                <button
+                  type="button"
+                  onClick={() => setLinkModalOpen(true)}
+                  className="px-4 py-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition font-semibold text-sm flex items-center gap-1.5 shadow-xs cursor-pointer"
+                >
+                  <Smartphone size={16} className="text-blue-600" />
+                  <span>Divulgar App do Membro</span>
+                </button>
+              )}
+              <button
+                onClick={() => setIsEditing(!isEditing)}
+                className={`px-6 py-2 rounded-lg transition font-semibold text-sm cursor-pointer ${
+                  isEditing
+                    ? 'bg-gray-500 text-white hover:bg-gray-600'
+                    : 'bg-teal-600 text-white hover:bg-teal-700'
+                }`}
+              >
+                {isEditing ? '❌ Cancelar' : '✏️ Editar'}
+              </button>
+            </div>
           </div>
 
           {/* Formulário */}
@@ -283,13 +311,13 @@ export default function PerfilMinisterioPage() {
                 <div className="flex gap-4 pt-4">
                   <button
                     onClick={handleSave}
-                    className="flex-1 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
+                    className="flex-1 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold cursor-pointer"
                   >
                     ✓ Salvar Alterações
                   </button>
                   <button
                     onClick={() => setIsEditing(false)}
-                    className="flex-1 px-6 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition font-semibold"
+                    className="flex-1 px-6 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition font-semibold cursor-pointer"
                   >
                     ✕ Descartar
                   </button>
@@ -298,6 +326,15 @@ export default function PerfilMinisterioPage() {
             </div>
           </div>
         </div>
+
+        {/* Modal de Divulgação do App do Membro */}
+        <AppMembroLinkModal
+          isOpen={linkModalOpen}
+          onClose={() => setLinkModalOpen(false)}
+          slug={formData.slug}
+          igrejaNome={formData.nomeMinisterio}
+          logoUrl={formData.logo}
+        />
       </div>
   );
 }

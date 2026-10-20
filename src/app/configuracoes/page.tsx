@@ -14,6 +14,8 @@ import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { useUserContext } from '@/hooks/useUserContext';
 import { fetchConfiguracaoIgrejaFromSupabase, updateConfiguracaoIgrejaInSupabase, formatarEnderecoCompleto } from '@/lib/igreja-config-utils';
 import { EnderecoForm } from '@/components/configuracoes/EnderecoForm';
+import AppMembroLinkModal from '@/components/configuracoes/AppMembroLinkModal';
+import { Smartphone } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -148,7 +150,10 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
   const { ministryId } = useUserContext();
 
   const [isEditing, setIsEditing] = useState(false);
+  const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [formData, setFormData] = useState({
+    slug: '',
+    logo: '',
     nomeMinisterio: '',
     cnpj: '',
     email: '',
@@ -188,6 +193,8 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
           cidade: config.cidade || '',
           estado: config.estado || '',
           descricao: config.descricao || '',
+          slug: config.slug || '',
+          logo: config.logo || '',
           responsavel: config.responsavel || '',
           dataCadastro: config.dataCadastro || ''
         };
@@ -307,17 +314,36 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Perfil do Ministério</h2>
-        <button
-          onClick={() => setIsEditing(!isEditing)}
-          className={`px-6 py-2 rounded-lg transition font-semibold ${isEditing
-            ? 'bg-gray-500 text-white hover:bg-gray-600'
-            : 'bg-teal-600 text-white hover:bg-teal-700'
-            }`}
-        >
-          {isEditing ? '❌ Cancelar' : '✏️ Editar'}
-        </button>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800">Perfil do Ministério</h2>
+          {formData.slug && (
+            <p className="text-xs text-gray-500 font-mono mt-0.5">
+              Slug público: <strong className="text-teal-700">{formData.slug}</strong>
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {formData.slug && (
+            <button
+              type="button"
+              onClick={() => setLinkModalOpen(true)}
+              className="px-4 py-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition font-semibold text-sm flex items-center gap-1.5 shadow-xs cursor-pointer"
+            >
+              <Smartphone size={16} className="text-blue-600" />
+              <span>Divulgar App do Membro</span>
+            </button>
+          )}
+          <button
+            onClick={() => setIsEditing(!isEditing)}
+            className={`px-6 py-2 rounded-lg transition font-semibold cursor-pointer ${isEditing
+              ? 'bg-gray-500 text-white hover:bg-gray-600'
+              : 'bg-teal-600 text-white hover:bg-teal-700'
+              }`}
+          >
+            {isEditing ? '❌ Cancelar' : '✏️ Editar'}
+          </button>
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -455,6 +481,14 @@ function PerfilContent({ onNotification }: { onNotification: (title: string, mes
           </div>
         )}
       </div>
+
+      <AppMembroLinkModal
+        isOpen={linkModalOpen}
+        onClose={() => setLinkModalOpen(false)}
+        slug={formData.slug}
+        igrejaNome={formData.nomeMinisterio}
+        logoUrl={formData.logo}
+      />
     </div>
   );
 }
