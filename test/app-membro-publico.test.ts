@@ -16,7 +16,6 @@ test('App do Membro Simplificado — Validações de Roteamento e Governança P�
   });
 
   await t.test('deve classificar corretamente rotas públicas vs protegidas', () => {
-    const publicFeatures = ['inicio', 'agenda', 'cultos', 'eventos', 'oracao', 'avisos', 'contato'];
     const privateFeatures = ['credencial', 'perfil', 'documentos', 'financeiro', 'historico'];
 
     const checkIsPrivate = (feat: string) => privateFeatures.includes(feat);

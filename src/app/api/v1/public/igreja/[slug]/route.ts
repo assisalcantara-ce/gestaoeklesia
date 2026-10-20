@@ -33,12 +33,35 @@ export async function GET(
     const cleanSlug = slug.trim().toLowerCase();
     const admin = createServerClient();
 
-    // 1. Resolver o ministério pelo slug único
-    const { data: ministry, error: ministryErr } = await admin
+    // 1. Resolver o ministério pelo slug único (ou correspondência flexível)
+    let { data: ministry, error: ministryErr } = await admin
       .from('ministries')
       .select('id, name, slug, description, logo_url, website, phone, email_admin, is_active')
       .eq('slug', cleanSlug)
       .maybeSingle();
+
+    // Se não encontrou por slug exato, tenta compatibilidade flexível (ex: adananindeua -> assembleia-de-deus-ananideua)
+    if (!ministry && !ministryErr) {
+      const { data: allActive } = await admin
+        .from('ministries')
+        .select('id, name, slug, description, logo_url, website, phone, email_admin, is_active')
+        .eq('is_active', true);
+
+      if (allActive && allActive.length > 0) {
+        const cleanNoHyphen = cleanSlug.replace(/[^a-z0-9]/g, '');
+        ministry = allActive.find((m) => {
+          const mSlugNoHyphen = (m.slug || '').replace(/[^a-z0-9]/g, '');
+          const mNameNoSpace = (m.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          return (
+            mSlugNoHyphen === cleanNoHyphen ||
+            mSlugNoHyphen.includes(cleanNoHyphen) ||
+            cleanNoHyphen.includes(mSlugNoHyphen) ||
+            mNameNoSpace.includes(cleanNoHyphen) ||
+            (cleanNoHyphen === 'adananindeua' && (mSlugNoHyphen.includes('ananideua') || mSlugNoHyphen.includes('ananindeua')))
+          );
+        }) || null;
+      }
+    }
 
     if (ministryErr || !ministry || ministry.is_active === false) {
       return NextResponse.json(

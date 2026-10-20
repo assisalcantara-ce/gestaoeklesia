@@ -28,6 +28,7 @@ const PUBLIC_PREFIXES = [
   '/ebd/chamada-rapida',
   '/revista',
   '/recepcao',
+  '/igreja',
   // Apenas as rotas mobile públicas explícitas estão liberadas do ProtectedRoute global
   '/app/login',
   '/app/vincular',

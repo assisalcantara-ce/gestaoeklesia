@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
@@ -49,6 +49,7 @@ export default function GlobalFinancialBanner() {
       pathname.startsWith('/membro') ||
       pathname.startsWith('/validar') ||
       pathname.startsWith('/app') ||
+      pathname.startsWith('/igreja') ||
       pathname.startsWith('/formularios') ||
       pathname.startsWith('/eventos/check-in') ||
       pathname.startsWith('/eventos/e') ||
