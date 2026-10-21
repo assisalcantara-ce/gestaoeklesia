@@ -1,7 +1,81 @@
 /**
- * API Client com autenticação Supabase
- * Injeta automaticamente o token Bearer da sessão nativa nas requisições.
+ * Extrai de forma segura o corpo JSON de uma Response HTTP.
+ * Se a resposta não for JSON (por exemplo, página de erro HTML 500/502 do Next.js/Vercel
+ * que começa com "An error occurred..."), captura o texto bruto e retorna
+ * um objeto { error: string } estruturado, prevenindo a quebra
+ * "Unexpected token 'A', 'An error o'... is not valid JSON".
  */
+export async function safeResponseJson<T = any>(
+  response: Response,
+  fallbackErrorMessage = 'Resposta inválida do servidor.'
+): Promise<{ ok: boolean; data?: T; error?: string; status: number; [key: string]: any }> {
+  const status = response.status;
+  const contentType = response.headers.get('content-type') || '';
+
+  try {
+    const rawText = await response.text();
+    const trimmed = rawText.trim();
+
+    if (!trimmed) {
+      return {
+        ok: response.ok,
+        error: response.ok ? undefined : `${fallbackErrorMessage} (HTTP ${status})`,
+        status,
+      };
+    }
+
+    // Se o Content-Type indicar JSON ou se começar com { ou [
+    if (
+      contentType.includes('application/json') ||
+      (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+      (trimmed.startsWith('[') && trimmed.endsWith(']'))
+    ) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (typeof parsed === 'object' && parsed !== null) {
+          return {
+            ok: response.ok,
+            status,
+            ...parsed,
+          };
+        }
+        return {
+          ok: response.ok,
+          data: parsed,
+          status,
+        };
+      } catch {
+        // Fallback se JSON.parse falhar mesmo iniciando com {
+      }
+    }
+
+    // Caso a resposta seja texto puro ou HTML (ex: "An error occurred on the server...")
+    let cleanText = trimmed;
+    // Remove tags HTML básicas se presentes
+    if (cleanText.includes('<html') || cleanText.includes('<body') || cleanText.includes('<!DOCTYPE')) {
+      const match = cleanText.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
+                    cleanText.match(/<p[^>]*>([\s\S]*?)<\/p>/i) ||
+                    cleanText.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+      cleanText = match ? match[1].replace(/<[^>]+>/g, '').trim() : `Erro no servidor (HTTP ${status})`;
+    } else if (cleanText.length > 200) {
+      cleanText = cleanText.substring(0, 197) + '...';
+    }
+
+    return {
+      ok: response.ok,
+      error: cleanText || `${fallbackErrorMessage} (HTTP ${status})`,
+      status,
+      rawText: trimmed,
+    };
+  } catch (err: any) {
+    return {
+      ok: false,
+      error: err?.message || `${fallbackErrorMessage} (HTTP ${status})`,
+      status,
+    };
+  }
+}
+
 
 import { createClient } from '@/lib/supabase-client'
 

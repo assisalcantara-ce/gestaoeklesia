@@ -18,6 +18,7 @@ import {
   Banknote,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase-client';
+import { safeResponseJson } from '@/lib/api-client';
 
 const TIPOS_RECEBIMENTO_OPCOES = [
   { value: 'dizimo', label: 'Dízimo', cor: 'bg-blue-100 text-blue-800' },
@@ -259,7 +260,7 @@ export default function EditarClassificacaoLancamentoModal({
         }),
       });
 
-      const json = await res.json();
+      const json = await safeResponseJson(res, 'Erro ao salvar a reclassificação do lançamento.');
 
       if (!res.ok) {
         throw new Error(json.error || 'Erro ao salvar a reclassificação do lançamento.');

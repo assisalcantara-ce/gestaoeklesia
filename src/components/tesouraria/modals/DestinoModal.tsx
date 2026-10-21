@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, QrCode } from 'lucide-react';
-import { authenticatedFetch } from '@/lib/api-client';
+import { authenticatedFetch, safeResponseJson } from '@/lib/api-client';
 
 interface Congregacao { id: string; nome: string }
 interface FinConta { id: string; nome: string }
@@ -115,8 +115,8 @@ export default function DestinoModal({
         body: JSON.stringify(payload),
       });
 
+      const json = await safeResponseJson(res, 'Erro ao salvar destino.');
       if (!res.ok) {
-        const json = await res.json();
         throw new Error(json.error || 'Erro ao salvar destino.');
       }
 

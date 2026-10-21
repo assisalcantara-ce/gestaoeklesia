@@ -130,27 +130,31 @@ export async function POST(request: NextRequest) {
       permitir_duplicidade: Boolean(body.permitir_duplicidade),
     });
 
-    await logServerAudit(admin, {
-      ministryId,
-      userId: context.userId,
-      acao: 'criar',
-      modulo: 'financeiro',
-      area: 'tesouraria',
-      tabelaAfetada: 'tesouraria_lancamentos',
-      registroId: lancamento.id,
-      descricao: `Novo lançamento [${lancamento.tipo_movimento?.toUpperCase()}]: R$ ${lancamento.valor} (${lancamento.tipo_recebimento}) - Código: ${lancamento.codigo_registro || '-'}`,
-      dadosNovos: {
-        id: lancamento.id,
-        tipo_movimento: lancamento.tipo_movimento,
-        tipo_recebimento: lancamento.tipo_recebimento,
-        valor: lancamento.valor,
-        data_lancamento: lancamento.data_lancamento,
-        codigo_registro: lancamento.codigo_registro,
-        conta_id: lancamento.conta_id,
-        categoria_id: lancamento.categoria_id,
-      },
-      status: 'sucesso',
-    });
+    try {
+      await logServerAudit(admin, {
+        ministryId,
+        userId: context.userId,
+        acao: 'criar',
+        modulo: 'financeiro',
+        area: 'tesouraria',
+        tabelaAfetada: 'tesouraria_lancamentos',
+        registroId: lancamento.id,
+        descricao: `Novo lançamento [${lancamento.tipo_movimento?.toUpperCase()}]: R$ ${lancamento.valor} (${lancamento.tipo_recebimento}) - Código: ${lancamento.codigo_registro || '-'}`,
+        dadosNovos: {
+          id: lancamento.id,
+          tipo_movimento: lancamento.tipo_movimento,
+          tipo_recebimento: lancamento.tipo_recebimento,
+          valor: lancamento.valor,
+          data_lancamento: lancamento.data_lancamento,
+          codigo_registro: lancamento.codigo_registro,
+          conta_id: lancamento.conta_id,
+          categoria_id: lancamento.categoria_id,
+        },
+        status: 'sucesso',
+      });
+    } catch (auditErr) {
+      console.warn('[AuditLogger] Falha não-bloqueante no log de auditoria pós-criação:', auditErr);
+    }
 
     return NextResponse.json(
       { success: true, data: lancamento },
@@ -162,17 +166,21 @@ export async function POST(request: NextRequest) {
                         err?.code === '23505' ||
                         err?.message?.includes('idx_tesouraria_lancamentos_codigo_registro');
 
-    await logServerAudit(admin, {
-      ministryId,
-      userId: context.userId,
-      acao: 'criar',
-      modulo: 'financeiro',
-      area: 'tesouraria',
-      tabelaAfetada: 'tesouraria_lancamentos',
-      descricao: `Falha ao cadastrar lançamento financeiro: ${err?.message || 'Erro desconhecido'}`,
-      status: 'erro',
-      mensagemErro: err?.message,
-    });
+    try {
+      await logServerAudit(admin, {
+        ministryId,
+        userId: context.userId,
+        acao: 'criar',
+        modulo: 'financeiro',
+        area: 'tesouraria',
+        tabelaAfetada: 'tesouraria_lancamentos',
+        descricao: `Falha ao cadastrar lançamento financeiro: ${err?.message || 'Erro desconhecido'}`,
+        status: 'erro',
+        mensagemErro: err?.message,
+      });
+    } catch (auditErr) {
+      console.warn('[AuditLogger] Falha não-bloqueante no log de auditoria de erro:', auditErr);
+    }
 
     if (isDuplicate) {
       return NextResponse.json(
@@ -287,25 +295,29 @@ export async function PUT(request: NextRequest) {
       permitir_duplicidade: Boolean(body.permitir_duplicidade),
     });
 
-    await logServerAudit(admin, {
-      ministryId,
-      userId: context.userId,
-      acao: 'editar',
-      modulo: 'financeiro',
-      area: 'tesouraria',
-      tabelaAfetada: 'tesouraria_lancamentos',
-      registroId: id,
-      descricao: `Lançamento atualizado: [${lancamento.tipo_movimento?.toUpperCase()}] R$ ${lancamento.valor} (${lancamento.tipo_recebimento}) - Código: ${lancamento.codigo_registro || '-'}`,
-      dadosNovos: {
-        id: lancamento.id,
-        tipo_movimento: lancamento.tipo_movimento,
-        tipo_recebimento: lancamento.tipo_recebimento,
-        valor: lancamento.valor,
-        data_lancamento: lancamento.data_lancamento,
-        codigo_registro: lancamento.codigo_registro,
-      },
-      status: 'sucesso',
-    });
+    try {
+      await logServerAudit(admin, {
+        ministryId,
+        userId: context.userId,
+        acao: 'editar',
+        modulo: 'financeiro',
+        area: 'tesouraria',
+        tabelaAfetada: 'tesouraria_lancamentos',
+        registroId: id,
+        descricao: `Lançamento atualizado: [${lancamento.tipo_movimento?.toUpperCase()}] R$ ${lancamento.valor} (${lancamento.tipo_recebimento}) - Código: ${lancamento.codigo_registro || '-'}`,
+        dadosNovos: {
+          id: lancamento.id,
+          tipo_movimento: lancamento.tipo_movimento,
+          tipo_recebimento: lancamento.tipo_recebimento,
+          valor: lancamento.valor,
+          data_lancamento: lancamento.data_lancamento,
+          codigo_registro: lancamento.codigo_registro,
+        },
+        status: 'sucesso',
+      });
+    } catch (auditErr) {
+      console.warn('[AuditLogger] Falha não-bloqueante no log de auditoria pós-edição:', auditErr);
+    }
 
     return NextResponse.json({ success: true, data: lancamento });
   } catch (err: any) {
@@ -314,18 +326,22 @@ export async function PUT(request: NextRequest) {
                         err?.code === '23505' ||
                         err?.message?.includes('idx_tesouraria_lancamentos_codigo_registro');
 
-    await logServerAudit(admin, {
-      ministryId,
-      userId: context.userId,
-      acao: 'editar',
-      modulo: 'financeiro',
-      area: 'tesouraria',
-      tabelaAfetada: 'tesouraria_lancamentos',
-      registroId: id,
-      descricao: `Falha ao atualizar lançamento financeiro: ${err?.message || 'Erro desconhecido'}`,
-      status: 'erro',
-      mensagemErro: err?.message,
-    });
+    try {
+      await logServerAudit(admin, {
+        ministryId,
+        userId: context.userId,
+        acao: 'editar',
+        modulo: 'financeiro',
+        area: 'tesouraria',
+        tabelaAfetada: 'tesouraria_lancamentos',
+        registroId: id,
+        descricao: `Falha ao atualizar lançamento financeiro: ${err?.message || 'Erro desconhecido'}`,
+        status: 'erro',
+        mensagemErro: err?.message,
+      });
+    } catch (auditErr) {
+      console.warn('[AuditLogger] Falha não-bloqueante no log de auditoria de erro em edição:', auditErr);
+    }
     if (isDuplicate) {
       return NextResponse.json(
         {

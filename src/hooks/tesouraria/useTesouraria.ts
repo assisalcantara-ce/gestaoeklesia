@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { createClient } from '@/lib/supabase-client';
-import { authenticatedFetch } from '@/lib/api-client';
+import { authenticatedFetch, safeResponseJson } from '@/lib/api-client';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
@@ -972,11 +972,9 @@ export function useTesouraria() {
     // Busca código sequencial gerado para o ano atual
     try {
       const res = await authenticatedFetch(`/api/v1/tesouraria/lancamentos?action=proximo_codigo&data=${baseForm.data_lancamento}`);
-      if (res.ok) {
-        const json = await res.json();
-        if (json?.codigo) {
-          setForm((p) => ({ ...p, codigo_registro: json.codigo }));
-        }
+      const json = await safeResponseJson(res);
+      if (json.ok && json.codigo) {
+        setForm((p) => ({ ...p, codigo_registro: json.codigo }));
       }
     } catch (err) {
       console.error('Erro ao buscar próximo código de registro:', err);
@@ -1138,16 +1136,17 @@ export function useTesouraria() {
         body: JSON.stringify(payload),
       });
 
+      const resData = await safeResponseJson(res, 'Falha ao salvar lançamento.');
+
       if (!res.ok) {
-        const errJson = await res.json();
-        if (res.status === 409 || errJson.error === 'DUPLICATE_CODIGO_REGISTRO' || errJson.requires_confirmation) {
+        if (res.status === 409 || resData.error === 'DUPLICATE_CODIGO_REGISTRO' || resData.requires_confirmation) {
           setConfirmDuplicidadeCodigo({
             open: true,
             codigo: form.codigo_registro?.trim() || '',
           });
           return;
         }
-        showModal('Erro', errJson.error ?? 'Falha ao salvar lançamento.', 'error');
+        showModal('Erro', resData.error ?? 'Falha ao salvar lançamento.', 'error');
         return;
       }
 
@@ -1178,8 +1177,8 @@ export function useTesouraria() {
   const handleDelete = useCallback(async (id: string) => {
     try {
       const res = await authenticatedFetch(`/api/v1/tesouraria/lancamentos?id=${id}`, { method: 'DELETE' });
+      const json = await safeResponseJson(res, 'Falha ao excluir lançamento.');
       if (!res.ok) {
-        const json = await res.json();
         showModal('Erro', json.error ?? 'Falha ao excluir.', 'error');
         return;
       }
@@ -1228,8 +1227,8 @@ export function useTesouraria() {
         body: JSON.stringify(payload),
       });
 
+      const json = await safeResponseJson(res, 'Falha ao fechar mês.');
       if (!res.ok) {
-        const json = await res.json();
         showModal('Erro', json.error ?? 'Falha ao fechar mês.', 'error');
         return;
       }
@@ -1277,8 +1276,8 @@ export function useTesouraria() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formConta),
       });
+      const json = await safeResponseJson(res, 'Falha ao salvar conta.');
       if (!res.ok) {
-        const json = await res.json();
         showModal('Erro', json.error ?? 'Falha ao salvar conta.', 'error');
         return;
       }
@@ -1306,8 +1305,8 @@ export function useTesouraria() {
   const handleDeleteConta = useCallback(async (id: string) => {
     try {
       const res = await authenticatedFetch(`/api/v1/tesouraria/contas?id=${id}`, { method: 'DELETE' });
+      const json = await safeResponseJson(res, 'Falha ao excluir conta.');
       if (!res.ok) {
-        const json = await res.json();
         showModal('Erro', json.error ?? 'Falha ao excluir conta.', 'error');
         return;
       }
@@ -1365,8 +1364,8 @@ export function useTesouraria() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      const json = await safeResponseJson(res, 'Falha ao salvar categoria.');
       if (!res.ok) {
-        const json = await res.json();
         showModal('Erro', json.error ?? 'Falha ao salvar categoria.', 'error');
         return;
       }
@@ -1395,8 +1394,8 @@ export function useTesouraria() {
   const handleDeleteCat = useCallback(async (id: string) => {
     try {
       const res = await authenticatedFetch(`/api/v1/tesouraria/categorias?id=${id}`, { method: 'DELETE' });
+      const json = await safeResponseJson(res, 'Falha ao excluir categoria.');
       if (!res.ok) {
-        const json = await res.json();
         showModal('Erro', json.error ?? 'Falha ao excluir categoria.', 'error');
         return;
       }
