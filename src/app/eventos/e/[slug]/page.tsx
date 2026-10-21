@@ -35,18 +35,18 @@ interface EventoPublico {
   is_lista_espera?: boolean;
   motivo_bloqueio?: string | null;
   descricao_status?: string;
+  congregacoes?: Array<{ id: string; nome: string }>;
 }
 
 type FormState = {
   nome: string;
   email: string;
   telefone: string;
-  igreja: string;
-  cidade: string;
+  congregacao: string;
   cpf_cnpj: string;
 };
 
-const FORM_INICIAL: FormState = { nome: '', email: '', telefone: '', igreja: '', cidade: '', cpf_cnpj: '' };
+const FORM_INICIAL: FormState = { nome: '', email: '', telefone: '', congregacao: '', cpf_cnpj: '' };
 
 type PixData = {
   pagamento_id: string;
@@ -527,22 +527,28 @@ export default function EventoPublicoPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 block mb-1">Igreja / Organização</label>
-                  <input
-                    value={form.igreja}
-                    onChange={e => setForm(f => ({ ...f, igreja: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]/30"
-                    placeholder="Opcional"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">Cidade</label>
-                  <input
-                    value={form.cidade}
-                    onChange={e => setForm(f => ({ ...f, cidade: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]/30"
-                    placeholder="Opcional"
-                  />
+                  <label className="text-xs text-gray-500 block mb-1">Congregação</label>
+                  {evento.congregacoes && evento.congregacoes.length > 0 ? (
+                    <select
+                      value={form.congregacao}
+                      onChange={e => setForm(f => ({ ...f, congregacao: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#123b63]/30"
+                    >
+                      <option value="">Selecione sua congregação (opcional)</option>
+                      {evento.congregacoes.map(c => (
+                        <option key={c.id} value={c.nome}>
+                          {c.nome}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      value={form.congregacao}
+                      onChange={e => setForm(f => ({ ...f, congregacao: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]/30"
+                      placeholder="Sua congregação (opcional)"
+                    />
+                  )}
                 </div>
                 {evento.valor_inscricao > 0 && (
                   <div>

@@ -25,13 +25,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'JSON inválido.' }, { status: 400 });
   }
 
-  const slug      = sanitize(body.slug);
-  const nome      = sanitize(body.nome);
-  const email     = sanitize(body.email).toLowerCase();
-  const telefone  = sanitize(body.telefone);
-  const igreja    = sanitize(body.igreja);
-  const cidade    = sanitize(body.cidade);
-  const cpfCnpj   = sanitize(body.cpf_cnpj);  // opcional para PIX
+  const slug          = sanitize(body.slug);
+  const nome          = sanitize(body.nome);
+  const email         = sanitize(body.email).toLowerCase();
+  const telefone      = sanitize(body.telefone);
+  const congregacao   = sanitize(body.congregacao || body.igreja);
+  const cpfCnpj       = sanitize(body.cpf_cnpj);  // opcional para PIX
 
   // Validações básicas
   if (!slug) return NextResponse.json({ error: 'Slug do evento é obrigatório.' }, { status: 400 });
@@ -122,10 +121,9 @@ export async function POST(request: NextRequest) {
     statusInscricao = 'aguardando_pagamento';
   }
 
-  // Observações com dados extras (igreja/cidade)
+  // Observações com congregação ou dados adicionais
   const obsPartes: string[] = [];
-  if (igreja) obsPartes.push(`Igreja: ${igreja}`);
-  if (cidade) obsPartes.push(`Cidade: ${cidade}`);
+  if (congregacao) obsPartes.push(`Congregação: ${congregacao}`);
   const observacoes = obsPartes.length > 0 ? obsPartes.join(' | ') : null;
 
   // Inserir inscrição

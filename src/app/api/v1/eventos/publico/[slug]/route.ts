@@ -58,6 +58,31 @@ export async function GET(
     .eq('evento_id', evento.id)
     .eq('status', 'lista_espera');
 
+  // Buscar congregações ativas do ministério para o select de inscrição
+  let congregacoes: Array<{ id: string; nome: string }> = [];
+  const { data: congData } = await admin
+    .from('congregacoes')
+    .select('id, nome, is_active')
+    .eq('ministry_id', evento.ministry_id)
+    .or('is_active.eq.true,is_active.is.null')
+    .order('nome', { ascending: true });
+
+  if (congData && congData.length > 0) {
+    congregacoes = congData.map((c: any) => ({ id: c.id, nome: c.nome }));
+  } else {
+    // Fallback para supervisões caso o tenant utilize como 1ª divisão
+    const { data: supData } = await admin
+      .from('supervisoes')
+      .select('id, nome, is_active')
+      .eq('ministry_id', evento.ministry_id)
+      .or('is_active.eq.true,is_active.is.null')
+      .order('nome', { ascending: true });
+
+    if (supData && supData.length > 0) {
+      congregacoes = supData.map((s: any) => ({ id: s.id, nome: s.nome }));
+    }
+  }
+
   const confirmados = inscritosConfirmados ?? 0;
   const aguardando = inscritosAguardando ?? 0;
   const espera = listaEspera ?? 0;
@@ -109,6 +134,7 @@ export async function GET(
     lista_espera: espera,
     vagas_restantes,
     lotado: statusInfo.status_inscricao === 'lotado',
+    congregacoes,
   });
 }
 
