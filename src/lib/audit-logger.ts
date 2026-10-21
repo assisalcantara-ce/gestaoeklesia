@@ -67,7 +67,30 @@ const SENSITIVE_KEYS = new Set([
   'apikey',
   'auth_token',
   'jwt',
-])
+]);
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function toValidUuidOrNull(val?: string | null): string | null {
+  if (!val || typeof val !== 'string') return null;
+  const trimmed = val.trim();
+  return UUID_REGEX.test(trimmed) ? trimmed : null;
+}
+
+function toValidIpOrNull(ip?: string | null): string | null {
+  if (!ip || typeof ip !== 'string') return null;
+  const trimmed = ip.trim();
+  // Se for "unknown", "localhost", ou lista de proxies "1.2.3.4, 5.6.7.8"
+  if (trimmed.includes(',')) {
+    const first = trimmed.split(',')[0].trim();
+    return toValidIpOrNull(first);
+  }
+  if (trimmed === '::1' || trimmed === '127.0.0.1') return trimmed;
+  // Regex básica para IPv4 ou IPv6
+  const isIpv4 = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(trimmed);
+  const isIpv6 = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/.test(trimmed);
+  return isIpv4 || isIpv6 ? trimmed : null;
+}
 
 export function sanitizeAuditData(data: any): any {
   if (!data || typeof data !== 'object') {
@@ -102,82 +125,101 @@ export async function logServerAudit(
   params: ServerAuditLogParams
 ): Promise<void> {
   try {
-    if (!params.ministryId) {
-      console.warn('[AuditLogger] ministryId ausente, pulando log de auditoria')
-      return
+    const validMinistryId = toValidUuidOrNull(params.ministryId);
+    if (!validMinistryId) {
+      console.warn('[AuditLogger] ministryId inválido (deve ser UUID), pulando log de auditoria:', params.ministryId);
+      return;
     }
 
-    const status = params.status || 'sucesso'
-    const statusCode = status === 'erro' ? 500 : status === 'aviso' ? 400 : 200
-    const mappedAction = actionMap[params.acao] || 'READ'
+    const status = params.status || 'sucesso';
+    const statusCode = status === 'erro' ? 500 : status === 'aviso' ? 400 : 200;
+    const mappedAction = actionMap[params.acao] || 'READ';
 
-    const cleanDadosAnteriores = sanitizeAuditData(params.dadosAnteriores)
-    const cleanDadosNovos = sanitizeAuditData(params.dadosNovos)
+    const cleanDadosAnteriores = sanitizeAuditData(params.dadosAnteriores);
+    const cleanDadosNovos = sanitizeAuditData(params.dadosNovos);
+
+    const validUserId = toValidUuidOrNull(params.userId);
+    const validRegistroId = toValidUuidOrNull(params.registroId);
+    const validIp = toValidIpOrNull(params.ip);
+
+    // Se registroId não for UUID (ex: REG-2026-000001 ou código alfanumérico), preservamos no campo de descrição e dados novos
+    let descricaoFinal = params.descricao || '';
+    if (params.registroId && !validRegistroId && !descricaoFinal.includes(params.registroId)) {
+      descricaoFinal = descricaoFinal ? `${descricaoFinal} [Ref: ${params.registroId}]` : `[Ref: ${params.registroId}]`;
+    }
 
     const payloadAtual: Record<string, any> = {
-      ministry_id: params.ministryId,
-      usuario_id: params.userId || null,
+      ministry_id: validMinistryId,
+      usuario_id: validUserId,
       usuario_email: params.userEmail || null,
       acao: params.acao,
       modulo: params.modulo,
       area: params.area || null,
       tabela_afetada: params.tabelaAfetada || null,
-      registro_id: params.registroId || null,
-      descricao: params.descricao || null,
+      registro_id: validRegistroId,
+      descricao: descricaoFinal || null,
       dados_anteriores: cleanDadosAnteriores,
       dados_novos: cleanDadosNovos,
-      ip_address: params.ip || null,
+      ip_address: validIp,
       user_agent: params.userAgent || null,
       status,
       mensagem_erro: params.mensagemErro || null,
       // Suporte cruzado de colunas do esquema legado
-      user_id: params.userId || null,
+      user_id: validUserId,
       action: mappedAction,
       resource_type: params.modulo || params.tabelaAfetada || 'geral',
-      resource_id: params.registroId || null,
+      resource_id: validRegistroId,
       old_data: cleanDadosAnteriores,
       new_data: cleanDadosNovos,
       status_code: statusCode,
       error_message: params.mensagemErro || null,
-    }
+    };
 
-    const { error } = await adminClient.from('audit_logs').insert([payloadAtual])
+    const { error } = await adminClient.from('audit_logs').insert([payloadAtual]);
 
     if (error) {
       // Se a tabela tiver restrição de colunas, tenta payload estrito de esquema novo
       const { error: retryError } = await adminClient.from('audit_logs').insert([
         {
-          ministry_id: params.ministryId,
-          usuario_id: params.userId || null,
+          ministry_id: validMinistryId,
+          usuario_id: validUserId,
           usuario_email: params.userEmail || null,
           acao: params.acao,
           modulo: params.modulo,
           area: params.area || null,
           tabela_afetada: params.tabelaAfetada || null,
-          registro_id: params.registroId || null,
-          descricao: params.descricao || null,
+          registro_id: validRegistroId,
+          descricao: descricaoFinal || null,
           dados_anteriores: cleanDadosAnteriores,
           dados_novos: cleanDadosNovos,
           status,
           mensagem_erro: params.mensagemErro || null,
         },
-      ])
+      ]);
 
       if (retryError) {
         // Tenta esquema legado alternativo
-        await adminClient.from('audit_logs').insert([
+        const { error: legacyError } = await adminClient.from('audit_logs').insert([
           {
-            ministry_id: params.ministryId,
-            user_id: params.userId || null,
+            ministry_id: validMinistryId,
+            user_id: validUserId,
             action: mappedAction,
             resource_type: params.modulo,
-            resource_id: params.registroId || null,
+            resource_id: validRegistroId,
             old_data: cleanDadosAnteriores,
             new_data: cleanDadosNovos,
             status_code: statusCode,
             error_message: params.mensagemErro || null,
           },
-        ])
+        ]);
+
+        if (legacyError) {
+          console.error('[AuditLogger] Falha crítica ao persistir log de auditoria em todos os esquemas:', {
+            errorPrincipal: error?.message,
+            retryError: retryError?.message,
+            legacyError: legacyError?.message,
+          });
+        }
       }
     }
   } catch (err) {
