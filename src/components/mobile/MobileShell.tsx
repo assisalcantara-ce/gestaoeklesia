@@ -8,6 +8,7 @@
 import { MobileMemberProvider } from '@/providers/MobileMemberProvider';
 import OfflineBanner from '@/components/mobile/OfflineBanner';
 import PwaInstaller from '@/components/mobile/PwaInstaller';
+import MobileViewportDiagnostics from '@/components/mobile/MobileViewportDiagnostics';
 
 export default function MobileShell({ children }: { children: React.ReactNode }) {
   return (
@@ -17,6 +18,7 @@ export default function MobileShell({ children }: { children: React.ReactNode })
           <OfflineBanner />
           <main className="flex-1">{children}</main>
           <PwaInstaller />
+          <MobileViewportDiagnostics />
         </MobileMemberProvider>
       </div>
     </div>

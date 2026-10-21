@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import MobileViewportDiagnostics from '@/components/mobile/MobileViewportDiagnostics';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +38,7 @@ export default function IgrejaLayout({ children }: { children: React.ReactNode }
     <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-blue-600 selection:text-white">
       <div className="min-h-screen bg-[#0f172a] max-w-md mx-auto shadow-[0_0_50px_rgba(0,0,0,0.5)] border-x border-slate-800/40 relative overflow-x-hidden flex flex-col justify-between">
         <main className="flex-1">{children}</main>
+        <MobileViewportDiagnostics />
       </div>
     </div>
   );
