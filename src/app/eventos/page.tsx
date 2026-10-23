@@ -122,6 +122,8 @@ interface Congregacao {
 interface Membro {
   id: string;
   nome_completo: string;
+  email?: string;
+  telefone?: string;
 }
 
 interface Evento {
@@ -389,6 +391,20 @@ const FORM_INSCRICAO_INICIAL: FormInscricao = {
   observacoes: '',
   com_hospedagem: false,
 };
+
+// Formatação amigável para telefone no padrão brasileiro
+function formatarTelefoneMembro(valor: string | null | undefined): string {
+  if (!valor) return '';
+  const digits = String(valor).replace(/\D/g, '');
+  if (!digits) return '';
+  const cleanDigits = (digits.startsWith('55') && digits.length > 11) ? digits.slice(2, 13) : digits.slice(0, 11);
+  if (cleanDigits.length <= 2) return `(${cleanDigits}`;
+  if (cleanDigits.length <= 6) return `(${cleanDigits.slice(0, 2)}) ${cleanDigits.slice(2)}`;
+  if (cleanDigits.length <= 10) {
+    return `(${cleanDigits.slice(0, 2)}) ${cleanDigits.slice(2, 6)}-${cleanDigits.slice(6)}`;
+  }
+  return `(${cleanDigits.slice(0, 2)}) ${cleanDigits.slice(2, 7)}-${cleanDigits.slice(7)}`;
+}
 
 // ─── Helpers de Formatação e Data ─────────────────────────────────────────────
 
@@ -1169,15 +1185,30 @@ export default function EventosPage() {
       }
       const { data } = await supabase
         .from('members')
-        .select('id, name')
+        .select('id, name, email, phone, celular, whatsapp, custom_fields')
         .eq('ministry_id', ministryId)
         .ilike('name', `%${q}%`)
         .limit(8);
+
       setResultadosMembro(
-        ((data ?? []) as any[]).map(m => ({
-          id: m.id,
-          nome_completo: m.name ?? '',
-        }))
+        ((data ?? []) as any[]).map(m => {
+          const cf = (m.custom_fields && typeof m.custom_fields === 'object') ? m.custom_fields : {};
+          const extrairValor = (...valores: any[]): string => {
+            for (const v of valores) {
+              if (typeof v === 'string' && v.trim()) return v.trim();
+            }
+            return '';
+          };
+          const rawTel = extrairValor(m.whatsapp, cf.whatsapp, m.celular, cf.celular, m.phone, cf.phone, cf.telefone);
+          const email = extrairValor(m.email, cf.email);
+
+          return {
+            id: m.id,
+            nome_completo: m.name ?? '',
+            email,
+            telefone: formatarTelefoneMembro(rawTel),
+          };
+        })
       );
     },
     [ministryId, supabase]
@@ -1195,15 +1226,30 @@ export default function EventosPage() {
       }
       const { data } = await supabase
         .from('members')
-        .select('id, name')
+        .select('id, name, email, phone, celular, whatsapp, custom_fields')
         .eq('ministry_id', ministryId)
         .ilike('name', `%${q}%`)
         .limit(8);
+
       setBalcaoResultadosMembro(
-        ((data ?? []) as any[]).map(m => ({
-          id: m.id,
-          nome_completo: m.name ?? '',
-        }))
+        ((data ?? []) as any[]).map(m => {
+          const cf = (m.custom_fields && typeof m.custom_fields === 'object') ? m.custom_fields : {};
+          const extrairValor = (...valores: any[]): string => {
+            for (const v of valores) {
+              if (typeof v === 'string' && v.trim()) return v.trim();
+            }
+            return '';
+          };
+          const rawTel = extrairValor(m.whatsapp, cf.whatsapp, m.celular, cf.celular, m.phone, cf.phone, cf.telefone);
+          const email = extrairValor(m.email, cf.email);
+
+          return {
+            id: m.id,
+            nome_completo: m.name ?? '',
+            email,
+            telefone: formatarTelefoneMembro(rawTel),
+          };
+        })
       );
     },
     [ministryId, supabase]
@@ -4753,11 +4799,26 @@ export default function EventosPage() {
                                 setMembroSelecionado(m);
                                 setBuscaMembro(m.nome_completo);
                                 setResultadosMembro([]);
-                                setFormInsc(f => ({ ...f, nome_externo: '' }));
+                                setFormInsc(f => ({
+                                  ...f,
+                                  nome_externo: '',
+                                  email_externo: m.email || f.email_externo,
+                                  telefone: m.telefone || f.telefone,
+                                }));
                               }}
                               className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 text-slate-800 font-medium cursor-pointer"
                             >
-                              {m.nome_completo}
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="font-semibold text-slate-900">{m.nome_completo}</p>
+                                  {(m.email || m.telefone) && (
+                                    <p className="text-[11px] text-slate-400">
+                                      {[m.email, m.telefone].filter(Boolean).join(' • ')}
+                                    </p>
+                                  )}
+                                </div>
+                                <span className="text-[10px] font-bold text-blue-600 uppercase">Selecionar</span>
+                              </div>
                             </button>
                           ))}
                         </div>
