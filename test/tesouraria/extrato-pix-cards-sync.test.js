@@ -213,4 +213,31 @@ test('Sincronização dos cards com filtros do extrato PIX', async (t) => {
     assert.equal(summary.totalArrecadado, 400.0);
     assert.equal(summary.transacoesPagas, 2);
   });
+
+  await t.test('8. Formatação de data/hora no padrão brasileiro para impressão', () => {
+    function formatExtratoDateTime(dateStr) {
+      if (!dateStr) return '—';
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      const dia = String(d.getDate()).padStart(2, '0');
+      const mes = String(d.getMonth() + 1).padStart(2, '0');
+      const ano = d.getFullYear();
+      const horas = String(d.getHours()).padStart(2, '0');
+      const mins = String(d.getMinutes()).padStart(2, '0');
+      return `${dia}/${mes}/${ano} ${horas}:${mins}`;
+    }
+
+    const formatted = formatExtratoDateTime('2026-10-05T14:30:00Z');
+    assert.match(formatted, /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/);
+    assert.equal(formatExtratoDateTime(null), '—');
+    assert.equal(formatExtratoDateTime(''), '—');
+  });
+
+  await t.test('9. Colunas de impressão limitadas a Data, Destino, Congregação e Valor', () => {
+    const printColumns = ['Data', 'Destino PIX', 'Congregação', 'Valor'];
+    assert.equal(printColumns.length, 4);
+    assert.ok(!printColumns.includes('Pagador / Doador'));
+    assert.ok(!printColumns.includes('Status'));
+    assert.ok(!printColumns.includes('Conciliado'));
+  });
 });

@@ -152,6 +152,23 @@ interface ArrecadacaoDigitalContentProps {
   congNome?: (id?: string | null) => string;
 }
 
+// Formatação amigável para data e hora no padrão brasileiro (dd/MM/yyyy HH:mm)
+function formatExtratoDateTime(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const dia = String(d.getDate()).padStart(2, '0');
+    const mes = String(d.getMonth() + 1).padStart(2, '0');
+    const ano = d.getFullYear();
+    const horas = String(d.getHours()).padStart(2, '0');
+    const mins = String(d.getMinutes()).padStart(2, '0');
+    return `${dia}/${mes}/${ano} ${horas}:${mins}`;
+  } catch {
+    return dateStr;
+  }
+}
+
 export default function ArrecadacaoDigitalContent({
   congregacoes,
   fmtBRL,
@@ -1374,6 +1391,32 @@ export default function ArrecadacaoDigitalContent({
       {/* ── BLOCO EXCLUSIVO DE IMPRESSÃO: EXTRATO DE OFERTAS PIX ── */}
       {subAba === 'extrato' && (
         <div className="print-only hidden p-8 bg-white text-black space-y-6">
+          <style
+            dangerouslySetInnerHTML={{
+              __html: `
+                @page {
+                  size: A4 portrait !important;
+                  margin: 12mm 15mm !important;
+                }
+                @media print {
+                  .print-only table {
+                    page-break-inside: auto;
+                  }
+                  .print-only tr {
+                    page-break-inside: avoid;
+                    page-break-after: auto;
+                  }
+                  .print-only thead {
+                    display: table-header-group;
+                  }
+                  .print-only tfoot {
+                    display: table-footer-group;
+                  }
+                }
+              `,
+            }}
+          />
+
           {/* Timbre da Igreja */}
           <div className="flex items-center gap-5 border-b pb-4 border-gray-300">
             {ministerio?.logo ? (
@@ -1403,14 +1446,19 @@ export default function ArrecadacaoDigitalContent({
           </div>
 
           {/* Título e Filtros Aplicados */}
-          <div className="space-y-1">
-            <h2 className="text-base font-bold uppercase tracking-wider text-gray-700">
+          <div className="space-y-2">
+            <h2 className="text-base font-bold uppercase tracking-wider text-gray-800">
               Relatório / Extrato de Ofertas e Arrecadação PIX
             </h2>
             <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-600 font-medium">
               <p>
                 Mês de Referência: <span className="font-bold text-gray-800">{extratoMes}</span>
               </p>
+              {extratoDataInicio && extratoDataFim && (
+                <p>
+                  Intervalo: <span className="font-bold text-gray-800">{extratoDataInicio} até {extratoDataFim}</span>
+                </p>
+              )}
               <p>
                 Congregação:{' '}
                 <span className="font-bold text-gray-800">
@@ -1448,49 +1496,61 @@ export default function ArrecadacaoDigitalContent({
             </div>
           </div>
 
+          {/* Bloco de Destaque: TOTAL ARRECADADO NO PERÍODO */}
+          <div className="border border-emerald-200 bg-emerald-50/60 rounded-xl p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase font-bold text-emerald-800 tracking-wider">
+                Total Arrecadado no Período
+              </p>
+              <p className="text-2xl font-black text-emerald-700 leading-tight">
+                {fmtBRL(summary.totalArrecadado || totalArrecadadoCalculado)}
+              </p>
+            </div>
+            <div className="text-right text-xs text-emerald-800 font-medium space-y-0.5">
+              <p>
+                Ofertas Pagas: <span className="font-bold">{summary.transacoesPagas || transacoesPagasCount}</span>
+              </p>
+              {Boolean(summary.destinosDistintos || destinosAtivosCount) && (
+                <p>
+                  Destinos Distintos: <span className="font-bold">{summary.destinosDistintos ?? destinosAtivosCount}</span>
+                </p>
+              )}
+            </div>
+          </div>
+
           {/* Tabela de Extrato de Ofertas Formato Impressão A4 */}
           <table className="w-full border-collapse text-xs text-left">
             <thead>
               <tr className="border-b border-gray-300 bg-gray-50">
-                <th className="py-2.5 px-2 font-bold text-gray-600">Data</th>
-                <th className="py-2.5 px-2 font-bold text-gray-600">Destino PIX</th>
-                <th className="py-2.5 px-2 font-bold text-gray-600">Congregação</th>
-                <th className="py-2.5 px-2 font-bold text-gray-600">Pagador / Doador</th>
-                <th className="py-2.5 px-2 font-bold text-gray-600 text-center">Status</th>
-                <th className="py-2.5 px-2 font-bold text-gray-600 text-center">Conciliado</th>
-                <th className="py-2.5 px-2 font-bold text-gray-600 text-right">Valor</th>
+                <th className="py-2.5 px-3 font-bold text-gray-700 w-[22%]">Data</th>
+                <th className="py-2.5 px-3 font-bold text-gray-700 w-[34%]">Destino PIX</th>
+                <th className="py-2.5 px-3 font-bold text-gray-700 w-[24%]">Congregação</th>
+                <th className="py-2.5 px-3 font-bold text-gray-700 text-right w-[20%]">Valor</th>
               </tr>
             </thead>
             <tbody>
               {cobrancasFiltradas.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-4 text-center text-gray-400">
+                  <td colSpan={4} className="py-6 text-center text-gray-400">
                     Nenhuma oferta PIX registrada no período/filtros selecionados.
                   </td>
                 </tr>
               ) : (
                 cobrancasFiltradas.map((c) => {
-                  const badge = STATUS_BADGES[c.status] ?? STATUS_BADGES.pendente;
                   const valor = c.valor_pago ?? c.valor_solicitado ?? 0;
+                  const dataFormatada = formatExtratoDateTime(c.paid_at || c.created_at);
                   return (
                     <tr key={c.id} className="border-b border-gray-100">
-                      <td className="py-2 px-2 text-gray-700">{fmtDate(c.created_at)}</td>
-                      <td className="py-2 px-2 font-semibold text-gray-800">
+                      <td className="py-2 px-3 text-gray-700 whitespace-nowrap">
+                        {dataFormatada}
+                      </td>
+                      <td className="py-2 px-3 font-semibold text-gray-800">
                         {c.fin_payment_destinations?.label ?? 'Destino Indefinido'}
                       </td>
-                      <td className="py-2 px-2 text-gray-600">
+                      <td className="py-2 px-3 text-gray-600">
                         {c.fin_payment_destinations?.congregacoes?.nome ?? 'Sede / Todas'}
                       </td>
-                      <td className="py-2 px-2 text-gray-700">
-                        {c.payer_name || 'Anônimo / Não identificado'}
-                      </td>
-                      <td className="py-2 px-2 text-center font-bold text-gray-700 uppercase text-[10px]">
-                        {badge.label}
-                      </td>
-                      <td className="py-2 px-2 text-center text-[10px]">
-                        {c.tesouraria_lancamento_id ? 'Sim' : 'Não'}
-                      </td>
-                      <td className="py-2 px-2 text-right font-bold text-emerald-700">
+                      <td className="py-2 px-3 text-right font-bold text-emerald-700 whitespace-nowrap">
                         {fmtBRL(valor)}
                       </td>
                     </tr>
@@ -1500,8 +1560,8 @@ export default function ArrecadacaoDigitalContent({
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-gray-300 font-bold bg-gray-50 text-xs">
-                <td colSpan={4} className="py-2.5 px-2 text-gray-700">
-                  Total de Transações Exibidas: {cobrancasFiltradas.length} | Pagas:{' '}
+                <td colSpan={2} className="py-2.5 px-3 text-gray-700">
+                  Total de Transações no Relatório: {cobrancasFiltradas.length} | Pagas:{' '}
                   {
                     cobrancasFiltradas.filter((c) => {
                       const st = String(c.status || '').toLowerCase();
@@ -1509,18 +1569,11 @@ export default function ArrecadacaoDigitalContent({
                     }).length
                   }
                 </td>
-                <td colSpan={2} className="py-2.5 px-2 text-right text-gray-700">
+                <td className="py-2.5 px-3 text-right text-gray-700">
                   Total Arrecadado:
                 </td>
-                <td className="py-2.5 px-2 text-right text-emerald-800 font-extrabold text-sm">
-                  {fmtBRL(
-                    cobrancasFiltradas
-                      .filter((c) => {
-                        const st = String(c.status || '').toLowerCase();
-                        return st === 'pago' || st === 'paid' || st === 'concluida' || st === 'received' || st === 'confirmed';
-                      })
-                      .reduce((acc, curr) => acc + (curr.valor_pago ?? curr.valor_solicitado ?? 0), 0)
-                  )}
+                <td className="py-2.5 px-3 text-right text-emerald-800 font-extrabold text-sm whitespace-nowrap">
+                  {fmtBRL(summary.totalArrecadado || totalArrecadadoCalculado)}
                 </td>
               </tr>
             </tfoot>
