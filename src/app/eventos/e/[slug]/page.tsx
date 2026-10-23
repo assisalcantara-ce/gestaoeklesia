@@ -48,6 +48,38 @@ type FormState = {
 
 const FORM_INICIAL: FormState = { nome: '', email: '', telefone: '', congregacao: '', cpf_cnpj: '' };
 
+// Máscara formatadora de CPF: 000.000.000-00 (permite digitação incremental)
+function aplicarMascaraCpf(valor: string): string {
+  const digits = valor.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+  if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+}
+
+// Máscara formatadora de Data: DD/MM/AAAA (permite digitação incremental)
+function aplicarMascaraData(valor: string): string {
+  const digits = valor.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+// Validador simples de data real no padrão DD/MM/AAAA
+function validarDataReal(dataStr: string): boolean {
+  const digits = dataStr.replace(/\D/g, '');
+  if (digits.length !== 8) return false;
+  const dia = parseInt(digits.slice(0, 2), 10);
+  const mes = parseInt(digits.slice(2, 4), 10);
+  const ano = parseInt(digits.slice(4, 8), 10);
+  if (mes < 1 || mes > 12) return false;
+  if (dia < 1 || dia > 31) return false;
+  const anoAtual = new Date().getFullYear();
+  if (ano < 1900 || ano > anoAtual) return false;
+  const diasNoMes = new Date(ano, mes, 0).getDate();
+  return dia <= diasNoMes;
+}
+
 type PixData = {
   pagamento_id: string;
   payload: string | null;
@@ -104,7 +136,7 @@ export default function EventoPublicoPage() {
   const [indiceFocado, setIndiceFocado] = useState<number>(-1);
   const [membroSelecionado, setMembroSelecionado] = useState<{ id: string; nome: string; congregacao_nome: string } | null>(null);
   const [modalConfirmacaoAberto, setModalConfirmacaoAberto] = useState(false);
-  const [tipoConfirmacao, setTipoConfirmacao] = useState<'nascimento' | 'cpf' | 'telefone'>('nascimento');
+  const [tipoConfirmacao, setTipoConfirmacao] = useState<'cpf' | 'nascimento'>('cpf');
   const [valorConfirmacao, setValorConfirmacao] = useState('');
   const [confirmandoMembro, setConfirmandoMembro] = useState(false);
   const [erroConfirmacao, setErroConfirmacao] = useState<string | null>(null);
@@ -113,6 +145,17 @@ export default function EventoPublicoPage() {
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const inputConfirmacaoRef = useRef<HTMLInputElement | null>(null);
+
+  // Foco automático ao abrir o modal ou ao trocar de método de confirmação
+  useEffect(() => {
+    if (modalConfirmacaoAberto) {
+      const t = setTimeout(() => {
+        inputConfirmacaoRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(t);
+    }
+  }, [modalConfirmacaoAberto, tipoConfirmacao]);
 
   // Fechar dropdown ao clicar fora
   useEffect(() => {
@@ -173,13 +216,28 @@ export default function EventoPublicoPage() {
     setMostrarDropdown(false);
     setErroConfirmacao(null);
     setValorConfirmacao('');
-    setTipoConfirmacao('nascimento');
+    setTipoConfirmacao('cpf');
     setModalConfirmacaoAberto(true);
   }
 
   async function handleConfirmarIdentidade(e: React.FormEvent) {
     e.preventDefault();
     if (!membroSelecionado || !valorConfirmacao.trim()) return;
+
+    // Se for data de nascimento, validar se é uma data real
+    if (tipoConfirmacao === 'nascimento') {
+      const cleanData = valorConfirmacao.replace(/\D/g, '');
+      if (cleanData.length !== 8 || !validarDataReal(valorConfirmacao)) {
+        setErroConfirmacao('Informe uma data de nascimento válida (DD/MM/AAAA).');
+        return;
+      }
+    } else if (tipoConfirmacao === 'cpf') {
+      const cleanCpf = valorConfirmacao.replace(/\D/g, '');
+      if (cleanCpf.length !== 11) {
+        setErroConfirmacao('Informe o CPF completo com 11 dígitos.');
+        return;
+      }
+    }
 
     setConfirmandoMembro(true);
     setErroConfirmacao(null);
@@ -190,8 +248,6 @@ export default function EventoPublicoPage() {
         payload.data_nascimento = valorConfirmacao.trim();
       } else if (tipoConfirmacao === 'cpf') {
         payload.digitos_cpf = valorConfirmacao.trim();
-      } else {
-        payload.telefone_confirmacao = valorConfirmacao.trim();
       }
 
       const res = await fetch(`/api/v1/eventos/publico/${encodeURIComponent(slug)}/membros/confirmar`, {
@@ -800,8 +856,8 @@ export default function EventoPublicoPage() {
 
         {/* Modal de Confirmação Segura de Identidade (LGPD) */}
         {modalConfirmacaoAberto && membroSelecionado && (
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative space-y-4">
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative space-y-4 my-auto">
               <button
                 type="button"
                 onClick={() => {
@@ -826,26 +882,11 @@ export default function EventoPublicoPage() {
               </div>
 
               <p className="text-xs text-gray-600 leading-relaxed">
-                Por proteção de dados (LGPD), informe um dado do seu cadastro para preenchimento automático:
+                Por proteção de dados (LGPD), confirme seu CPF ou Data de Nascimento para preenchimento automático seguro:
               </p>
 
-              {/* Seletor do método de verificação */}
+              {/* Seletor do método de verificação com CPF como padrão */}
               <div className="flex gap-2 text-xs">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTipoConfirmacao('nascimento');
-                    setValorConfirmacao('');
-                    setErroConfirmacao(null);
-                  }}
-                  className={`flex-1 py-1.5 px-2 rounded-lg font-medium transition border ${
-                    tipoConfirmacao === 'nascimento'
-                      ? 'bg-[#123b63] text-white border-[#123b63]'
-                      : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                  }`}
-                >
-                  Data Nasc.
-                </button>
                 <button
                   type="button"
                   onClick={() => {
@@ -853,53 +894,60 @@ export default function EventoPublicoPage() {
                     setValorConfirmacao('');
                     setErroConfirmacao(null);
                   }}
-                  className={`flex-1 py-1.5 px-2 rounded-lg font-medium transition border ${
+                  className={`flex-1 py-2 px-3 rounded-lg font-bold transition border cursor-pointer ${
                     tipoConfirmacao === 'cpf'
-                      ? 'bg-[#123b63] text-white border-[#123b63]'
+                      ? 'bg-[#123b63] text-white border-[#123b63] shadow-xs'
                       : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
                   }`}
                 >
-                  Dígitos CPF
+                  CPF (Principal)
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    setTipoConfirmacao('telefone');
+                    setTipoConfirmacao('nascimento');
                     setValorConfirmacao('');
                     setErroConfirmacao(null);
                   }}
-                  className={`flex-1 py-1.5 px-2 rounded-lg font-medium transition border ${
-                    tipoConfirmacao === 'telefone'
-                      ? 'bg-[#123b63] text-white border-[#123b63]'
+                  className={`flex-1 py-2 px-3 rounded-lg font-bold transition border cursor-pointer ${
+                    tipoConfirmacao === 'nascimento'
+                      ? 'bg-[#123b63] text-white border-[#123b63] shadow-xs'
                       : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
                   }`}
                 >
-                  Final Telefone
+                  Data de Nascimento
                 </button>
               </div>
 
-              <form onSubmit={handleConfirmarIdentidade} className="space-y-3">
+              <form onSubmit={handleConfirmarIdentidade} className="space-y-4">
                 <div>
                   <label className="text-xs font-semibold text-gray-700 block mb-1">
-                    {tipoConfirmacao === 'nascimento' && 'Data de Nascimento (DD/MM/AAAA)'}
-                    {tipoConfirmacao === 'cpf' && '3 primeiros ou 2 últimos dígitos do seu CPF'}
-                    {tipoConfirmacao === 'telefone' && '4 últimos dígitos do seu celular'}
+                    {tipoConfirmacao === 'cpf' ? 'Informe o CPF cadastrado:' : 'Informe a Data de Nascimento:'}
                   </label>
                   <input
+                    ref={inputConfirmacaoRef}
                     required
-                    autoFocus
-                    type={tipoConfirmacao === 'nascimento' ? 'date' : 'text'}
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
                     value={valorConfirmacao}
-                    onChange={e => setValorConfirmacao(e.target.value)}
-                    placeholder={
-                      tipoConfirmacao === 'nascimento'
-                        ? 'DD/MM/AAAA'
-                        : tipoConfirmacao === 'cpf'
-                          ? 'Ex: 123 ou 45'
-                          : 'Ex: 9876'
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]/30"
+                    onChange={e => {
+                      const raw = e.target.value;
+                      if (tipoConfirmacao === 'cpf') {
+                        setValorConfirmacao(aplicarMascaraCpf(raw));
+                      } else {
+                        setValorConfirmacao(aplicarMascaraData(raw));
+                      }
+                      if (erroConfirmacao) setErroConfirmacao(null);
+                    }}
+                    placeholder={tipoConfirmacao === 'cpf' ? '000.000.000-00' : 'DD/MM/AAAA'}
+                    className="w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]/40 tracking-wider font-medium text-gray-900 bg-white"
                   />
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    {tipoConfirmacao === 'cpf'
+                      ? 'Digite os 11 números do seu CPF.'
+                      : 'Digite o dia, mês e ano com 4 dígitos.'}
+                  </p>
                 </div>
 
                 {erroConfirmacao && (
@@ -908,21 +956,26 @@ export default function EventoPublicoPage() {
                   </div>
                 )}
 
-                <div className="flex gap-2 pt-2">
+                <div className="flex gap-2 pt-1">
                   <button
                     type="button"
                     onClick={() => {
                       setModalConfirmacaoAberto(false);
                       setMembroSelecionado(null);
                     }}
-                    className="flex-1 py-2.5 px-3 rounded-lg border border-gray-300 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                    className="flex-1 py-2.5 px-3 rounded-lg border border-gray-300 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition"
                   >
                     Digitar Manualmente
                   </button>
                   <button
                     type="submit"
-                    disabled={confirmandoMembro || !valorConfirmacao.trim()}
-                    className="flex-1 py-2.5 px-3 rounded-lg bg-[#123b63] text-xs font-semibold text-white hover:bg-[#0e2d4f] disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    disabled={
+                      confirmandoMembro ||
+                      (tipoConfirmacao === 'cpf'
+                        ? valorConfirmacao.replace(/\D/g, '').length !== 11
+                        : valorConfirmacao.replace(/\D/g, '').length !== 8)
+                    }
+                    className="flex-1 py-2.5 px-3 rounded-lg bg-[#123b63] text-xs font-semibold text-white hover:bg-[#0e2d4f] disabled:opacity-50 flex items-center justify-center gap-1.5 transition"
                   >
                     {confirmandoMembro ? (
                       <>

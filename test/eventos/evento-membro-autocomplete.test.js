@@ -89,4 +89,23 @@ describe('Inscrição Pública de Eventos - Autocomplete Seguro de Membros e LGP
     assert.match(pageContent, /Confirmar Identidade/);
     assert.match(pageContent, /Digitar Manualmente/);
   });
+
+  it('6. Modal de Confirmação: CPF como Padrão, Máscaras e Proteção contra Teclado/Zoom no iOS', () => {
+    const pagePath = path.join(projectRoot, 'src/app/eventos/e/[slug]/page.tsx');
+    const pageContent = fs.readFileSync(pagePath, 'utf-8');
+
+    // CPF como método inicial
+    assert.match(pageContent, /setTipoConfirmacao\('cpf'\)/);
+    // Máscara 000.000.000-00 e DD/MM/AAAA
+    assert.match(pageContent, /aplicarMascaraCpf/);
+    assert.match(pageContent, /aplicarMascaraData/);
+    assert.match(pageContent, /validarDataReal/);
+    // type="text" com inputMode="numeric" e sem type="date"
+    assert.match(pageContent, /inputMode="numeric"/);
+    assert.ok(!pageContent.includes('type={tipoConfirmacao === \'nascimento\' ? \'date\' : \'text\'}'));
+    // Fonte >= 16px (text-base) para evitar zoom automático no iOS Safari
+    assert.match(pageContent, /text-base md:text-sm/);
+    // Foco automático ao abrir ou alternar
+    assert.match(pageContent, /inputConfirmacaoRef\.current\?\.focus\(\)/);
+  });
 });
