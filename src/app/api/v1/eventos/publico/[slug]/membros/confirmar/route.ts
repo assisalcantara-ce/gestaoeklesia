@@ -160,7 +160,15 @@ export async function POST(
       ministryId: evento.ministry_id,
     });
 
-    const telefoneOficial = member.celular || member.whatsapp || member.phone || '';
+    // Regra de prioridade obrigatória para Telefone / WhatsApp:
+    // 1ª opção — WhatsApp: se o membro possuir WhatsApp cadastrado (não nulo nem em branco).
+    // 2ª opção — Celular / Telefone: se WhatsApp estiver vazio ou nulo, utilizar celular ou phone.
+    // 3ª opção — Sem número: se todos estiverem vazios/espaços em branco, retornar string vazia para digitação manual.
+    const whatsappValido = (typeof member.whatsapp === 'string' && member.whatsapp.trim()) ? member.whatsapp.trim() : null;
+    const celularValido = (typeof member.celular === 'string' && member.celular.trim()) ? member.celular.trim() : null;
+    const phoneValido = (typeof member.phone === 'string' && member.phone.trim()) ? member.phone.trim() : null;
+
+    const telefonePriorizado = whatsappValido || celularValido || phoneValido || '';
     const congregacaoNome = (member.congregacoes as any)?.nome || '';
 
     return NextResponse.json({
@@ -169,10 +177,10 @@ export async function POST(
       dados: {
         member_id: member.id,
         nome: member.name,
-        email: member.email || '',
-        telefone: telefoneOficial,
+        email: (typeof member.email === 'string' && member.email.trim()) ? member.email.trim() : '',
+        telefone: telefonePriorizado,
         congregacao: congregacaoNome,
-        cpf: member.cpf || '',
+        cpf: (typeof member.cpf === 'string' && member.cpf.trim()) ? member.cpf.trim() : '',
       },
     });
   } catch (err: any) {

@@ -65,6 +65,17 @@ function aplicarMascaraData(valor: string): string {
   return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
 }
 
+// Máscara formatadora de Telefone/Celular: (00) 00000-0000 ou (00) 0000-0000
+function aplicarMascaraTelefone(valor: string): string {
+  const digits = valor.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 2) return digits.length ? `(${digits}` : '';
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  }
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
 // Validador simples de data real no padrão DD/MM/AAAA
 function validarDataReal(dataStr: string): boolean {
   const digits = dataStr.replace(/\D/g, '');
@@ -265,11 +276,12 @@ export default function EventoPublicoPage() {
       // Auto-preenchimento seguro dos dados oficiais
       setMemberToken(data.token);
       setMembroConfirmadoBadge(data.dados.nome);
+      const telFormatado = data.dados.telefone ? aplicarMascaraTelefone(data.dados.telefone) : '';
       setForm(prev => ({
         ...prev,
         nome: data.dados.nome || prev.nome,
         email: data.dados.email || prev.email,
-        telefone: data.dados.telefone || prev.telefone,
+        telefone: telFormatado || prev.telefone,
         congregacao: data.dados.congregacao || prev.congregacao,
         cpf_cnpj: data.dados.cpf || prev.cpf_cnpj,
       }));
@@ -785,8 +797,9 @@ export default function EventoPublicoPage() {
                   <input
                     required
                     type="tel"
+                    inputMode="tel"
                     value={form.telefone}
-                    onChange={e => setForm(f => ({ ...f, telefone: e.target.value }))}
+                    onChange={e => setForm(f => ({ ...f, telefone: aplicarMascaraTelefone(e.target.value) }))}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]/30"
                     placeholder="(00) 00000-0000"
                   />

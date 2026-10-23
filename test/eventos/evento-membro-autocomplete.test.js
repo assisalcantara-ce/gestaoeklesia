@@ -108,4 +108,45 @@ describe('Inscrição Pública de Eventos - Autocomplete Seguro de Membros e LGP
     // Foco automático ao abrir ou alternar
     assert.match(pageContent, /inputConfirmacaoRef\.current\?\.focus\(\)/);
   });
+
+  it('7. Regra Obrigatória de Prioridade do WhatsApp no Preenchimento Automático', () => {
+    // Simulador da regra implementada no backend (confirmar/route.ts)
+    function resolverTelefonePriorizado(member) {
+      const whatsappValido = (typeof member.whatsapp === 'string' && member.whatsapp.trim()) ? member.whatsapp.trim() : null;
+      const celularValido = (typeof member.celular === 'string' && member.celular.trim()) ? member.celular.trim() : null;
+      const phoneValido = (typeof member.phone === 'string' && member.phone.trim()) ? member.phone.trim() : null;
+
+      return whatsappValido || celularValido || phoneValido || '';
+    }
+
+    // Caso 1: WhatsApp preenchido e celular vazio -> utilizar WhatsApp
+    assert.equal(
+      resolverTelefonePriorizado({ whatsapp: '11988887777', celular: '', phone: null }),
+      '11988887777'
+    );
+
+    // Caso 2: WhatsApp e celular preenchidos -> priorizar WhatsApp
+    assert.equal(
+      resolverTelefonePriorizado({ whatsapp: '11999998888', celular: '11977776666', phone: '1133334444' }),
+      '11999998888'
+    );
+
+    // Caso 3: WhatsApp vazio e celular preenchido -> utilizar celular
+    assert.equal(
+      resolverTelefonePriorizado({ whatsapp: '', celular: '11977776666', phone: null }),
+      '11977776666'
+    );
+
+    // Caso 3b: WhatsApp com apenas espaços em branco e phone preenchido -> utilizar phone
+    assert.equal(
+      resolverTelefonePriorizado({ whatsapp: '   ', celular: null, phone: '1133334444' }),
+      '1133334444'
+    );
+
+    // Caso 4: Ambos vazios ou nulos -> string vazia para preenchimento manual
+    assert.equal(
+      resolverTelefonePriorizado({ whatsapp: null, celular: '', phone: '   ' }),
+      ''
+    );
+  });
 });
