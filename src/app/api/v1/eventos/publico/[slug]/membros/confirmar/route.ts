@@ -171,26 +171,44 @@ export async function POST(
 
     // Regra de prioridade obrigatória para Telefone / WhatsApp:
     // 1ª opção — WhatsApp: se o membro possuir WhatsApp cadastrado (não nulo nem em branco),
-    //             verificando tanto a coluna nativa `whatsapp` quanto `custom_fields.whatsapp`.
+    //             verificando tanto a coluna nativa `whatsapp` quanto `custom_fields.whatsapp` (case-insensitive e chaves comuns).
     // 2ª opção — Celular / Telefone: se WhatsApp estiver vazio ou nulo, utilizar celular ou phone
     //             (verificando colunas nativas e custom_fields).
     // 3ª opção — Sem número: se todos estiverem vazios/espaços em branco, retornar string vazia para digitação manual.
     const cf = (member.custom_fields && typeof member.custom_fields === 'object') ? member.custom_fields : {};
 
-    const extrairValorValido = (...valores: any[]): string | null => {
-      for (const v of valores) {
-        if (typeof v === 'string' && v.trim()) {
-          return v.trim();
+    const buscarEmObjeto = (obj: Record<string, any>, prefixos: string[]): string | null => {
+      for (const p of prefixos) {
+        if (typeof obj[p] === 'string' && obj[p].trim()) return obj[p].trim();
+      }
+      const lowerPrefixes = prefixos.map(p => p.toLowerCase());
+      for (const [key, val] of Object.entries(obj)) {
+        if (typeof val === 'string' && val.trim()) {
+          const lowerKey = key.toLowerCase();
+          if (lowerPrefixes.some(lp => lowerKey === lp || lowerKey.includes(lp))) {
+            return val.trim();
+          }
         }
       }
       return null;
     };
 
-    const whatsappValido = extrairValorValido(member.whatsapp, cf.whatsapp);
-    const celularValido = extrairValorValido(member.celular, cf.celular, member.phone, cf.phone, cf.telefone);
+    const whatsappValido = (typeof member.whatsapp === 'string' && member.whatsapp.trim())
+      ? member.whatsapp.trim()
+      : buscarEmObjeto(cf, ['whatsapp', 'WhatsApp', 'zap', 'telefone_whatsapp', 'contato_whatsapp']);
+
+    const celularValido = (typeof member.celular === 'string' && member.celular.trim())
+      ? member.celular.trim()
+      : (typeof member.phone === 'string' && member.phone.trim())
+      ? member.phone.trim()
+      : buscarEmObjeto(cf, ['celular', 'phone', 'telefone', 'contato', 'fone']);
 
     const telefonePriorizado = whatsappValido || celularValido || '';
     const congregacaoNome = (member.congregacoes as any)?.nome || '';
+
+    const emailMembro = (typeof member.email === 'string' && member.email.trim())
+      ? member.email.trim()
+      : buscarEmObjeto(cf, ['email', 'e-mail', 'email_pessoal']) || '';
 
     return NextResponse.json({
       confirmado: true,
@@ -198,7 +216,7 @@ export async function POST(
       dados: {
         member_id: member.id,
         nome: member.name,
-        email: (typeof member.email === 'string' && member.email.trim()) ? member.email.trim() : (typeof cf.email === 'string' && cf.email.trim() ? cf.email.trim() : ''),
+        email: emailMembro,
         telefone: telefonePriorizado,
         congregacao: congregacaoNome,
         cpf: (typeof member.cpf === 'string' && member.cpf.trim()) ? member.cpf.trim() : (typeof cf.cpf === 'string' && cf.cpf.trim() ? cf.cpf.trim() : ''),

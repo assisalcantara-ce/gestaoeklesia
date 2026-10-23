@@ -20,6 +20,7 @@ import { getFontesCertificadosHeadHtml, getFontesReadyPrintScript, buildTextoEst
 import { QRCodeSVG } from 'qrcode.react';
 import {
   AlertCircle,
+  AlertTriangle,
   Award,
   Bed,
   Calendar,
@@ -396,14 +397,66 @@ const FORM_INSCRICAO_INICIAL: FormInscricao = {
 function formatarTelefoneMembro(valor: string | null | undefined): string {
   if (!valor) return '';
   const digits = String(valor).replace(/\D/g, '');
-  if (!digits) return '';
+  if (!digits) return String(valor).trim();
   const cleanDigits = (digits.startsWith('55') && digits.length > 11) ? digits.slice(2, 13) : digits.slice(0, 11);
-  if (cleanDigits.length <= 2) return `(${cleanDigits}`;
+  if (cleanDigits.length <= 2) return cleanDigits;
   if (cleanDigits.length <= 6) return `(${cleanDigits.slice(0, 2)}) ${cleanDigits.slice(2)}`;
   if (cleanDigits.length <= 10) {
     return `(${cleanDigits.slice(0, 2)}) ${cleanDigits.slice(2, 6)}-${cleanDigits.slice(6)}`;
   }
   return `(${cleanDigits.slice(0, 2)}) ${cleanDigits.slice(2, 7)}-${cleanDigits.slice(7)}`;
+}
+
+// Extração robusta e priorizada de WhatsApp / Telefone / Celular do cadastro de membro
+function extrairTelefoneMembro(m: any): string {
+  if (!m) return '';
+  const cf = (m.custom_fields && typeof m.custom_fields === 'object') ? m.custom_fields : {};
+
+  const buscarEmObjeto = (obj: Record<string, any>, prefixos: string[]): string | null => {
+    // 1. Busca exata de chaves
+    for (const p of prefixos) {
+      if (typeof obj[p] === 'string' && obj[p].trim()) return obj[p].trim();
+    }
+    // 2. Busca case-insensitive
+    const lowerPrefixes = prefixos.map(p => p.toLowerCase());
+    for (const [key, val] of Object.entries(obj)) {
+      if (typeof val === 'string' && val.trim()) {
+        const lowerKey = key.toLowerCase();
+        if (lowerPrefixes.some(lp => lowerKey === lp || lowerKey.includes(lp))) {
+          return val.trim();
+        }
+      }
+    }
+    return null;
+  };
+
+  // Prioridade 1: WhatsApp (coluna nativa whatsapp, ou custom_fields whatsapp/zap)
+  const whats = (typeof m.whatsapp === 'string' && m.whatsapp.trim())
+    ? m.whatsapp.trim()
+    : buscarEmObjeto(cf, ['whatsapp', 'WhatsApp', 'zap', 'telefone_whatsapp', 'contato_whatsapp']);
+
+  if (whats) return whats;
+
+  // Prioridade 2: Celular / Telefone / Phone (coluna nativa celular, phone, telefone ou custom_fields)
+  const celular = (typeof m.celular === 'string' && m.celular.trim()) ? m.celular.trim() : null;
+  const phone = (typeof m.phone === 'string' && m.phone.trim()) ? m.phone.trim() : null;
+  const telefone = (typeof m.telefone === 'string' && m.telefone.trim()) ? m.telefone.trim() : null;
+  const telCf = buscarEmObjeto(cf, ['celular', 'telefone', 'phone', 'contato', 'fone']);
+
+  return celular || phone || telefone || telCf || '';
+}
+
+function extrairEmailMembro(m: any): string {
+  if (!m) return '';
+  if (typeof m.email === 'string' && m.email.trim()) return m.email.trim();
+  const cf = (m.custom_fields && typeof m.custom_fields === 'object') ? m.custom_fields : {};
+  if (typeof cf.email === 'string' && cf.email.trim()) return cf.email.trim();
+  for (const [k, v] of Object.entries(cf)) {
+    if (k.toLowerCase().includes('email') && typeof v === 'string' && v.trim()) {
+      return v.trim();
+    }
+  }
+  return '';
 }
 
 // ─── Helpers de Formatação e Data ─────────────────────────────────────────────
@@ -663,6 +716,9 @@ export default function EventosPage() {
   const [buscaMembro, setBuscaMembro] = useState('');
   const [resultadosMembro, setResultadosMembro] = useState<Membro[]>([]);
   const [membroSelecionado, setMembroSelecionado] = useState<Membro | null>(null);
+
+  const [inscricaoParaExcluir, setInscricaoParaExcluir] = useState<Inscricao | null>(null);
+  const [excluindoInsc, setExcluindoInsc] = useState(false);
 
   // ── Tab Pagamentos ────────────────────────────────────────────────────────
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
@@ -1124,7 +1180,7 @@ export default function EventosPage() {
       setLoadingInsc(true);
       const { data, error } = await supabase
         .from('eventos_inscricoes')
-        .select('*, members(name, email, phone)')
+        .select('*, members(name, email, phone, celular, whatsapp, custom_fields)')
         .eq('evento_id', eventoId)
         .order('created_at', { ascending: false });
 
@@ -1134,14 +1190,27 @@ export default function EventosPage() {
         return;
       }
 
-      type RawInsc = Inscricao & { members?: { name?: string | null; email?: string | null; phone?: string | null } | null };
+      type RawInsc = Inscricao & {
+        members?: {
+          name?: string | null;
+          email?: string | null;
+          phone?: string | null;
+          celular?: string | null;
+          whatsapp?: string | null;
+          custom_fields?: any;
+        } | null;
+      };
       setInscricoes(
-        ((data ?? []) as RawInsc[]).map(i => ({
-          ...i,
-          nome_display: i.member_id ? i.members?.name ?? i.nome_externo ?? '—' : i.nome_externo ?? '—',
-          email_externo: i.email_externo || i.members?.email || null,
-          telefone: i.telefone || i.members?.phone || null,
-        }))
+        ((data ?? []) as RawInsc[]).map(i => {
+          const rawMemberTel = i.members ? extrairTelefoneMembro(i.members) : '';
+          const memberEmail = i.members ? extrairEmailMembro(i.members) : '';
+          return {
+            ...i,
+            nome_display: i.member_id ? i.members?.name ?? i.nome_externo ?? '—' : i.nome_externo ?? '—',
+            email_externo: i.email_externo || memberEmail || null,
+            telefone: i.telefone || (rawMemberTel ? formatarTelefoneMembro(rawMemberTel) : null),
+          };
+        })
       );
       setLoadingInsc(false);
     },
@@ -1192,15 +1261,8 @@ export default function EventosPage() {
 
       setResultadosMembro(
         ((data ?? []) as any[]).map(m => {
-          const cf = (m.custom_fields && typeof m.custom_fields === 'object') ? m.custom_fields : {};
-          const extrairValor = (...valores: any[]): string => {
-            for (const v of valores) {
-              if (typeof v === 'string' && v.trim()) return v.trim();
-            }
-            return '';
-          };
-          const rawTel = extrairValor(m.whatsapp, cf.whatsapp, m.celular, cf.celular, m.phone, cf.phone, cf.telefone);
-          const email = extrairValor(m.email, cf.email);
+          const rawTel = extrairTelefoneMembro(m);
+          const email = extrairEmailMembro(m);
 
           return {
             id: m.id,
@@ -1233,15 +1295,8 @@ export default function EventosPage() {
 
       setBalcaoResultadosMembro(
         ((data ?? []) as any[]).map(m => {
-          const cf = (m.custom_fields && typeof m.custom_fields === 'object') ? m.custom_fields : {};
-          const extrairValor = (...valores: any[]): string => {
-            for (const v of valores) {
-              if (typeof v === 'string' && v.trim()) return v.trim();
-            }
-            return '';
-          };
-          const rawTel = extrairValor(m.whatsapp, cf.whatsapp, m.celular, cf.celular, m.phone, cf.phone, cf.telefone);
-          const email = extrairValor(m.email, cf.email);
+          const rawTel = extrairTelefoneMembro(m);
+          const email = extrairEmailMembro(m);
 
           return {
             id: m.id,
@@ -1740,13 +1795,22 @@ export default function EventosPage() {
     carregarInscricoes(eventoSelecionado.id);
   };
 
-  const handleDeleteInscricao = async (id: string) => {
-    if (!confirm('Deseja remover esta inscrição?')) return;
-    const { error } = await supabase.from('eventos_inscricoes').delete().eq('id', id);
+  const handleDeleteInscricao = (insc: Inscricao) => {
+    setInscricaoParaExcluir(insc);
+  };
+
+  const confirmarExclusaoInscricao = async () => {
+    if (!inscricaoParaExcluir) return;
+    setExcluindoInsc(true);
+    const { error } = await supabase.from('eventos_inscricoes').delete().eq('id', inscricaoParaExcluir.id);
+    setExcluindoInsc(false);
     if (error) {
       showModal('Erro', error.message, 'error');
       return;
     }
+    const nomeRemovido = inscricaoParaExcluir.nome_display ?? inscricaoParaExcluir.nome_externo ?? 'Participante';
+    setInscricaoParaExcluir(null);
+    showModal('Inscrição removida', `A inscrição de "${nomeRemovido}" foi removida com sucesso.`, 'success');
     if (eventoSelecionado) carregarInscricoes(eventoSelecionado.id);
   };
 
@@ -5061,7 +5125,8 @@ export default function EventosPage() {
                                   </button>
                                 )}
                                 <button
-                                  onClick={() => handleDeleteInscricao(i.id)}
+                                  type="button"
+                                  onClick={() => handleDeleteInscricao(i)}
                                   className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 transition cursor-pointer"
                                   title="Remover inscrição"
                                 >
@@ -6105,6 +6170,117 @@ export default function EventosPage() {
                     Nenhum link ativo encontrado.
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+        {/* ══════════════════════════════════════════════════════════════════════
+            MODAL DE CONFIRMAÇÃO DE EXCLUSÃO DE INSCRIÇÃO
+        ══════════════════════════════════════════════════════════════════════ */}
+        {inscricaoParaExcluir && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-150">
+              {/* Header com destaque de perigo/alerta */}
+              <div className="px-6 py-4.5 bg-gradient-to-r from-rose-50 via-white to-white border-b border-rose-100 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-100/80 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0">
+                    <Trash2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-slate-900 leading-tight">
+                      Excluir Inscrição
+                    </h3>
+                    <p className="text-xs text-slate-500 font-medium">
+                      Esta ação removerá o participante deste evento
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={excluindoInsc}
+                  onClick={() => setInscricaoParaExcluir(null)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition disabled:opacity-50"
+                  aria-label="Fechar"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Corpo */}
+              <div className="p-6 space-y-4">
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Tem certeza de que deseja remover a inscrição deste participante? Todos os registros associados a esta inscrição no evento serão desvinculados.
+                </p>
+
+                {/* Card de Detalhes do Participante */}
+                <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-2 text-xs">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-slate-500 font-medium">Participante:</span>
+                    <span className="font-bold text-slate-900 text-right">
+                      {inscricaoParaExcluir.nome_display ?? inscricaoParaExcluir.nome_externo ?? 'Não informado'}
+                    </span>
+                  </div>
+
+                  {inscricaoParaExcluir.email_externo && (
+                    <div className="flex items-start justify-between gap-2 border-t border-slate-200/50 pt-1.5">
+                      <span className="text-slate-500 font-medium">E-mail:</span>
+                      <span className="text-slate-700 font-medium text-right">
+                        {inscricaoParaExcluir.email_externo}
+                      </span>
+                    </div>
+                  )}
+
+                  {inscricaoParaExcluir.telefone && (
+                    <div className="flex items-start justify-between gap-2 border-t border-slate-200/50 pt-1.5">
+                      <span className="text-slate-500 font-medium">Telefone / WhatsApp:</span>
+                      <span className="text-slate-700 font-medium text-right">
+                        {inscricaoParaExcluir.telefone}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between gap-2 border-t border-slate-200/50 pt-1.5">
+                    <span className="text-slate-500 font-medium">Status da Inscrição:</span>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-200 text-slate-800">
+                      {statusInscricaoLabel(inscricaoParaExcluir.status)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl text-[11px] text-amber-800 font-medium">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Essa exclusão é permanente e liberará a vaga para outros participantes.</span>
+                </div>
+              </div>
+
+              {/* Rodapé com botões de ação */}
+              <div className="px-6 py-4 bg-slate-50/60 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  disabled={excluindoInsc}
+                  onClick={() => setInscricaoParaExcluir(null)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition shadow-xs disabled:opacity-50 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={excluindoInsc}
+                  onClick={confirmarExclusaoInscricao}
+                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition shadow-xs flex items-center gap-2 disabled:opacity-60 cursor-pointer"
+                >
+                  {excluindoInsc ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Excluindo...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Excluir Inscrição</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
