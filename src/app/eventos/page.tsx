@@ -244,6 +244,7 @@ type FormInscricao = {
   status: StatusInscricao;
   observacoes: string;
   com_hospedagem: boolean;
+  status_hospedagem?: StatusHospedagem;
 };
 
 const TIPOS_EVENTO: { value: TipoEvento; label: string; badgeClass: string }[] = [
@@ -641,6 +642,7 @@ export default function EventosPage() {
   const [buscaInsc, setBuscaInsc] = useState('');
   const [filtroStatusInsc, setFiltroStatusInsc] = useState<'' | StatusInscricao>('');
   const [showFormInsc, setShowFormInsc] = useState(false);
+  const [editingInscId, setEditingInscId] = useState<string | null>(null);
   const [formInsc, setFormInsc] = useState<FormInscricao>(FORM_INSCRICAO_INICIAL);
   const [buscaMembro, setBuscaMembro] = useState('');
   const [resultadosMembro, setResultadosMembro] = useState<Membro[]>([]);
@@ -1582,6 +1584,38 @@ export default function EventosPage() {
   };
 
   // ── Inscrições ─────────────────────────────────────────────────────────────
+  const abrirNovaInscricao = () => {
+    setEditingInscId(null);
+    setFormInsc(FORM_INSCRICAO_INICIAL);
+    setMembroSelecionado(null);
+    setBuscaMembro('');
+    setShowFormInsc(true);
+  };
+
+  const abrirEditarInscricao = (insc: Inscricao) => {
+    setEditingInscId(insc.id);
+    setFormInsc({
+      member_id: insc.member_id || '',
+      nome_externo: insc.nome_externo || (!insc.member_id ? insc.nome_display || '' : ''),
+      email_externo: insc.email_externo || '',
+      telefone: insc.telefone || '',
+      status: insc.status,
+      observacoes: insc.observacoes || '',
+      com_hospedagem: Boolean(insc.com_hospedagem),
+    });
+    if (insc.member_id) {
+      setMembroSelecionado({
+        id: insc.member_id,
+        nome_completo: insc.nome_display || '',
+      });
+      setBuscaMembro(insc.nome_display || '');
+    } else {
+      setMembroSelecionado(null);
+      setBuscaMembro('');
+    }
+    setShowFormInsc(true);
+  };
+
   const handleSaveInscricao = async () => {
     if (!ministryId || !eventoSelecionado) return;
     const temMembro = !!membroSelecionado;
@@ -1592,7 +1626,7 @@ export default function EventosPage() {
     }
 
     let statusFinal = formInsc.status;
-    if (statusFinal === 'confirmado' && eventoSelecionado.capacidade != null) {
+    if (!editingInscId && statusFinal === 'confirmado' && eventoSelecionado.capacidade != null) {
       const { count } = await supabase
         .from('eventos_inscricoes')
         .select('id', { count: 'exact', head: true })
@@ -1608,26 +1642,52 @@ export default function EventosPage() {
       }
     }
 
-    const { error } = await supabase.from('eventos_inscricoes').insert({
-      evento_id: eventoSelecionado.id,
-      ministry_id: ministryId,
-      member_id: membroSelecionado?.id ?? null,
-      nome_externo: temExterno ? formInsc.nome_externo.trim() : null,
-      email_externo: formInsc.email_externo || null,
-      telefone: formInsc.telefone || null,
-      status: statusFinal,
-      observacoes: formInsc.observacoes || null,
-      com_hospedagem: formInsc.com_hospedagem,
-      status_hospedagem: formInsc.com_hospedagem ? 'solicitada' : 'nao_aplicavel',
-      criado_por: user?.id ?? null,
-    });
+    if (editingInscId) {
+      // Atualização de inscrição existente
+      const { error } = await supabase
+        .from('eventos_inscricoes')
+        .update({
+          member_id: membroSelecionado?.id ?? null,
+          nome_externo: temExterno ? formInsc.nome_externo.trim() : null,
+          email_externo: formInsc.email_externo || null,
+          telefone: formInsc.telefone || null,
+          status: statusFinal,
+          observacoes: formInsc.observacoes || null,
+          com_hospedagem: formInsc.com_hospedagem,
+          status_hospedagem: formInsc.com_hospedagem ? (formInsc.status_hospedagem ?? 'solicitada') : 'nao_aplicavel',
+        })
+        .eq('id', editingInscId);
 
-    if (error) {
-      showModal('Erro', error.code === '23505' ? 'Este membro já está inscrito neste evento.' : error.message, 'error');
-      return;
+      if (error) {
+        showModal('Erro', error.message, 'error');
+        return;
+      }
+      showModal('Sucesso', 'Inscrição atualizada com sucesso.', 'success');
+    } else {
+      // Inserção de nova inscrição
+      const { error } = await supabase.from('eventos_inscricoes').insert({
+        evento_id: eventoSelecionado.id,
+        ministry_id: ministryId,
+        member_id: membroSelecionado?.id ?? null,
+        nome_externo: temExterno ? formInsc.nome_externo.trim() : null,
+        email_externo: formInsc.email_externo || null,
+        telefone: formInsc.telefone || null,
+        status: statusFinal,
+        observacoes: formInsc.observacoes || null,
+        com_hospedagem: formInsc.com_hospedagem,
+        status_hospedagem: formInsc.com_hospedagem ? 'solicitada' : 'nao_aplicavel',
+        criado_por: user?.id ?? null,
+      });
+
+      if (error) {
+        showModal('Erro', error.code === '23505' ? 'Este membro já está inscrito neste evento.' : error.message, 'error');
+        return;
+      }
+      showModal('Sucesso', 'Inscrição realizada com sucesso.', 'success');
     }
-    showModal('Sucesso', 'Inscrição realizada com sucesso.', 'success');
+
     setShowFormInsc(false);
+    setEditingInscId(null);
     setFormInsc(FORM_INSCRICAO_INICIAL);
     setMembroSelecionado(null);
     setBuscaMembro('');
@@ -4602,8 +4662,8 @@ export default function EventosPage() {
 
               {scope.canWrite && (
                 <button
-                  onClick={() => setShowFormInsc(v => !v)}
-                  className="inline-flex items-center gap-1.5 bg-[#0f3460] text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-[#162a47] transition shadow-xs"
+                  onClick={abrirNovaInscricao}
+                  className="inline-flex items-center gap-1.5 bg-[#0f3460] text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-[#162a47] transition shadow-xs cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Inscrever</span>
@@ -4638,143 +4698,184 @@ export default function EventosPage() {
               </button>
             </div>
 
-            {/* Modal Inscrição */}
+            {/* Modal de Inscrição no Evento com Backdrop (Criação e Edição) */}
             {showFormInsc && scope.canWrite && (
-              <div className="bg-white rounded-2xl border border-slate-300 p-6 shadow-xl space-y-4 animate-in fade-in duration-200">
-                <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-                  <h3 className="font-bold text-slate-900 text-sm">Nova Inscrição no Evento</h3>
-                  <button onClick={() => setShowFormInsc(false)} className="text-slate-400 hover:text-slate-600">
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Buscar Membro Cadastrado</label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                    <input
-                      value={buscaMembro}
-                      onChange={e => {
-                        setBuscaMembro(e.target.value);
-                        setMembroSelecionado(null);
-                      }}
-                      placeholder="Digite 3 ou mais letras para pesquisar no rol de membros..."
-                      className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs text-slate-900"
-                    />
-                  </div>
-                  {resultadosMembro.length > 0 && !membroSelecionado && (
-                    <div className="border border-slate-200 rounded-xl mt-1 max-h-40 overflow-y-auto bg-white shadow-lg z-10 relative">
-                      {resultadosMembro.map(m => (
-                        <button
-                          key={m.id}
-                          onClick={() => {
-                            setMembroSelecionado(m);
-                            setBuscaMembro(m.nome_completo);
-                            setResultadosMembro([]);
-                            setFormInsc(f => ({ ...f, nome_externo: '' }));
-                          }}
-                          className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 text-slate-800 font-medium"
-                        >
-                          {m.nome_completo}
-                        </button>
-                      ))}
+              <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+                <div className="bg-white rounded-3xl border border-slate-200/90 max-w-2xl w-full p-6 sm:p-7 shadow-2xl relative space-y-5 my-auto">
+                  <div className="flex justify-between items-center pb-4 border-b border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-blue-50 text-[#0f3460] flex items-center justify-center">
+                        {editingInscId ? <Pencil className="w-5 h-5" /> : <Users className="w-5 h-5" />}
+                      </div>
+                      <div>
+                        <h3 className="font-extrabold text-slate-900 text-base leading-tight">
+                          {editingInscId ? 'Editar Inscrição no Evento' : 'Nova Inscrição no Evento'}
+                        </h3>
+                        <p className="text-xs text-slate-500 font-medium truncate max-w-sm sm:max-w-md">
+                          {eventoSelecionado.titulo}
+                        </p>
+                      </div>
                     </div>
-                  )}
-                  {membroSelecionado && (
-                    <p className="text-xs font-semibold text-emerald-700 mt-1.5 flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Membro selecionado: {membroSelecionado.nome_completo}
-                    </p>
-                  )}
-                </div>
-
-                <div className="relative flex py-1 items-center">
-                  <div className="flex-grow border-t border-slate-200" />
-                  <span className="flex-shrink mx-3 text-slate-400 text-xs font-semibold">ou participante externo</span>
-                  <div className="flex-grow border-t border-slate-200" />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-semibold text-slate-700 block mb-1">Nome Completo</label>
-                    <input
-                      value={formInsc.nome_externo}
-                      onChange={e => setFormInsc(f => ({ ...f, nome_externo: e.target.value }))}
-                      disabled={!!membroSelecionado}
-                      className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs disabled:opacity-50"
-                      placeholder="Nome do participante"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-slate-700 block mb-1">E-mail</label>
-                    <input
-                      type="email"
-                      value={formInsc.email_externo}
-                      onChange={e => setFormInsc(f => ({ ...f, email_externo: e.target.value }))}
-                      className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs"
-                      placeholder="email@exemplo.com"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-slate-700 block mb-1">Telefone / WhatsApp</label>
-                    <input
-                      value={formInsc.telefone}
-                      onChange={e => setFormInsc(f => ({ ...f, telefone: e.target.value }))}
-                      className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs"
-                      placeholder="(99) 99999-9999"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-slate-700 block mb-1">Status Inicial</label>
-                    <select
-                      value={formInsc.status}
-                      onChange={e => setFormInsc(f => ({ ...f, status: e.target.value as StatusInscricao }))}
-                      className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs"
+                    <button
+                      onClick={() => {
+                        setShowFormInsc(false);
+                        setEditingInscId(null);
+                      }}
+                      className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
                     >
-                      {STATUS_INSCRICAO.map(s => (
-                        <option key={s.value} value={s.value}>
-                          {s.label}
-                        </option>
-                      ))}
-                    </select>
+                      <X className="w-5 h-5" />
+                    </button>
                   </div>
-                </div>
 
-                {eventoSelecionado.inclui_hospedagem && (
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-amber-800">
-                    <input
-                      type="checkbox"
-                      checked={formInsc.com_hospedagem}
-                      onChange={e => setFormInsc(f => ({ ...f, com_hospedagem: e.target.checked }))}
-                      className="w-4 h-4 rounded text-amber-600"
-                    />
-                    <Bed className="w-4 h-4 text-amber-600" /> Solicitar vaga de hospedagem
-                  </label>
-                )}
+                  <div className="space-y-4 max-h-[calc(85vh-160px)] overflow-y-auto pr-1">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-700 block mb-1">
+                        {editingInscId ? 'Membro Vinculado' : 'Buscar Membro Cadastrado'}
+                      </label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                        <input
+                          value={buscaMembro}
+                          onChange={e => {
+                            setBuscaMembro(e.target.value);
+                            setMembroSelecionado(null);
+                          }}
+                          placeholder="Digite 3 ou mais letras para pesquisar no rol de membros..."
+                          className="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0f3460]/20"
+                        />
+                      </div>
+                      {resultadosMembro.length > 0 && !membroSelecionado && (
+                        <div className="border border-slate-200 rounded-xl mt-1 max-h-40 overflow-y-auto bg-white shadow-lg z-10 relative">
+                          {resultadosMembro.map(m => (
+                            <button
+                              key={m.id}
+                              onClick={() => {
+                                setMembroSelecionado(m);
+                                setBuscaMembro(m.nome_completo);
+                                setResultadosMembro([]);
+                                setFormInsc(f => ({ ...f, nome_externo: '' }));
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 text-slate-800 font-medium cursor-pointer"
+                            >
+                              {m.nome_completo}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {membroSelecionado && (
+                        <div className="flex items-center justify-between text-xs font-semibold text-emerald-700 mt-1.5 bg-emerald-50/70 border border-emerald-200 rounded-lg px-2.5 py-1">
+                          <span className="flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Membro selecionado: {membroSelecionado.nome_completo}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMembroSelecionado(null);
+                              setBuscaMembro('');
+                            }}
+                            className="text-slate-400 hover:text-slate-600 text-[11px] font-normal underline cursor-pointer"
+                          >
+                            Alterar
+                          </button>
+                        </div>
+                      )}
+                    </div>
 
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Observações Internas</label>
-                  <textarea
-                    value={formInsc.observacoes}
-                    onChange={e => setFormInsc(f => ({ ...f, observacoes: e.target.value }))}
-                    className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs"
-                    rows={2}
-                    placeholder="Restrições, necessidades especiais, etc."
-                  />
-                </div>
+                    <div className="relative flex py-1 items-center">
+                      <div className="flex-grow border-t border-slate-200" />
+                      <span className="flex-shrink mx-3 text-slate-400 text-xs font-semibold">ou participante externo</span>
+                      <div className="flex-grow border-t border-slate-200" />
+                    </div>
 
-                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                  <button
-                    onClick={() => setShowFormInsc(false)}
-                    className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-600 hover:bg-slate-50"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleSaveInscricao}
-                    className="px-5 py-2 rounded-xl bg-[#0f3460] text-white text-xs font-bold hover:bg-[#162a47]"
-                  >
-                    Confirmar Inscrição
-                  </button>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-semibold text-slate-700 block mb-1">Nome Completo</label>
+                        <input
+                          value={formInsc.nome_externo}
+                          onChange={e => setFormInsc(f => ({ ...f, nome_externo: e.target.value }))}
+                          disabled={!!membroSelecionado}
+                          className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs disabled:opacity-50"
+                          placeholder="Nome do participante"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-700 block mb-1">E-mail</label>
+                        <input
+                          type="email"
+                          value={formInsc.email_externo}
+                          onChange={e => setFormInsc(f => ({ ...f, email_externo: e.target.value }))}
+                          className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs"
+                          placeholder="email@exemplo.com"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-700 block mb-1">Telefone / WhatsApp</label>
+                        <input
+                          value={formInsc.telefone}
+                          onChange={e => setFormInsc(f => ({ ...f, telefone: e.target.value }))}
+                          className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs"
+                          placeholder="(99) 99999-9999"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-700 block mb-1">Status</label>
+                        <select
+                          value={formInsc.status}
+                          onChange={e => setFormInsc(f => ({ ...f, status: e.target.value as StatusInscricao }))}
+                          className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs bg-white"
+                        >
+                          {STATUS_INSCRICAO.map(s => (
+                            <option key={s.value} value={s.value}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {eventoSelecionado.inclui_hospedagem && (
+                      <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-amber-800">
+                        <input
+                          type="checkbox"
+                          checked={formInsc.com_hospedagem}
+                          onChange={e => setFormInsc(f => ({ ...f, com_hospedagem: e.target.checked }))}
+                          className="w-4 h-4 rounded text-amber-600"
+                        />
+                        <Bed className="w-4 h-4 text-amber-600" /> Solicitar vaga de hospedagem
+                      </label>
+                    )}
+
+                    <div>
+                      <label className="text-xs font-semibold text-slate-700 block mb-1">Observações Internas</label>
+                      <textarea
+                        value={formInsc.observacoes}
+                        onChange={e => setFormInsc(f => ({ ...f, observacoes: e.target.value }))}
+                        className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs"
+                        rows={2}
+                        placeholder="Restrições, necessidades especiais, etc."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowFormInsc(false);
+                        setEditingInscId(null);
+                      }}
+                      className="px-4 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveInscricao}
+                      className="px-5 py-2.5 rounded-xl bg-[#0f3460] text-white text-xs font-bold hover:bg-[#162a47] transition shadow-xs cursor-pointer"
+                    >
+                      {editingInscId ? 'Salvar Alterações' : 'Confirmar Inscrição'}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -4881,10 +4982,18 @@ export default function EventosPage() {
                           {scope.canWrite && (
                             <td className="px-4 py-3.5 text-right">
                               <div className="flex items-center justify-end gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => abrirEditarInscricao(i)}
+                                  className="p-1.5 rounded-lg text-slate-600 hover:text-[#0f3460] hover:bg-slate-100 transition cursor-pointer"
+                                  title="Editar inscrição"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </button>
                                 {eventoSelecionado.inclui_certificado && i.status === 'confirmado' && (
                                   <button
                                     onClick={() => handleImprimirCertificado(i)}
-                                    className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition"
+                                    className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition cursor-pointer"
                                     title="Emitir/Imprimir Certificado Individual"
                                   >
                                     <Award className="w-4 h-4" />
@@ -4892,7 +5001,7 @@ export default function EventosPage() {
                                 )}
                                 <button
                                   onClick={() => handleDeleteInscricao(i.id)}
-                                  className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 transition"
+                                  className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 transition cursor-pointer"
                                   title="Remover inscrição"
                                 >
                                   <Trash2 className="w-4 h-4" />
