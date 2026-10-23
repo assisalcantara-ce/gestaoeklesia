@@ -18,6 +18,7 @@ import {
   FileSpreadsheet,
   Settings,
   Sparkles,
+  Loader2,
 } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/api-client';
 import ConfirmDeleteModal from '@/components/tesouraria/modals/ConfirmDeleteModal';
@@ -169,9 +170,10 @@ export default function ArrecadacaoDigitalContent({
   const [subAba, setSubAba] = useState<'destinos' | 'extrato'>('destinos');
   const [destinos, setDestinos] = useState<PaymentDestino[]>([]);
   const [cobrancas, setCobrancas] = useState<FinCobrancaCharge[]>([]);
-  const [summary, setSummary] = useState<{ totalArrecadado: number; transacoesPagas: number }>({
+  const [summary, setSummary] = useState<{ totalArrecadado: number; transacoesPagas: number; destinosDistintos?: number }>({
     totalArrecadado: 0,
     transacoesPagas: 0,
+    destinosDistintos: 0,
   });
   const [loadingDestinos, setLoadingDestinos] = useState(true);
   const [loadingCobrancas, setLoadingCobrancas] = useState(false);
@@ -348,6 +350,8 @@ export default function ArrecadacaoDigitalContent({
       if (extratoCong) params.set('congregacao_id', extratoCong);
       if (extratoDestino) params.set('destination_id', extratoDestino);
 
+      if (buscaExtrato.trim()) params.set('q', buscaExtrato.trim());
+
       const res = await authenticatedFetch(`/api/v1/ministry/payment-charges?${params.toString()}`);
       if (!res.ok) throw new Error('Erro ao carregar extrato de ofertas.');
       const json = await res.json();
@@ -362,6 +366,7 @@ export default function ArrecadacaoDigitalContent({
         setSummary({
           totalArrecadado: Number(json.summary.totalArrecadado ?? 0),
           transacoesPagas: Number(json.summary.transacoesPagas ?? 0),
+          destinosDistintos: Number(json.summary.destinosDistintos ?? 0),
         });
       }
     } catch (err) {
@@ -370,7 +375,7 @@ export default function ArrecadacaoDigitalContent({
     } finally {
       setLoadingCobrancas(false);
     }
-  }, [extratoMes, extratoCong, extratoDestino, extratoDataInicio, extratoDataFim]);
+  }, [extratoMes, extratoCong, extratoDestino, extratoDataInicio, extratoDataFim, buscaExtrato]);
 
   useEffect(() => {
     loadDestinos();
@@ -459,20 +464,6 @@ export default function ArrecadacaoDigitalContent({
 
 
 
-  // Métricas Computadas
-  const totalArrecadadoCalculado = Math.max(
-    summary.totalArrecadado,
-    destinos.reduce((acc, d) => acc + (d.total_arrecadado ?? 0), 0)
-  );
-  const destinosAtivosCount = destinos.filter((d) => d.is_ativo).length;
-  const transacoesPagasCount = Math.max(
-    summary.transacoesPagas,
-    cobrancas.filter((c) => {
-      const st = String(c.status || '').toLowerCase().trim();
-      return st === 'pago' || st === 'paid' || st === 'concluida' || st === 'received' || st === 'confirmed';
-    }).length
-  );
-
   // Filtragem de Extrato (busca textual, tipo de movimento e período de datas)
   const cobrancasFiltradas = cobrancas.filter((c) => {
     // Filtro por tipo de movimento
@@ -501,6 +492,46 @@ export default function ArrecadacaoDigitalContent({
       cong.includes(term)
     );
   });
+
+  // Métricas Computadas
+  // Quando estamos na subAba 'extrato', os cards refletem estritamente o conjunto filtrado pelo extrato PIX
+  const isExtrato = subAba === 'extrato';
+
+  // Cálculos no conjunto filtrado de cobranças
+  const cobrancasPagasFiltradas = cobrancasFiltradas.filter((c) => {
+    const st = String(c.status || '').toLowerCase().trim();
+    return st === 'pago' || st === 'paid' || st === 'concluida' || st === 'received' || st === 'confirmed';
+  });
+
+  const totalArrecadadoExtrato = cobrancasPagasFiltradas.reduce(
+    (acc, c) => acc + Number(c.valor_pago ?? c.valor_solicitado ?? 0),
+    0
+  );
+
+  const distinctDestinosExtrato = new Set(
+    cobrancasFiltradas.map((c) => c.destination_id).filter(Boolean)
+  ).size;
+
+  const totalArrecadadoCalculado = isExtrato
+    ? totalArrecadadoExtrato
+    : Math.max(
+        summary.totalArrecadado,
+        destinos.reduce((acc, d) => acc + (d.total_arrecadado ?? 0), 0)
+      );
+
+  const destinosAtivosCount = isExtrato
+    ? distinctDestinosExtrato
+    : destinos.filter((d) => d.is_ativo).length;
+
+  const transacoesPagasCount = isExtrato
+    ? cobrancasPagasFiltradas.length
+    : Math.max(
+        summary.transacoesPagas,
+        cobrancas.filter((c) => {
+          const st = String(c.status || '').toLowerCase().trim();
+          return st === 'pago' || st === 'paid' || st === 'concluida' || st === 'received' || st === 'confirmed';
+        }).length
+      );
 
   // Exportar Extrato para CSV
   const handleExportarExtratoCSV = () => {
@@ -674,10 +705,14 @@ export default function ArrecadacaoDigitalContent({
         <div className="relative overflow-hidden rounded-3xl border border-[#bbf7d0] bg-[#f0fdf4] p-5 shadow-xs transition hover:shadow-sm">
           <div className="flex items-center justify-between">
             <div className="flex h-13 w-13 items-center justify-center rounded-2xl bg-white shadow-xs border border-[#dcfce7]">
-              <TrendingUp className="h-6 w-6 text-[#16a34a]" />
+              {loadingCobrancas && isExtrato ? (
+                <Loader2 className="h-6 w-6 text-[#16a34a] animate-spin" />
+              ) : (
+                <TrendingUp className="h-6 w-6 text-[#16a34a]" />
+              )}
             </div>
             <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-[#16a34a] shadow-2xs border border-[#bbf7d0]">
-              PIX Recebido
+              {isExtrato ? 'Filtrado' : 'PIX Recebido'}
             </span>
           </div>
           <div className="mt-4">
@@ -685,33 +720,50 @@ export default function ArrecadacaoDigitalContent({
               Total Arrecadado PIX
             </p>
             <p className="mt-1 text-2xl lg:text-3xl font-extrabold text-[#14532d] tracking-tight">
-              {fmtBRL(totalArrecadadoCalculado)}
+              {loadingCobrancas && isExtrato ? (
+                <span className="text-lg font-medium text-slate-400">Calculando...</span>
+              ) : (
+                fmtBRL(totalArrecadadoCalculado)
+              )}
             </p>
             <p className="mt-1 text-xs text-[#16a34a]/90 font-medium">
-              Ofertas e doações confirmadas
+              {isExtrato ? 'Ofertas confirmadas no filtro' : 'Ofertas e doações confirmadas'}
             </p>
           </div>
         </div>
 
-        {/* Card 2: Destinos Cadastrados */}
+        {/* Card 2: Destinos Cadastrados / Destinos no Extrato */}
         <div className="relative overflow-hidden rounded-3xl border border-teal-200 bg-teal-50/60 p-5 shadow-xs transition hover:shadow-sm">
           <div className="flex items-center justify-between">
             <div className="flex h-13 w-13 items-center justify-center rounded-2xl bg-white shadow-xs border border-teal-100">
-              <QrCode className="h-6 w-6 text-teal-700" />
+              {loadingCobrancas && isExtrato ? (
+                <Loader2 className="h-6 w-6 text-teal-700 animate-spin" />
+              ) : (
+                <QrCode className="h-6 w-6 text-teal-700" />
+              )}
             </div>
             <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-teal-700 shadow-2xs border border-teal-200">
-              Destinos
+              {isExtrato ? 'Filtrado' : 'Destinos'}
             </span>
           </div>
           <div className="mt-4">
             <p className="text-xs font-bold uppercase tracking-wider text-teal-800">
-              Destinos Cadastrados
+              {isExtrato ? 'Destinos no Extrato' : 'Destinos Cadastrados'}
             </p>
             <p className="mt-1 text-2xl lg:text-3xl font-extrabold text-teal-900 tracking-tight">
-              {destinosAtivosCount} <span className="text-sm font-semibold text-teal-700">item(ns)</span>
+              {loadingCobrancas && isExtrato ? (
+                <span className="text-lg font-medium text-slate-400">Calculando...</span>
+              ) : (
+                <>
+                  {destinosAtivosCount}{' '}
+                  <span className="text-sm font-semibold text-teal-700">
+                    {isExtrato ? 'destino(s) no filtro' : 'item(ns)'}
+                  </span>
+                </>
+              )}
             </p>
             <p className="mt-1 text-xs text-teal-700 font-medium">
-              Pontos de arrecadação ativos
+              {isExtrato ? 'Destinos distintos com transações' : 'Pontos de arrecadação ativos'}
             </p>
           </div>
         </div>
@@ -720,10 +772,14 @@ export default function ArrecadacaoDigitalContent({
         <div className="relative overflow-hidden rounded-3xl border border-[#d0e6ff] bg-[#ebf5ff] p-5 shadow-xs transition hover:shadow-sm">
           <div className="flex items-center justify-between">
             <div className="flex h-13 w-13 items-center justify-center rounded-2xl bg-white shadow-xs border border-[#dbeafe]">
-              <CreditCard className="h-6 w-6 text-[#2563eb]" />
+              {loadingCobrancas && isExtrato ? (
+                <Loader2 className="h-6 w-6 text-[#2563eb] animate-spin" />
+              ) : (
+                <CreditCard className="h-6 w-6 text-[#2563eb]" />
+              )}
             </div>
             <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-[#2563eb] shadow-2xs border border-[#bfdbfe]">
-              Transações
+              {isExtrato ? 'Filtrado' : 'Transações'}
             </span>
           </div>
           <div className="mt-4">
@@ -731,10 +787,17 @@ export default function ArrecadacaoDigitalContent({
               Ofertas Pagas
             </p>
             <p className="mt-1 text-2xl lg:text-3xl font-extrabold text-[#1e3a8a] tracking-tight">
-              {transacoesPagasCount} <span className="text-sm font-semibold text-blue-700">transação(ões)</span>
+              {loadingCobrancas && isExtrato ? (
+                <span className="text-lg font-medium text-slate-400">Calculando...</span>
+              ) : (
+                <>
+                  {transacoesPagasCount}{' '}
+                  <span className="text-sm font-semibold text-blue-700">transação(ões)</span>
+                </>
+              )}
             </p>
             <p className="mt-1 text-xs text-[#2563eb]/90 font-medium">
-              Pagamentos liquidados via gateway
+              {isExtrato ? 'Pagamentos liquidados no filtro' : 'Pagamentos liquidados via gateway'}
             </p>
           </div>
         </div>

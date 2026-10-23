@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { CalendarDays, MapPin, Users, Clock, AlertTriangle, CheckCircle2, Loader2, Copy, RefreshCw, Gift, Award, Utensils, Home } from 'lucide-react';
+import { CalendarDays, MapPin, Users, Clock, AlertTriangle, CheckCircle2, Loader2, Copy, RefreshCw, Gift, Award, Utensils, Home, Search, ShieldCheck, UserCheck, X } from 'lucide-react';
 
 interface EventoPublico {
   id: string;
@@ -97,6 +97,156 @@ export default function EventoPublicoPage() {
   const [copiado, setCopiado] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // ── Autocomplete Dinâmico e Seguro de Membros ──
+  const [sugestoesMembros, setSugestoesMembros] = useState<Array<{ id: string; nome: string; congregacao_nome: string }>>([]);
+  const [buscandoMembros, setBuscandoMembros] = useState(false);
+  const [mostrarDropdown, setMostrarDropdown] = useState(false);
+  const [indiceFocado, setIndiceFocado] = useState<number>(-1);
+  const [membroSelecionado, setMembroSelecionado] = useState<{ id: string; nome: string; congregacao_nome: string } | null>(null);
+  const [modalConfirmacaoAberto, setModalConfirmacaoAberto] = useState(false);
+  const [tipoConfirmacao, setTipoConfirmacao] = useState<'nascimento' | 'cpf' | 'telefone'>('nascimento');
+  const [valorConfirmacao, setValorConfirmacao] = useState('');
+  const [confirmandoMembro, setConfirmandoMembro] = useState(false);
+  const [erroConfirmacao, setErroConfirmacao] = useState<string | null>(null);
+  const [memberToken, setMemberToken] = useState<string | null>(null);
+  const [membroConfirmadoBadge, setMembroConfirmadoBadge] = useState<string | null>(null);
+
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+
+  // Fechar dropdown ao clicar fora
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setMostrarDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Executar busca após debounce de 300ms quando nome tiver >= 3 caracteres
+  const dispararBuscaMembros = useCallback((termo: string) => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    if (!slug || termo.trim().length < 3) {
+      setSugestoesMembros([]);
+      setMostrarDropdown(false);
+      setBuscandoMembros(false);
+      return;
+    }
+
+    setBuscandoMembros(true);
+    debounceTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/v1/eventos/publico/${encodeURIComponent(slug)}/membros?q=${encodeURIComponent(termo.trim())}`);
+        if (!res.ok) {
+          setSugestoesMembros([]);
+          return;
+        }
+        const data = await res.json();
+        setSugestoesMembros(data.membros || []);
+        setMostrarDropdown(true);
+        setIndiceFocado(-1);
+      } catch {
+        setSugestoesMembros([]);
+      } finally {
+        setBuscandoMembros(false);
+      }
+    }, 300);
+  }, [slug]);
+
+  function handleNomeChange(valor: string) {
+    setForm(f => ({ ...f, nome: valor }));
+    // Se o usuário já havia confirmado um membro e resolveu alterar o nome, reseta o vínculo
+    if (memberToken) {
+      setMemberToken(null);
+      setMembroConfirmadoBadge(null);
+    }
+    dispararBuscaMembros(valor);
+  }
+
+  function handleSelecionarMembro(m: { id: string; nome: string; congregacao_nome: string }) {
+    setMembroSelecionado(m);
+    setMostrarDropdown(false);
+    setErroConfirmacao(null);
+    setValorConfirmacao('');
+    setTipoConfirmacao('nascimento');
+    setModalConfirmacaoAberto(true);
+  }
+
+  async function handleConfirmarIdentidade(e: React.FormEvent) {
+    e.preventDefault();
+    if (!membroSelecionado || !valorConfirmacao.trim()) return;
+
+    setConfirmandoMembro(true);
+    setErroConfirmacao(null);
+
+    try {
+      const payload: Record<string, any> = { member_id: membroSelecionado.id };
+      if (tipoConfirmacao === 'nascimento') {
+        payload.data_nascimento = valorConfirmacao.trim();
+      } else if (tipoConfirmacao === 'cpf') {
+        payload.digitos_cpf = valorConfirmacao.trim();
+      } else {
+        payload.telefone_confirmacao = valorConfirmacao.trim();
+      }
+
+      const res = await fetch(`/api/v1/eventos/publico/${encodeURIComponent(slug)}/membros/confirmar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.confirmado) {
+        setErroConfirmacao(data.error || 'Não foi possível confirmar os dados.');
+        return;
+      }
+
+      // Auto-preenchimento seguro dos dados oficiais
+      setMemberToken(data.token);
+      setMembroConfirmadoBadge(data.dados.nome);
+      setForm(prev => ({
+        ...prev,
+        nome: data.dados.nome || prev.nome,
+        email: data.dados.email || prev.email,
+        telefone: data.dados.telefone || prev.telefone,
+        congregacao: data.dados.congregacao || prev.congregacao,
+        cpf_cnpj: data.dados.cpf || prev.cpf_cnpj,
+      }));
+
+      setModalConfirmacaoAberto(false);
+      setMembroSelecionado(null);
+      setSugestoesMembros([]);
+    } catch {
+      setErroConfirmacao('Erro ao conectar ao servidor. Tente novamente.');
+    } finally {
+      setConfirmandoMembro(false);
+    }
+  }
+
+  function handleKeyDownNome(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!mostrarDropdown || sugestoesMembros.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setIndiceFocado(prev => (prev < sugestoesMembros.length - 1 ? prev + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setIndiceFocado(prev => (prev > 0 ? prev - 1 : sugestoesMembros.length - 1));
+    } else if (e.key === 'Enter') {
+      if (indiceFocado >= 0 && indiceFocado < sugestoesMembros.length) {
+        e.preventDefault();
+        handleSelecionarMembro(sugestoesMembros[indiceFocado]);
+      }
+    } else if (e.key === 'Escape') {
+      setMostrarDropdown(false);
+    }
+  }
+
   useEffect(() => {
     if (!slug) return;
     fetch(`/api/v1/eventos/publico/${encodeURIComponent(slug)}`)
@@ -145,7 +295,7 @@ export default function EventoPublicoPage() {
       const res = await fetch('/api/v1/eventos/inscricao', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, ...form }),
+        body: JSON.stringify({ slug, ...form, member_token: memberToken }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -494,15 +644,74 @@ export default function EventoPublicoPage() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">Nome completo *</label>
-                  <input
-                    required
-                    value={form.nome}
-                    onChange={e => setForm(f => ({ ...f, nome: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]/30"
-                    placeholder="Seu nome"
-                  />
+                <div className="relative" ref={dropdownRef}>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs text-gray-500 block">Nome completo *</label>
+                    {membroConfirmadoBadge && (
+                      <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        <UserCheck className="w-3 h-3 text-emerald-600" />
+                        Membro Identificado
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input
+                      required
+                      value={form.nome}
+                      onChange={e => handleNomeChange(e.target.value)}
+                      onFocus={() => {
+                        if (sugestoesMembros.length > 0) setMostrarDropdown(true);
+                      }}
+                      onKeyDown={handleKeyDownNome}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]/30"
+                      placeholder="Digite seu nome (busca a partir de 3 letras)"
+                      autoComplete="off"
+                    />
+                    <div className="absolute right-3 top-2.5 text-gray-400 pointer-events-none">
+                      {buscandoMembros ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-[#123b63]" />
+                      ) : (
+                        <Search className="w-4 h-4 text-gray-400" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Dropdown de sugestões */}
+                  {mostrarDropdown && form.nome.trim().length >= 3 && (
+                    <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                      {sugestoesMembros.length > 0 ? (
+                        <div className="p-1.5 space-y-1">
+                          <p className="px-2.5 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                            Membros encontrados na igreja:
+                          </p>
+                          {sugestoesMembros.map((m, idx) => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => handleSelecionarMembro(m)}
+                              className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between transition ${
+                                idx === indiceFocado ? 'bg-[#123b63]/10 text-[#123b63]' : 'hover:bg-gray-50 text-gray-800'
+                              }`}
+                            >
+                              <div>
+                                <p className="font-semibold">{m.nome}</p>
+                                <p className="text-xs text-gray-500 flex items-center gap-1">
+                                  <span>{m.congregacao_nome}</span>
+                                </p>
+                              </div>
+                              <span className="text-[11px] font-medium text-[#123b63] bg-[#123b63]/5 px-2 py-1 rounded">
+                                Selecionar
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="p-3 text-center text-xs text-gray-500">
+                          Nenhum membro encontrado com este nome. Você pode continuar preenchendo normalmente como participante não cadastrado.
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">E-mail *</label>
@@ -586,6 +795,147 @@ export default function EventoPublicoPage() {
                 }
               </button>
             </form>
+          </div>
+        )}
+
+        {/* Modal de Confirmação Segura de Identidade (LGPD) */}
+        {modalConfirmacaoAberto && membroSelecionado && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative space-y-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setModalConfirmacaoAberto(false);
+                  setMembroSelecionado(null);
+                }}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#123b63]/10 flex items-center justify-center text-[#123b63]">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-800 text-base">Confirmar Identidade</h3>
+                  <p className="text-xs text-gray-500">
+                    Você selecionou: <strong>{membroSelecionado.nome}</strong>
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-xs text-gray-600 leading-relaxed">
+                Por proteção de dados (LGPD), informe um dado do seu cadastro para preenchimento automático:
+              </p>
+
+              {/* Seletor do método de verificação */}
+              <div className="flex gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTipoConfirmacao('nascimento');
+                    setValorConfirmacao('');
+                    setErroConfirmacao(null);
+                  }}
+                  className={`flex-1 py-1.5 px-2 rounded-lg font-medium transition border ${
+                    tipoConfirmacao === 'nascimento'
+                      ? 'bg-[#123b63] text-white border-[#123b63]'
+                      : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                  }`}
+                >
+                  Data Nasc.
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTipoConfirmacao('cpf');
+                    setValorConfirmacao('');
+                    setErroConfirmacao(null);
+                  }}
+                  className={`flex-1 py-1.5 px-2 rounded-lg font-medium transition border ${
+                    tipoConfirmacao === 'cpf'
+                      ? 'bg-[#123b63] text-white border-[#123b63]'
+                      : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                  }`}
+                >
+                  Dígitos CPF
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTipoConfirmacao('telefone');
+                    setValorConfirmacao('');
+                    setErroConfirmacao(null);
+                  }}
+                  className={`flex-1 py-1.5 px-2 rounded-lg font-medium transition border ${
+                    tipoConfirmacao === 'telefone'
+                      ? 'bg-[#123b63] text-white border-[#123b63]'
+                      : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                  }`}
+                >
+                  Final Telefone
+                </button>
+              </div>
+
+              <form onSubmit={handleConfirmarIdentidade} className="space-y-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-700 block mb-1">
+                    {tipoConfirmacao === 'nascimento' && 'Data de Nascimento (DD/MM/AAAA)'}
+                    {tipoConfirmacao === 'cpf' && '3 primeiros ou 2 últimos dígitos do seu CPF'}
+                    {tipoConfirmacao === 'telefone' && '4 últimos dígitos do seu celular'}
+                  </label>
+                  <input
+                    required
+                    autoFocus
+                    type={tipoConfirmacao === 'nascimento' ? 'date' : 'text'}
+                    value={valorConfirmacao}
+                    onChange={e => setValorConfirmacao(e.target.value)}
+                    placeholder={
+                      tipoConfirmacao === 'nascimento'
+                        ? 'DD/MM/AAAA'
+                        : tipoConfirmacao === 'cpf'
+                          ? 'Ex: 123 ou 45'
+                          : 'Ex: 9876'
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#123b63]/30"
+                  />
+                </div>
+
+                {erroConfirmacao && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700">
+                    {erroConfirmacao}
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModalConfirmacaoAberto(false);
+                      setMembroSelecionado(null);
+                    }}
+                    className="flex-1 py-2.5 px-3 rounded-lg border border-gray-300 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                  >
+                    Digitar Manualmente
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={confirmandoMembro || !valorConfirmacao.trim()}
+                    className="flex-1 py-2.5 px-3 rounded-lg bg-[#123b63] text-xs font-semibold text-white hover:bg-[#0e2d4f] disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  >
+                    {confirmandoMembro ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Validando...
+                      </>
+                    ) : (
+                      'Confirmar e Preencher'
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
 

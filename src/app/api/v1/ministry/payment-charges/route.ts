@@ -222,12 +222,32 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Erro ao buscar cobranças.' }, { status: 500 });
     }
 
-    // Cálculo das Métricas Gerais de Arrecadação Digital (sempre considerando todos os registros pagos do ministério)
+    // Cálculo das Métricas de Arrecadação Digital sincronizadas com os mesmos filtros ativos
     let summaryQuery = ctx.admin
       .from('fin_payment_charges')
-      .select('valor_pago, status')
+      .select('destination_id, valor_pago, valor_solicitado, status')
       .eq('ministry_id', ctx.ministryId)
       .in('status', ['pago', 'paid', 'concluida', 'received', 'confirmed']);
+
+    // Aplicar os mesmos filtros temporais na agregação
+    if (dataInicioParam && dataFimParam) {
+      summaryQuery = summaryQuery.gte('created_at', `${dataInicioParam}T00:00:00.000Z`).lte('created_at', `${dataFimParam}T23:59:59.999Z`);
+    } else if (dataInicioParam) {
+      summaryQuery = summaryQuery.gte('created_at', `${dataInicioParam}T00:00:00.000Z`);
+    } else if (dataFimParam) {
+      summaryQuery = summaryQuery.lte('created_at', `${dataFimParam}T23:59:59.999Z`);
+    } else if (mesParam && /^\d{4}-\d{2}$/.test(mesParam)) {
+      const [anoStr, mesStr] = mesParam.split('-');
+      const ano = parseInt(anoStr, 10);
+      const mes = parseInt(mesStr, 10);
+      const startIso = new Date(ano, mes - 1, 1).toISOString();
+      const endIso = new Date(ano, mes, 0, 23, 59, 59, 999).toISOString();
+      summaryQuery = summaryQuery.gte('created_at', startIso).lte('created_at', endIso);
+    }
+
+    if (destinationParam) {
+      summaryQuery = summaryQuery.eq('destination_id', destinationParam);
+    }
 
     if (isLocalUser(ctx) && ctx.congregacaoId) {
       const { data: localDests } = await ctx.admin
@@ -238,22 +258,61 @@ export async function GET(request: NextRequest) {
       const ids = (localDests ?? []).map((d: any) => d.id);
       if (ids.length > 0) {
         summaryQuery = summaryQuery.in('destination_id', ids);
+      } else {
+        summaryQuery = summaryQuery.eq('id', '00000000-0000-0000-0000-000000000000');
       }
+    } else if (congParam === 'none') {
+      const { data: noCongDests } = await ctx.admin
+        .from('fin_payment_destinations')
+        .select('id')
+        .eq('ministry_id', ctx.ministryId)
+        .is('congregacao_id', null);
+      const ids = (noCongDests ?? []).map((d: any) => d.id);
+      if (ids.length > 0) {
+        summaryQuery = summaryQuery.in('destination_id', ids);
+      } else {
+        summaryQuery = summaryQuery.eq('id', '00000000-0000-0000-0000-000000000000');
+      }
+    } else if (congParam) {
+      const { data: congDests } = await ctx.admin
+        .from('fin_payment_destinations')
+        .select('id')
+        .eq('ministry_id', ctx.ministryId)
+        .eq('congregacao_id', congParam);
+      const ids = (congDests ?? []).map((d: any) => d.id);
+      if (ids.length > 0) {
+        summaryQuery = summaryQuery.in('destination_id', ids);
+      } else {
+        summaryQuery = summaryQuery.eq('id', '00000000-0000-0000-0000-000000000000');
+      }
+    }
+
+    if (querySearch) {
+      summaryQuery = summaryQuery.or(
+        `payer_name.ilike.%${querySearch}%,payer_document.ilike.%${querySearch}%,gateway_charge_id.ilike.%${querySearch}%`
+      );
     }
 
     const { data: summaryData } = await summaryQuery;
 
     const totalArrecadado = (summaryData ?? []).reduce(
-      (acc: number, item: any) => acc + Number(item.valor_pago ?? 0),
+      (acc: number, item: any) => acc + Number(item.valor_pago ?? item.valor_solicitado ?? 0),
       0
     );
     const transacoesPagas = (summaryData ?? []).length;
+
+    // Quantidade de destinos distintos presentes no conjunto filtrado
+    const distinctDestinos = new Set(
+      (summaryData ?? []).map((item: any) => item.destination_id).filter(Boolean)
+    );
+    const destinosFiltradosDistintos = distinctDestinos.size;
 
     return NextResponse.json({
       data: charges ?? [],
       summary: {
         totalArrecadado,
         transacoesPagas,
+        destinosDistintos: destinosFiltradosDistintos,
       },
       meta: {
         page,

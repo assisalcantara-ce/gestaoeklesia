@@ -8,6 +8,7 @@ import {
   futureDateStr,
 } from '@/lib/asaas-eventos';
 import { avaliarStatusInscricao } from '@/lib/evento-status-utils';
+import { verifyMemberPrefillToken } from '@/lib/evento-membro-token';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,6 +32,7 @@ export async function POST(request: NextRequest) {
   const telefone      = sanitize(body.telefone);
   const congregacao   = sanitize(body.congregacao || body.igreja);
   const cpfCnpj       = sanitize(body.cpf_cnpj);  // opcional para PIX
+  const memberToken   = sanitize(body.member_token); // token HMAC de confirmação segura de membro
 
   // Validações básicas
   if (!slug) return NextResponse.json({ error: 'Slug do evento é obrigatório.' }, { status: 400 });
@@ -126,14 +128,23 @@ export async function POST(request: NextRequest) {
   if (congregacao) obsPartes.push(`Congregação: ${congregacao}`);
   const observacoes = obsPartes.length > 0 ? obsPartes.join(' | ') : null;
 
+  // Validar se há memberToken válido para vincular oficialmente ao member_id do cadastro
+  let verifiedMemberId: string | null = null;
+  if (memberToken) {
+    const verified = verifyMemberPrefillToken(memberToken);
+    if (verified.valido && verified.memberId && verified.eventoId === evento.id && verified.ministryId === evento.ministry_id) {
+      verifiedMemberId = verified.memberId;
+    }
+  }
+
   // Inserir inscrição
   const { data: inscricao, error: insErr } = await admin
     .from('eventos_inscricoes')
     .insert({
       evento_id: evento.id,
       ministry_id: evento.ministry_id,
-      member_id: null,
-      nome_externo: nome,
+      member_id: verifiedMemberId,
+      nome_externo: verifiedMemberId ? null : nome,
       email_externo: email,
       telefone,
       status: statusInscricao,
