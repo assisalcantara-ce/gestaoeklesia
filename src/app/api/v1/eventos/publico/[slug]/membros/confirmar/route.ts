@@ -76,7 +76,7 @@ export async function POST(
     // 3. Buscar cadastro do membro no tenant do evento
     const { data: member, error: memErr } = await admin
       .from('members')
-      .select('id, name, email, phone, celular, whatsapp, cpf, data_nascimento, congregacao_id, congregacoes(id, nome)')
+      .select('id, name, email, phone, celular, whatsapp, cpf, data_nascimento, congregacao_id, custom_fields, congregacoes(id, nome)')
       .eq('id', member_id)
       .eq('ministry_id', evento.ministry_id)
       .maybeSingle();
@@ -133,7 +133,16 @@ export async function POST(
     // C) Verificação pelos 4 últimos dígitos do telefone/celular/whatsapp
     if (!confirmado && telefone_confirmacao && typeof telefone_confirmacao === 'string') {
       const telDigits = telefone_confirmacao.replace(/\D/g, '');
-      const phones = [member.phone, member.celular, member.whatsapp].filter(Boolean) as string[];
+      const cf = (member.custom_fields && typeof member.custom_fields === 'object') ? member.custom_fields : {};
+      const phones = [
+        member.phone,
+        member.celular,
+        member.whatsapp,
+        cf.whatsapp,
+        cf.celular,
+        cf.phone,
+        cf.telefone,
+      ].filter(Boolean) as string[];
       for (const p of phones) {
         const cleanP = String(p).replace(/\D/g, '');
         if (cleanP.length >= 8 && telDigits.length >= 4 && cleanP.endsWith(telDigits)) {
@@ -161,14 +170,26 @@ export async function POST(
     });
 
     // Regra de prioridade obrigatória para Telefone / WhatsApp:
-    // 1ª opção — WhatsApp: se o membro possuir WhatsApp cadastrado (não nulo nem em branco).
-    // 2ª opção — Celular / Telefone: se WhatsApp estiver vazio ou nulo, utilizar celular ou phone.
+    // 1ª opção — WhatsApp: se o membro possuir WhatsApp cadastrado (não nulo nem em branco),
+    //             verificando tanto a coluna nativa `whatsapp` quanto `custom_fields.whatsapp`.
+    // 2ª opção — Celular / Telefone: se WhatsApp estiver vazio ou nulo, utilizar celular ou phone
+    //             (verificando colunas nativas e custom_fields).
     // 3ª opção — Sem número: se todos estiverem vazios/espaços em branco, retornar string vazia para digitação manual.
-    const whatsappValido = (typeof member.whatsapp === 'string' && member.whatsapp.trim()) ? member.whatsapp.trim() : null;
-    const celularValido = (typeof member.celular === 'string' && member.celular.trim()) ? member.celular.trim() : null;
-    const phoneValido = (typeof member.phone === 'string' && member.phone.trim()) ? member.phone.trim() : null;
+    const cf = (member.custom_fields && typeof member.custom_fields === 'object') ? member.custom_fields : {};
 
-    const telefonePriorizado = whatsappValido || celularValido || phoneValido || '';
+    const extrairValorValido = (...valores: any[]): string | null => {
+      for (const v of valores) {
+        if (typeof v === 'string' && v.trim()) {
+          return v.trim();
+        }
+      }
+      return null;
+    };
+
+    const whatsappValido = extrairValorValido(member.whatsapp, cf.whatsapp);
+    const celularValido = extrairValorValido(member.celular, cf.celular, member.phone, cf.phone, cf.telefone);
+
+    const telefonePriorizado = whatsappValido || celularValido || '';
     const congregacaoNome = (member.congregacoes as any)?.nome || '';
 
     return NextResponse.json({
@@ -177,10 +198,10 @@ export async function POST(
       dados: {
         member_id: member.id,
         nome: member.name,
-        email: (typeof member.email === 'string' && member.email.trim()) ? member.email.trim() : '',
+        email: (typeof member.email === 'string' && member.email.trim()) ? member.email.trim() : (typeof cf.email === 'string' && cf.email.trim() ? cf.email.trim() : ''),
         telefone: telefonePriorizado,
         congregacao: congregacaoNome,
-        cpf: (typeof member.cpf === 'string' && member.cpf.trim()) ? member.cpf.trim() : '',
+        cpf: (typeof member.cpf === 'string' && member.cpf.trim()) ? member.cpf.trim() : (typeof cf.cpf === 'string' && cf.cpf.trim() ? cf.cpf.trim() : ''),
       },
     });
   } catch (err: any) {

@@ -109,14 +109,24 @@ describe('Inscrição Pública de Eventos - Autocomplete Seguro de Membros e LGP
     assert.match(pageContent, /inputConfirmacaoRef\.current\?\.focus\(\)/);
   });
 
-  it('7. Regra Obrigatória de Prioridade do WhatsApp no Preenchimento Automático', () => {
+  it('7. Regra Obrigatória de Prioridade do WhatsApp no Preenchimento Automático (incluindo custom_fields)', () => {
     // Simulador da regra implementada no backend (confirmar/route.ts)
     function resolverTelefonePriorizado(member) {
-      const whatsappValido = (typeof member.whatsapp === 'string' && member.whatsapp.trim()) ? member.whatsapp.trim() : null;
-      const celularValido = (typeof member.celular === 'string' && member.celular.trim()) ? member.celular.trim() : null;
-      const phoneValido = (typeof member.phone === 'string' && member.phone.trim()) ? member.phone.trim() : null;
+      const cf = (member.custom_fields && typeof member.custom_fields === 'object') ? member.custom_fields : {};
 
-      return whatsappValido || celularValido || phoneValido || '';
+      const extrairValorValido = (...valores) => {
+        for (const v of valores) {
+          if (typeof v === 'string' && v.trim()) {
+            return v.trim();
+          }
+        }
+        return null;
+      };
+
+      const whatsappValido = extrairValorValido(member.whatsapp, cf.whatsapp);
+      const celularValido = extrairValorValido(member.celular, cf.celular, member.phone, cf.phone, cf.telefone);
+
+      return whatsappValido || celularValido || '';
     }
 
     // Caso 1: WhatsApp preenchido e celular vazio -> utilizar WhatsApp
@@ -131,21 +141,27 @@ describe('Inscrição Pública de Eventos - Autocomplete Seguro de Membros e LGP
       '11999998888'
     );
 
-    // Caso 3: WhatsApp vazio e celular preenchido -> utilizar celular
+    // Caso 3: WhatsApp na coluna custom_fields.whatsapp -> priorizar WhatsApp
     assert.equal(
-      resolverTelefonePriorizado({ whatsapp: '', celular: '11977776666', phone: null }),
-      '11977776666'
+      resolverTelefonePriorizado({ whatsapp: null, celular: '11977776666', custom_fields: { whatsapp: '85999991111' } }),
+      '85999991111'
     );
 
-    // Caso 3b: WhatsApp com apenas espaços em branco e phone preenchido -> utilizar phone
+    // Caso 4: Celular no custom_fields.celular com whatsapp vazio -> utilizar celular do custom_fields
     assert.equal(
-      resolverTelefonePriorizado({ whatsapp: '   ', celular: null, phone: '1133334444' }),
-      '1133334444'
+      resolverTelefonePriorizado({ whatsapp: '', celular: null, custom_fields: { celular: '85988882222' } }),
+      '85988882222'
     );
 
-    // Caso 4: Ambos vazios ou nulos -> string vazia para preenchimento manual
+    // Caso 5: Celular em custom_fields.telefone com whatsapp vazio -> utilizar telefone do custom_fields
     assert.equal(
-      resolverTelefonePriorizado({ whatsapp: null, celular: '', phone: '   ' }),
+      resolverTelefonePriorizado({ whatsapp: null, celular: null, phone: null, custom_fields: { telefone: '8533334444' } }),
+      '8533334444'
+    );
+
+    // Caso 6: Ambos vazios ou nulos -> string vazia para preenchimento manual
+    assert.equal(
+      resolverTelefonePriorizado({ whatsapp: null, celular: '', phone: '   ', custom_fields: {} }),
       ''
     );
   });

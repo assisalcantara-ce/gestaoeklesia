@@ -67,13 +67,17 @@ function aplicarMascaraData(valor: string): string {
 
 // Máscara formatadora de Telefone/Celular: (00) 00000-0000 ou (00) 0000-0000
 function aplicarMascaraTelefone(valor: string): string {
-  const digits = valor.replace(/\D/g, '').slice(0, 11);
-  if (digits.length <= 2) return digits.length ? `(${digits}` : '';
-  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
-  if (digits.length <= 10) {
-    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  if (!valor) return '';
+  const digits = valor.replace(/\D/g, '');
+  if (!digits) return '';
+  // Se tiver 55 no início e mais de 11 dígitos, remove DDI do Brasil para manter padrão local
+  const cleanDigits = (digits.startsWith('55') && digits.length > 11) ? digits.slice(2, 13) : digits.slice(0, 11);
+  if (cleanDigits.length <= 2) return `(${cleanDigits}`;
+  if (cleanDigits.length <= 6) return `(${cleanDigits.slice(0, 2)}) ${cleanDigits.slice(2)}`;
+  if (cleanDigits.length <= 10) {
+    return `(${cleanDigits.slice(0, 2)}) ${cleanDigits.slice(2, 6)}-${cleanDigits.slice(6)}`;
   }
-  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  return `(${cleanDigits.slice(0, 2)}) ${cleanDigits.slice(2, 7)}-${cleanDigits.slice(7)}`;
 }
 
 // Validador simples de data real no padrão DD/MM/AAAA
