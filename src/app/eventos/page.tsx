@@ -46,6 +46,7 @@ import {
   LayoutList,
   Lock,
   MapPin,
+  MessageCircle,
   MoreVertical,
   Pencil,
   Play,
@@ -162,6 +163,7 @@ interface Evento {
   vagas_hospedagem?: number | null;
   descricao_hospedagem?: string | null;
   programacao?: string | null;
+  whatsapp_grupo_url?: string | null;
   criado_por: string | null;
   created_at: string;
   congregacao_nome?: string;
@@ -241,6 +243,7 @@ type FormEvento = {
   vagas_hospedagem: string;
   descricao_hospedagem: string;
   programacao: string;
+  whatsapp_grupo_url: string;
 };
 
 type FormInscricao = {
@@ -387,6 +390,7 @@ const FORM_EVENTO_INICIAL: FormEvento = {
   vagas_hospedagem: '',
   descricao_hospedagem: '',
   programacao: '',
+  whatsapp_grupo_url: '',
 };
 
 const FORM_INSCRICAO_INICIAL: FormInscricao = {
@@ -1610,7 +1614,7 @@ export default function EventosPage() {
 
     setSalvando(true);
 
-    const payload = {
+    let payload: Record<string, any> = {
       ministry_id: ministryId,
       congregacao_id: formEvento.congregacao_id || null,
       titulo: formEvento.titulo.trim(),
@@ -1639,13 +1643,24 @@ export default function EventosPage() {
       vagas_hospedagem: formEvento.inclui_hospedagem && formEvento.vagas_hospedagem ? parseInt(formEvento.vagas_hospedagem) : null,
       descricao_hospedagem: formEvento.inclui_hospedagem ? (formEvento.descricao_hospedagem || null) : null,
       programacao: formEvento.programacao || null,
+      whatsapp_grupo_url: formEvento.whatsapp_grupo_url?.trim() || null,
       criado_por: user?.id ?? null,
       updated_at: new Date().toISOString(),
     };
 
-    const { error } = editandoId
+    let { error } = editandoId
       ? await supabase.from('eventos').update(payload).eq('id', editandoId)
       : await supabase.from('eventos').insert(payload);
+
+    // Compatibilidade resiliente caso a coluna whatsapp_grupo_url ainda esteja em processo de aplicação na migration
+    if (error && (error.message?.includes('whatsapp_grupo_url') || error.code === '42703')) {
+      console.warn('Coluna whatsapp_grupo_url ausente no banco remoto. Reenviando payload sem ela:', error.message);
+      delete payload.whatsapp_grupo_url;
+      const retryResult = editandoId
+        ? await supabase.from('eventos').update(payload).eq('id', editandoId)
+        : await supabase.from('eventos').insert(payload);
+      error = retryResult.error;
+    }
 
     setSalvando(false);
 
@@ -1722,6 +1737,7 @@ export default function EventosPage() {
       vagas_hospedagem: e.vagas_hospedagem?.toString() ?? '',
       descricao_hospedagem: e.descricao_hospedagem ?? '',
       programacao: e.programacao ?? '',
+      whatsapp_grupo_url: e.whatsapp_grupo_url ?? '',
     });
     setShowForm(true);
   };
@@ -4203,6 +4219,37 @@ export default function EventosPage() {
                       className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:ring-2 focus:ring-[#1d4ed8] transition"
                     />
                   </div>
+
+                  <div className="md:col-span-3">
+                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 mb-1">
+                      <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                      Link do Grupo de WhatsApp do Evento (Opcional)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="url"
+                        value={formEvento.whatsapp_grupo_url}
+                        onChange={e => setFormEvento(f => ({ ...f, whatsapp_grupo_url: e.target.value }))}
+                        placeholder="https://chat.whatsapp.com/..."
+                        className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition"
+                      />
+                      {formEvento.whatsapp_grupo_url && (
+                        <a
+                          href={formEvento.whatsapp_grupo_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="absolute right-2.5 top-2.5 px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[11px] font-bold flex items-center gap-1 transition"
+                          title="Testar link do grupo"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          <span>Testar</span>
+                        </a>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Link de convite do grupo do evento (ex: https://chat.whatsapp.com/...). Pode ser disponibilizado para os inscritos e na página do evento.
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -5627,6 +5674,22 @@ export default function EventosPage() {
                   <pre className="text-xs font-mono text-slate-700 bg-slate-50 p-3 rounded-xl whitespace-pre-line">
                     {eventoSelecionado.programacao}
                   </pre>
+                </div>
+              )}
+
+              {eventoSelecionado.whatsapp_grupo_url && (
+                <div className="pt-2 border-t border-slate-100">
+                  <span className="text-slate-400 font-semibold block text-xs mb-1.5">Comunicação e Grupo</span>
+                  <a
+                    href={eventoSelecionado.whatsapp_grupo_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition shadow-2xs"
+                  >
+                    <MessageCircle className="w-4 h-4 text-emerald-600" />
+                    <span>Entrar no Grupo do WhatsApp do Evento</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-emerald-500" />
+                  </a>
                 </div>
               )}
             </div>
