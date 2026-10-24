@@ -17,6 +17,7 @@ import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/
 import { substituirPlaceholdersCertificado, isTemplateCategoriaEventos } from '@/lib/certificados-utils';
 import { formatarEnderecoCongregacao, buildEventoPlaceholderMap } from '@/lib/evento-status-utils';
 import { getFontesCertificadosHeadHtml, getFontesReadyPrintScript, buildTextoEstiloRenderizacao } from '@/lib/certificados-fontes';
+import { formatCpf, validarCpf } from '@/lib/mascaras';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   AlertCircle,
@@ -125,6 +126,7 @@ interface Membro {
   nome_completo: string;
   email?: string;
   telefone?: string;
+  cpf?: string;
 }
 
 interface Evento {
@@ -242,6 +244,7 @@ type FormEvento = {
 type FormInscricao = {
   member_id: string;
   nome_externo: string;
+  cpf: string;
   email_externo: string;
   telefone: string;
   status: StatusInscricao;
@@ -386,6 +389,7 @@ const FORM_EVENTO_INICIAL: FormEvento = {
 const FORM_INSCRICAO_INICIAL: FormInscricao = {
   member_id: '',
   nome_externo: '',
+  cpf: '',
   email_externo: '',
   telefone: '',
   status: 'confirmado',
@@ -459,6 +463,35 @@ function extrairEmailMembro(m: any): string {
   return '';
 }
 
+function extrairCpfMembro(m: any): string {
+  if (!m) return '';
+  if (typeof m.cpf === 'string' && m.cpf.trim()) return m.cpf.trim();
+  const cf = (m.custom_fields && typeof m.custom_fields === 'object') ? m.custom_fields : {};
+  if (typeof cf.cpf === 'string' && cf.cpf.trim()) return cf.cpf.trim();
+  for (const [k, v] of Object.entries(cf)) {
+    if (k.toLowerCase().includes('cpf') && typeof v === 'string' && v.trim()) {
+      return v.trim();
+    }
+  }
+  return '';
+}
+
+// Normaliza nome completo para formato Title Case (Nome Próprio), preservando partículas e acentos
+function formatarNomeProprio(nome: string | null | undefined): string {
+  if (!nome || typeof nome !== 'string') return '';
+  const preposicoes = new Set(['de', 'da', 'do', 'dos', 'das', 'e', 'em', 'para', 'com', 'por', 'a', 'o', 'as', 'os']);
+  const partes = nome.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (partes.length === 0) return '';
+  return partes
+    .map((parte, idx) => {
+      if (idx > 0 && preposicoes.has(parte)) {
+        return parte;
+      }
+      return parte.charAt(0).toUpperCase() + parte.slice(1);
+    })
+    .join(' ');
+}
+
 // ─── Helpers de Formatação e Data ─────────────────────────────────────────────
 
 const fmtDate = (s: string | null | undefined) => {
@@ -495,9 +528,14 @@ const parseDateParts = (s: string | null | undefined) => {
 const fmtBRL = (v: number) =>
   v === 0 ? 'Gratuito' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+// Retorna a data no fuso de Brasília (America/Sao_Paulo / UTC-3) no formato YYYY-MM-DD
+const hojeBrasiliaDataStr = (d: Date = new Date()): string => {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(d);
+};
+
 const mesAtualEvento = () => {
-  const n = new Date();
-  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`;
+  const [y, m] = hojeBrasiliaDataStr().split('-');
+  return `${y}-${m}`;
 };
 
 const formatMonthLabel = (mes: string) => {
@@ -1069,42 +1107,41 @@ export default function EventosPage() {
         .eq('ministry_id', ministryId)
         .order('data_inicio', { ascending: true });
 
-      const hoje = new Date();
-      const hojeStr = hoje.toISOString().split('T')[0];
+      // Referência temporal no fuso de Brasília (America/Sao_Paulo / UTC-3)
+      const hojeStr = hojeBrasiliaDataStr();
       const hojeInicio = `${hojeStr}T00:00:00`;
 
       // Aplicação dos Períodos
       if (periodo === 'todos') {
         // Regra 1: Agenda padrão operacional
-        // Exibe eventos futuros (data_inicio >= hoje) ou eventos em andamento
+        // Exibe eventos futuros (data_inicio >= hojeInicio), eventos em andamento,
+        // ou eventos com status programado que ainda estejam no ar/vigentes por data_fim
         if (!status) {
-          q = q.or(`data_inicio.gte.${hojeInicio},status.eq.em_andamento`);
+          q = q.or(`data_inicio.gte.${hojeInicio},status.eq.em_andamento,status.eq.programado,data_fim.gte.${hojeInicio}`);
           q = q.neq('status', 'cancelado').neq('status', 'realizado');
         } else {
-          q = q.gte('data_inicio', hojeInicio);
+          q = q.or(`data_inicio.gte.${hojeInicio},data_fim.gte.${hojeInicio},status.eq.${status}`);
         }
       } else if (periodo === 'este_mes') {
-        const y = hoje.getFullYear();
-        const m = String(hoje.getMonth() + 1).padStart(2, '0');
-        const proxDate = new Date(y, hoje.getMonth() + 1, 1);
-        const py = proxDate.getFullYear();
-        const pm = String(proxDate.getMonth() + 1).padStart(2, '0');
-        q = q.gte('data_inicio', `${y}-${m}-01T00:00:00`).lt('data_inicio', `${py}-${pm}-01T00:00:00`);
+        const [y, m] = hojeStr.split('-');
+        const mesAtualStr = `${y}-${m}`;
+        const proxMesStr = mesProximoEvento(mesAtualStr);
+        q = q.gte('data_inicio', `${mesAtualStr}-01T00:00:00`).lt('data_inicio', `${proxMesStr}-01T00:00:00`);
       } else if (periodo === 'proximo_mes') {
-        const proxDate = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1);
-        const y = proxDate.getFullYear();
-        const m = String(proxDate.getMonth() + 1).padStart(2, '0');
-        const aposProxDate = new Date(hoje.getFullYear(), hoje.getMonth() + 2, 1);
-        const py = aposProxDate.getFullYear();
-        const pm = String(aposProxDate.getMonth() + 1).padStart(2, '0');
-        q = q.gte('data_inicio', `${y}-${m}-01T00:00:00`).lt('data_inicio', `${py}-${pm}-01T00:00:00`);
+        const [y, m] = hojeStr.split('-');
+        const mesAtualStr = `${y}-${m}`;
+        const proxMesStr = mesProximoEvento(mesAtualStr);
+        const aposProxMesStr = mesProximoEvento(proxMesStr);
+        q = q.gte('data_inicio', `${proxMesStr}-01T00:00:00`).lt('data_inicio', `${aposProxMesStr}-01T00:00:00`);
       } else if (periodo === 'proximos_30') {
-        const d30 = new Date(hoje.getTime() + 30 * 24 * 60 * 60 * 1000);
-        const d30Str = d30.toISOString().split('T')[0];
+        const [y, m, d] = hojeStr.split('-').map(Number);
+        const d30 = new Date(y, m - 1, d + 30);
+        const d30Str = hojeBrasiliaDataStr(d30);
         q = q.gte('data_inicio', hojeInicio).lte('data_inicio', `${d30Str}T23:59:59`);
       } else if (periodo === 'proximos_90') {
-        const d90 = new Date(hoje.getTime() + 90 * 24 * 60 * 60 * 1000);
-        const d90Str = d90.toISOString().split('T')[0];
+        const [y, m, d] = hojeStr.split('-').map(Number);
+        const d90 = new Date(y, m - 1, d + 90);
+        const d90Str = hojeBrasiliaDataStr(d90);
         q = q.gte('data_inicio', hojeInicio).lte('data_inicio', `${d90Str}T23:59:59`);
       } else if (periodo === 'mes_especifico' && mesCustom && /^\d{4}-\d{2}$/.test(mesCustom)) {
         const prox = mesProximoEvento(mesCustom);
@@ -1254,7 +1291,7 @@ export default function EventosPage() {
       }
       const { data } = await supabase
         .from('members')
-        .select('id, name, email, phone, celular, whatsapp, custom_fields')
+        .select('id, name, email, phone, celular, whatsapp, cpf, custom_fields')
         .eq('ministry_id', ministryId)
         .ilike('name', `%${q}%`)
         .limit(8);
@@ -1263,12 +1300,14 @@ export default function EventosPage() {
         ((data ?? []) as any[]).map(m => {
           const rawTel = extrairTelefoneMembro(m);
           const email = extrairEmailMembro(m);
+          const rawCpf = extrairCpfMembro(m);
 
           return {
             id: m.id,
             nome_completo: m.name ?? '',
             email,
             telefone: formatarTelefoneMembro(rawTel),
+            cpf: rawCpf ? formatCpf(rawCpf) : '',
           };
         })
       );
@@ -1695,9 +1734,11 @@ export default function EventosPage() {
 
   const abrirEditarInscricao = (insc: Inscricao) => {
     setEditingInscId(insc.id);
+    const cpfExtraido = (insc as any).cpf || '';
     setFormInsc({
       member_id: insc.member_id || '',
       nome_externo: insc.nome_externo || (!insc.member_id ? insc.nome_display || '' : ''),
+      cpf: cpfExtraido ? formatCpf(cpfExtraido) : '',
       email_externo: insc.email_externo || '',
       telefone: insc.telefone || '',
       status: insc.status,
@@ -1708,11 +1749,12 @@ export default function EventosPage() {
       setMembroSelecionado({
         id: insc.member_id,
         nome_completo: insc.nome_display || '',
+        cpf: cpfExtraido ? formatCpf(cpfExtraido) : '',
       });
       setBuscaMembro(insc.nome_display || '');
     } else {
       setMembroSelecionado(null);
-      setBuscaMembro('');
+      setBuscaMembro(insc.nome_display || insc.nome_externo || '');
     }
     setShowFormInsc(true);
   };
@@ -1720,11 +1762,23 @@ export default function EventosPage() {
   const handleSaveInscricao = async () => {
     if (!ministryId || !eventoSelecionado) return;
     const temMembro = !!membroSelecionado;
-    const temExterno = !!formInsc.nome_externo.trim();
-    if (!temMembro && !temExterno) {
-      showModal('Campo obrigatório', 'Selecione um membro ou informe o nome do participante.', 'error');
+    const nomeDigitado = (formInsc.nome_externo || buscaMembro).trim();
+    if (!temMembro && !nomeDigitado) {
+      showModal('Campo obrigatório', 'Informe o nome do participante ou selecione um membro cadastrado.', 'error');
       return;
     }
+
+    // Validação de CPF caso preenchido
+    const cpfLimpo = formInsc.cpf.replace(/\D/g, '');
+    if (cpfLimpo) {
+      if (!validarCpf(cpfLimpo)) {
+        showModal('CPF inválido', 'O CPF informado não é válido. Por favor, verifique os dígitos.', 'error');
+        return;
+      }
+    }
+
+    // Normalização do nome para Title Case (Nome Próprio)
+    const nomeNormalizado = formatarNomeProprio(temMembro ? membroSelecionado.nome_completo : nomeDigitado);
 
     let statusFinal = formInsc.status;
     if (!editingInscId && statusFinal === 'confirmado' && eventoSelecionado.capacidade != null) {
@@ -1749,7 +1803,7 @@ export default function EventosPage() {
         .from('eventos_inscricoes')
         .update({
           member_id: membroSelecionado?.id ?? null,
-          nome_externo: temExterno ? formInsc.nome_externo.trim() : null,
+          nome_externo: temMembro ? null : nomeNormalizado,
           email_externo: formInsc.email_externo || null,
           telefone: formInsc.telefone || null,
           status: statusFinal,
@@ -1770,7 +1824,7 @@ export default function EventosPage() {
         evento_id: eventoSelecionado.id,
         ministry_id: ministryId,
         member_id: membroSelecionado?.id ?? null,
-        nome_externo: temExterno ? formInsc.nome_externo.trim() : null,
+        nome_externo: temMembro ? null : nomeNormalizado,
         email_externo: formInsc.email_externo || null,
         telefone: formInsc.telefone || null,
         status: statusFinal,
@@ -1793,6 +1847,7 @@ export default function EventosPage() {
     setMembroSelecionado(null);
     setBuscaMembro('');
     carregarInscricoes(eventoSelecionado.id);
+    carregarEventos(filtroPeriodo, filtroMesCustom, filtroStatus, filtroCongEv, buscaEv);
   };
 
   const handleDeleteInscricao = (insc: Inscricao) => {
@@ -1811,7 +1866,10 @@ export default function EventosPage() {
     const nomeRemovido = inscricaoParaExcluir.nome_display ?? inscricaoParaExcluir.nome_externo ?? 'Participante';
     setInscricaoParaExcluir(null);
     showModal('Inscrição removida', `A inscrição de "${nomeRemovido}" foi removida com sucesso.`, 'success');
-    if (eventoSelecionado) carregarInscricoes(eventoSelecionado.id);
+    if (eventoSelecionado) {
+      carregarInscricoes(eventoSelecionado.id);
+      carregarEventos(filtroPeriodo, filtroMesCustom, filtroStatus, filtroCongEv, buscaEv);
+    }
   };
 
   // ── Ações do Balcão (Atendimento Presencial) ─────────────────────────────
@@ -2184,7 +2242,10 @@ export default function EventosPage() {
       showModal('Erro', error.message, 'error');
       return;
     }
-    if (eventoSelecionado) carregarInscricoes(eventoSelecionado.id);
+    if (eventoSelecionado) {
+      carregarInscricoes(eventoSelecionado.id);
+      carregarEventos(filtroPeriodo, filtroMesCustom, filtroStatus, filtroCongEv, buscaEv);
+    }
   };
 
   const handleToggleBrindeEntregue = async (insc: Inscricao) => {
@@ -2201,7 +2262,10 @@ export default function EventosPage() {
       showModal('Erro', error.message, 'error');
       return;
     }
-    if (eventoSelecionado) carregarInscricoes(eventoSelecionado.id);
+    if (eventoSelecionado) {
+      carregarInscricoes(eventoSelecionado.id);
+      carregarEventos(filtroPeriodo, filtroMesCustom, filtroStatus, filtroCongEv, buscaEv);
+    }
   };
 
   const handleStatusHospedagem = async (insc: Inscricao, status: StatusHospedagem) => {
@@ -2213,7 +2277,10 @@ export default function EventosPage() {
       showModal('Erro', error.message, 'error');
       return;
     }
-    if (eventoSelecionado) carregarInscricoes(eventoSelecionado.id);
+    if (eventoSelecionado) {
+      carregarInscricoes(eventoSelecionado.id);
+      carregarEventos(filtroPeriodo, filtroMesCustom, filtroStatus, filtroCongEv, buscaEv);
+    }
   };
 
 
@@ -4840,17 +4907,21 @@ export default function EventosPage() {
                   <div className="space-y-4 max-h-[calc(85vh-160px)] overflow-y-auto pr-1">
                     <div>
                       <label className="text-xs font-semibold text-slate-700 block mb-1">
-                        {editingInscId ? 'Membro Vinculado' : 'Buscar Membro Cadastrado'}
+                        Buscar Membro Cadastrado
                       </label>
                       <div className="relative">
                         <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
                         <input
                           value={buscaMembro}
                           onChange={e => {
-                            setBuscaMembro(e.target.value);
-                            setMembroSelecionado(null);
+                            const val = e.target.value;
+                            setBuscaMembro(val);
+                            if (membroSelecionado) {
+                              setMembroSelecionado(null);
+                            }
+                            setFormInsc(f => ({ ...f, nome_externo: val }));
                           }}
-                          placeholder="Digite 3 ou mais letras para pesquisar no rol de membros..."
+                          placeholder="Digite 3 ou mais letras para buscar no rol de membros ou digite o nome completo..."
                           className="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0f3460]/20"
                         />
                       </div>
@@ -4859,13 +4930,16 @@ export default function EventosPage() {
                           {resultadosMembro.map(m => (
                             <button
                               key={m.id}
+                              type="button"
                               onClick={() => {
                                 setMembroSelecionado(m);
                                 setBuscaMembro(m.nome_completo);
                                 setResultadosMembro([]);
                                 setFormInsc(f => ({
                                   ...f,
+                                  member_id: m.id,
                                   nome_externo: '',
+                                  cpf: m.cpf || f.cpf,
                                   email_externo: m.email || f.email_externo,
                                   telefone: m.telefone || f.telefone,
                                 }));
@@ -4875,9 +4949,9 @@ export default function EventosPage() {
                               <div className="flex items-center justify-between">
                                 <div>
                                   <p className="font-semibold text-slate-900">{m.nome_completo}</p>
-                                  {(m.email || m.telefone) && (
+                                  {(m.cpf || m.email || m.telefone) && (
                                     <p className="text-[11px] text-slate-400">
-                                      {[m.email, m.telefone].filter(Boolean).join(' • ')}
+                                      {[m.cpf ? `CPF: ${m.cpf}` : null, m.email, m.telefone].filter(Boolean).join(' • ')}
                                     </p>
                                   )}
                                 </div>
@@ -4897,6 +4971,7 @@ export default function EventosPage() {
                             onClick={() => {
                               setMembroSelecionado(null);
                               setBuscaMembro('');
+                              setFormInsc(f => ({ ...f, member_id: '', nome_externo: '' }));
                             }}
                             className="text-slate-400 hover:text-slate-600 text-[11px] font-normal underline cursor-pointer"
                           >
@@ -4906,21 +4981,15 @@ export default function EventosPage() {
                       )}
                     </div>
 
-                    <div className="relative flex py-1 items-center">
-                      <div className="flex-grow border-t border-slate-200" />
-                      <span className="flex-shrink mx-3 text-slate-400 text-xs font-semibold">ou participante externo</span>
-                      <div className="flex-grow border-t border-slate-200" />
-                    </div>
-
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-xs font-semibold text-slate-700 block mb-1">Nome Completo</label>
+                        <label className="text-xs font-semibold text-slate-700 block mb-1">CPF</label>
                         <input
-                          value={formInsc.nome_externo}
-                          onChange={e => setFormInsc(f => ({ ...f, nome_externo: e.target.value }))}
-                          disabled={!!membroSelecionado}
-                          className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs disabled:opacity-50"
-                          placeholder="Nome do participante"
+                          value={formInsc.cpf}
+                          onChange={e => setFormInsc(f => ({ ...f, cpf: formatCpf(e.target.value) }))}
+                          maxLength={14}
+                          className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs"
+                          placeholder="000.000.000-00"
                         />
                       </div>
                       <div>
