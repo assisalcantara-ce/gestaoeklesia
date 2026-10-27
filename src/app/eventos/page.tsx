@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   Award,
   Bed,
+  Building2,
   Calendar,
   CalendarDays,
   Check,
@@ -164,6 +165,7 @@ interface Evento {
   descricao_hospedagem?: string | null;
   programacao?: string | null;
   whatsapp_grupo_url?: string | null;
+  certificado_envio_auto_checkin?: boolean;
   criado_por: string | null;
   created_at: string;
   congregacao_nome?: string;
@@ -194,6 +196,8 @@ interface Inscricao {
   criado_por: string | null;
   created_at: string;
   nome_display?: string;
+  congregacao_id?: string | null;
+  congregacao_nome?: string;
 }
 
 interface Pagamento {
@@ -244,6 +248,7 @@ type FormEvento = {
   descricao_hospedagem: string;
   programacao: string;
   whatsapp_grupo_url: string;
+  certificado_envio_auto_checkin: boolean;
 };
 
 type FormInscricao = {
@@ -391,6 +396,7 @@ const FORM_EVENTO_INICIAL: FormEvento = {
   descricao_hospedagem: '',
   programacao: '',
   whatsapp_grupo_url: '',
+  certificado_envio_auto_checkin: false,
 };
 
 const FORM_INSCRICAO_INICIAL: FormInscricao = {
@@ -500,6 +506,48 @@ function formatarNomeProprio(nome: string | null | undefined): string {
     .join(' ');
 }
 
+// Extrai congregação explicitamente informada ou vinculada à inscrição
+function extrairCongregacaoInscricao(
+  rawObs: string | null | undefined,
+  member: any,
+  congregacoesList: Congregacao[]
+): { congregacao_id?: string; congregacao_nome: string } {
+  // 1. Prioridade: Congregação salva nas observações estruturadas (ex: "Congregação: Templo Central / Sede")
+  if (rawObs) {
+    const match = rawObs.match(/Congregação:\s*([^|]+)/i);
+    if (match && match[1]) {
+      const nomeOuId = match[1].trim();
+      const achada = congregacoesList.find(
+        c => c.id === nomeOuId || c.nome.toLowerCase() === nomeOuId.toLowerCase()
+      );
+      if (achada) {
+        return { congregacao_id: achada.id, congregacao_nome: achada.nome };
+      }
+      if (nomeOuId) {
+        return { congregacao_nome: nomeOuId };
+      }
+    }
+  }
+
+  // 2. Prioridade: Relacionamento de membro cadastrado
+  if (member) {
+    if (member.congregacoes && member.congregacoes.nome) {
+      return {
+        congregacao_id: member.congregacoes.id || member.congregacao_id,
+        congregacao_nome: member.congregacoes.nome,
+      };
+    }
+    if (member.congregacao_id) {
+      const achada = congregacoesList.find(c => c.id === member.congregacao_id);
+      if (achada) {
+        return { congregacao_id: achada.id, congregacao_nome: achada.nome };
+      }
+    }
+  }
+
+  return { congregacao_nome: 'Não informada' };
+}
+
 // ─── Helpers de Formatação e Data ─────────────────────────────────────────────
 
 const fmtDate = (s: string | null | undefined) => {
@@ -595,6 +643,7 @@ const statusHospCor = (s: StatusHospedagem | undefined) =>
 const exportarCSVInscricoes = (inscricoes: Inscricao[], tituloEvento: string) => {
   const header = [
     'Nome',
+    'Congregação',
     'E-mail',
     'Telefone',
     'Status',
@@ -606,6 +655,7 @@ const exportarCSVInscricoes = (inscricoes: Inscricao[], tituloEvento: string) =>
   ];
   const rows = inscricoes.map(i => [
     i.nome_display ?? i.nome_externo ?? '—',
+    i.congregacao_nome ?? 'Não informada',
     i.email_externo ?? '—',
     i.telefone ?? '—',
     statusInscricaoLabel(i.status),
@@ -756,6 +806,7 @@ export default function EventosPage() {
   const [loadingInsc, setLoadingInsc] = useState(false);
   const [buscaInsc, setBuscaInsc] = useState('');
   const [filtroStatusInsc, setFiltroStatusInsc] = useState<'' | StatusInscricao>('');
+  const [filtroCongInsc, setFiltroCongInsc] = useState('');
   const [showFormInsc, setShowFormInsc] = useState(false);
   const [editingInscId, setEditingInscId] = useState<string | null>(null);
   const [formInsc, setFormInsc] = useState<FormInscricao>(FORM_INSCRICAO_INICIAL);
@@ -776,7 +827,6 @@ export default function EventosPage() {
   // ── Modal Atendimento de Balcão (Inscrição Presencial) ────────────────────
   const [showBalcaoModal, setShowBalcaoModal] = useState(false);
   const [balcaoEventoId, setBalcaoEventoId] = useState<string>('');
-  const [balcaoTipoParticipante, setBalcaoTipoParticipante] = useState<'membro' | 'externo'>('membro');
   const [balcaoMembro, setBalcaoMembro] = useState<Membro | null>(null);
   const [balcaoBuscaMembro, setBalcaoBuscaMembro] = useState('');
   const [balcaoResultadosMembro, setBalcaoResultadosMembro] = useState<Membro[]>([]);
@@ -1227,7 +1277,7 @@ export default function EventosPage() {
       setLoadingInsc(true);
       const { data, error } = await supabase
         .from('eventos_inscricoes')
-        .select('*, members(name, email, phone, celular, whatsapp, custom_fields)')
+        .select('*, members(name, email, phone, celular, whatsapp, congregacao_id, custom_fields, congregacoes(id, nome))')
         .eq('evento_id', eventoId)
         .order('created_at', { ascending: false });
 
@@ -1244,24 +1294,30 @@ export default function EventosPage() {
           phone?: string | null;
           celular?: string | null;
           whatsapp?: string | null;
+          congregacao_id?: string | null;
           custom_fields?: any;
+          congregacoes?: { id?: string; nome?: string } | null;
         } | null;
       };
       setInscricoes(
         ((data ?? []) as RawInsc[]).map(i => {
           const rawMemberTel = i.members ? extrairTelefoneMembro(i.members) : '';
           const memberEmail = i.members ? extrairEmailMembro(i.members) : '';
+          const { congregacao_id: congIdExtraida, congregacao_nome: congNomeExtraido } =
+            extrairCongregacaoInscricao(i.observacoes, i.members, congregacoes);
           return {
             ...i,
             nome_display: i.member_id ? i.members?.name ?? i.nome_externo ?? '—' : i.nome_externo ?? '—',
             email_externo: i.email_externo || memberEmail || null,
             telefone: i.telefone || (rawMemberTel ? formatarTelefoneMembro(rawMemberTel) : null),
+            congregacao_id: congIdExtraida || null,
+            congregacao_nome: congNomeExtraido || 'Não informada',
           };
         })
       );
       setLoadingInsc(false);
     },
-    [supabase]
+    [supabase, congregacoes]
   );
 
   useEffect(() => {
@@ -1413,17 +1469,27 @@ export default function EventosPage() {
   const inscricoesFiltradas = useMemo(() => {
     let list = inscricoes;
     if (filtroStatusInsc) list = list.filter(i => i.status === filtroStatusInsc);
+    if (filtroCongInsc) {
+      const congAlvo = congregacoes.find(c => c.id === filtroCongInsc);
+      const nomeAlvo = congAlvo?.nome.toLowerCase();
+      list = list.filter(i => {
+        if (i.congregacao_id && i.congregacao_id === filtroCongInsc) return true;
+        if (nomeAlvo && i.congregacao_nome && i.congregacao_nome.toLowerCase() === nomeAlvo) return true;
+        return false;
+      });
+    }
     if (buscaInsc) {
       const t = buscaInsc.toLowerCase();
       list = list.filter(
         i =>
           (i.nome_display ?? '').toLowerCase().includes(t) ||
           (i.email_externo ?? '').toLowerCase().includes(t) ||
-          (i.telefone ?? '').toLowerCase().includes(t)
+          (i.telefone ?? '').toLowerCase().includes(t) ||
+          (i.congregacao_nome ?? '').toLowerCase().includes(t)
       );
     }
     return list;
-  }, [inscricoes, filtroStatusInsc, buscaInsc]);
+  }, [inscricoes, filtroStatusInsc, filtroCongInsc, congregacoes, buscaInsc]);
 
   const checkinFiltrado = useMemo(() => {
     const base = buscaCheckin.trim()
@@ -1639,6 +1705,7 @@ export default function EventosPage() {
       inclui_certificado: formEvento.inclui_certificado,
       certificado_habilitado: formEvento.inclui_certificado,
       certificado_modelo_id: formEvento.inclui_certificado ? (modeloCertId || null) : null,
+      certificado_envio_auto_checkin: formEvento.inclui_certificado ? Boolean(formEvento.certificado_envio_auto_checkin) : false,
       status: formEvento.status,
       vagas_hospedagem: formEvento.inclui_hospedagem && formEvento.vagas_hospedagem ? parseInt(formEvento.vagas_hospedagem) : null,
       descricao_hospedagem: formEvento.inclui_hospedagem ? (formEvento.descricao_hospedagem || null) : null,
@@ -1652,10 +1719,11 @@ export default function EventosPage() {
       ? await supabase.from('eventos').update(payload).eq('id', editandoId)
       : await supabase.from('eventos').insert(payload);
 
-    // Compatibilidade resiliente caso a coluna whatsapp_grupo_url ainda esteja em processo de aplicação na migration
-    if (error && (error.message?.includes('whatsapp_grupo_url') || error.code === '42703')) {
-      console.warn('Coluna whatsapp_grupo_url ausente no banco remoto. Reenviando payload sem ela:', error.message);
+    // Compatibilidade resiliente caso colunas novas ainda estejam em processo de aplicação na migration
+    if (error && (error.message?.includes('whatsapp_grupo_url') || error.message?.includes('certificado_envio_auto_checkin') || error.code === '42703')) {
+      console.warn('Coluna opcional ausente no banco remoto. Reenviando payload sem ela:', error.message);
       delete payload.whatsapp_grupo_url;
+      delete payload.certificado_envio_auto_checkin;
       const retryResult = editandoId
         ? await supabase.from('eventos').update(payload).eq('id', editandoId)
         : await supabase.from('eventos').insert(payload);
@@ -1733,6 +1801,7 @@ export default function EventosPage() {
       brinde_quantidade: e.brinde_quantidade?.toString() ?? '',
       inclui_certificado: certHab,
       certificado_modelo_id: certModeloIdFinal,
+      certificado_envio_auto_checkin: Boolean(e.certificado_envio_auto_checkin),
       status: e.status,
       vagas_hospedagem: e.vagas_hospedagem?.toString() ?? '',
       descricao_hospedagem: e.descricao_hospedagem ?? '',
@@ -1945,7 +2014,6 @@ export default function EventosPage() {
       idPadrao = primeiroAberto ? primeiroAberto.id : (eventos[0]?.id ?? '');
     }
     setBalcaoEventoId(idPadrao);
-    setBalcaoTipoParticipante('membro');
     setBalcaoMembro(null);
     setBalcaoBuscaMembro('');
     setBalcaoResultadosMembro([]);
@@ -1975,18 +2043,13 @@ export default function EventosPage() {
       return;
     }
 
-    const temMembro = balcaoTipoParticipante === 'membro' && !!balcaoMembro;
-    const nomeDigitado = (balcaoTipoParticipante === 'membro'
-      ? (balcaoMembro?.nome_completo || balcaoNome || balcaoBuscaMembro)
-      : balcaoNome
-    ).trim();
+    const temMembro = !!balcaoMembro;
+    const nomeDigitado = (balcaoMembro?.nome_completo || balcaoNome || balcaoBuscaMembro).trim();
 
     if (!temMembro && !nomeDigitado) {
       showModal(
         'Participante obrigatório',
-        balcaoTipoParticipante === 'membro'
-          ? 'Busque e selecione um membro do rol ou informe o nome do participante.'
-          : 'Informe o nome do participante externo.',
+        'Busque e selecione um membro do rol ou digite o nome completo do participante.',
         'error'
       );
       return;
@@ -2350,7 +2413,7 @@ export default function EventosPage() {
     }
   };
 
-  const handleStatusHospedagem = async (insc: Inscricao, status: StatusHospedagem) => {
+  const handleStatusHospedagem = useCallback(async (insc: Inscricao, status: StatusHospedagem) => {
     const { error } = await supabase
       .from('eventos_inscricoes')
       .update({ status_hospedagem: status })
@@ -2363,7 +2426,8 @@ export default function EventosPage() {
       carregarInscricoes(eventoSelecionado.id);
       carregarEventos(filtroPeriodo, filtroMesCustom, filtroStatus, filtroCongEv, buscaEv);
     }
-  };
+  }, [supabase, showModal, eventoSelecionado, carregarInscricoes, carregarEventos, filtroPeriodo, filtroMesCustom, filtroStatus, filtroCongEv, buscaEv]);
+  void handleStatusHospedagem;
 
 
   const renderCertificadoHtml = (
@@ -3945,6 +4009,22 @@ export default function EventosPage() {
                             <p className="text-[11px] text-slate-500 font-medium">
                               Selecione o modelo configurado em Configurações &gt; Certificados que será gerado para os participantes com presença confirmada.
                             </p>
+
+                            <div className="pt-2 border-t border-slate-100 opacity-60">
+                              <label className="flex items-center gap-2 cursor-not-allowed select-none text-xs font-semibold text-slate-500">
+                                <input
+                                  type="checkbox"
+                                  disabled
+                                  checked={false}
+                                  className="w-4 h-4 rounded text-slate-400 border-slate-300 cursor-not-allowed"
+                                />
+                                <span>Enviar certificado por e-mail automaticamente após o check-in</span>
+                                <span className="text-[10px] bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded ml-1">Em breve</span>
+                              </label>
+                              <p className="text-[10px] text-slate-400 pl-6 mt-0.5">
+                                Recurso em homologação da fila de processamento. Inicialmente desativado até a conclusão dos testes de disparo.
+                              </p>
+                            </div>
                           </div>
                         )}
 
@@ -4172,6 +4252,22 @@ export default function EventosPage() {
                             <p className="text-[11px] text-slate-500 font-medium">
                               Selecione o modelo configurado em Configurações &gt; Certificados que será gerado para os participantes com presença confirmada.
                             </p>
+
+                            <div className="pt-2 border-t border-slate-100 opacity-60">
+                              <label className="flex items-center gap-2 cursor-not-allowed select-none text-xs font-semibold text-slate-500">
+                                <input
+                                  type="checkbox"
+                                  disabled
+                                  checked={false}
+                                  className="w-4 h-4 rounded text-slate-400 border-slate-300 cursor-not-allowed"
+                                />
+                                <span>Enviar certificado por e-mail automaticamente após o check-in</span>
+                                <span className="text-[10px] bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded ml-1">Em breve</span>
+                              </label>
+                              <p className="text-[10px] text-slate-400 pl-6 mt-0.5">
+                                Recurso em homologação da fila de processamento. Inicialmente desativado até a conclusão dos testes de disparo.
+                              </p>
+                            </div>
                           </div>
                         )}
 
@@ -4940,12 +5036,25 @@ export default function EventosPage() {
               <select
                 value={filtroStatusInsc}
                 onChange={e => setFiltroStatusInsc(e.target.value as '' | StatusInscricao)}
-                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700"
+                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8]"
               >
                 <option value="">Todos os status</option>
                 {STATUS_INSCRICAO.map(s => (
                   <option key={s.value} value={s.value}>
                     {s.label}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={filtroCongInsc}
+                onChange={e => setFiltroCongInsc(e.target.value)}
+                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 max-w-[200px] truncate focus:outline-none focus:ring-2 focus:ring-[#1d4ed8]"
+              >
+                <option value="">Todas as congregações</option>
+                {congregacoes.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.nome}
                   </option>
                 ))}
               </select>
@@ -4972,7 +5081,7 @@ export default function EventosPage() {
               )}
 
               <button
-                onClick={() => exportarCSVInscricoes(inscricoes, eventoSelecionado.titulo)}
+                onClick={() => exportarCSVInscricoes(inscricoesFiltradas, eventoSelecionado.titulo)}
                 className="inline-flex items-center gap-1.5 border border-slate-200 bg-white text-slate-700 px-3.5 py-2 rounded-xl text-xs font-semibold hover:bg-slate-50 transition shadow-xs"
               >
                 <Download className="w-4 h-4 text-slate-500" />
@@ -5143,15 +5252,33 @@ export default function EventosPage() {
                     </div>
 
                     {eventoSelecionado.inclui_hospedagem && (
-                      <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-amber-800">
-                        <input
-                          type="checkbox"
-                          checked={formInsc.com_hospedagem}
-                          onChange={e => setFormInsc(f => ({ ...f, com_hospedagem: e.target.checked }))}
-                          className="w-4 h-4 rounded text-amber-600"
-                        />
-                        <Bed className="w-4 h-4 text-amber-600" /> Solicitar vaga de hospedagem
-                      </label>
+                      <div className="space-y-2 p-3 bg-amber-50/50 rounded-xl border border-amber-200/60">
+                        <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-amber-800">
+                          <input
+                            type="checkbox"
+                            checked={formInsc.com_hospedagem}
+                            onChange={e => setFormInsc(f => ({ ...f, com_hospedagem: e.target.checked }))}
+                            className="w-4 h-4 rounded text-amber-600"
+                          />
+                          <Bed className="w-4 h-4 text-amber-600" /> Solicitar vaga de hospedagem
+                        </label>
+                        {formInsc.com_hospedagem && (
+                          <div className="flex items-center gap-2 pt-1">
+                            <span className="text-[11px] font-semibold text-amber-900">Status da Hospedagem:</span>
+                            <select
+                              value={formInsc.status_hospedagem ?? 'solicitada'}
+                              onChange={e => setFormInsc(f => ({ ...f, status_hospedagem: e.target.value as StatusHospedagem }))}
+                              className={`rounded-lg px-2.5 py-1 border text-xs font-bold bg-white cursor-pointer ${statusHospCor(formInsc.status_hospedagem)}`}
+                            >
+                              {STATUS_HOSPEDAGEM.filter(s => s.value !== 'nao_aplicavel').map(s => (
+                                <option key={s.value} value={s.value}>
+                                  {s.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </div>
                     )}
 
                     <div>
@@ -5207,11 +5334,10 @@ export default function EventosPage() {
                     <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
                       <tr>
                         <th className="px-4 py-3.5">Participante</th>
+                        <th className="px-4 py-3.5">Congregação</th>
                         <th className="px-4 py-3.5">Contato</th>
                         <th className="px-4 py-3.5">Status</th>
                         <th className="px-4 py-3.5">Benefícios</th>
-                        <th className="px-4 py-3.5">Hospedagem</th>
-                        <th className="px-4 py-3.5">Observações</th>
                         {scope.canWrite && <th className="px-4 py-3.5 text-right">Ações</th>}
                       </tr>
                     </thead>
@@ -5219,6 +5345,14 @@ export default function EventosPage() {
                       {inscricoesFiltradas.map(i => (
                         <tr key={i.id} className="hover:bg-slate-50/80 transition">
                           <td className="px-4 py-3.5 font-bold text-slate-900">{i.nome_display}</td>
+                          <td className="px-4 py-3.5 text-slate-600 font-medium">
+                            <span className="inline-flex items-center gap-1.5">
+                              <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              <span className={i.congregacao_nome && i.congregacao_nome !== 'Não informada' ? 'text-slate-700 font-semibold' : 'text-slate-400 italic'}>
+                                {i.congregacao_nome || 'Não informada'}
+                              </span>
+                            </span>
+                          </td>
                           <td className="px-4 py-3.5 text-slate-500">
                             {i.email_externo && <span className="block">{i.email_externo}</span>}
                             {i.telefone && <span className="block font-medium">{i.telefone}</span>}
@@ -5261,32 +5395,6 @@ export default function EventosPage() {
                                 <span className="text-slate-400 text-xs">—</span>
                               )}
                             </div>
-                          </td>
-                          <td className="px-4 py-3.5">
-                            {i.com_hospedagem ? (
-                              scope.canWrite ? (
-                                <select
-                                  value={i.status_hospedagem ?? 'solicitada'}
-                                  onChange={e => handleStatusHospedagem(i, e.target.value as StatusHospedagem)}
-                                  className={`rounded-full px-2.5 py-0.5 border text-xs font-bold cursor-pointer ${statusHospCor(i.status_hospedagem)}`}
-                                >
-                                  {STATUS_HOSPEDAGEM.filter(s => s.value !== 'nao_aplicavel').map(s => (
-                                    <option key={s.value} value={s.value}>
-                                      {s.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : (
-                                <span className={`px-2 py-0.5 rounded-full font-bold ${statusHospCor(i.status_hospedagem)}`}>
-                                  {statusHospLabel(i.status_hospedagem)}
-                                </span>
-                              )
-                            ) : (
-                              <span className="text-slate-300">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3.5 text-slate-500 max-w-[180px] truncate">
-                            {i.observacoes ?? '—'}
                           </td>
                           {scope.canWrite && (
                             <td className="px-4 py-3.5 text-right">
@@ -5922,286 +6030,154 @@ export default function EventosPage() {
 
                     {/* 2. IDENTIFICAÇÃO DO PARTICIPANTE */}
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-slate-700">
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">
                           Participante *
                         </label>
-                        <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setBalcaoTipoParticipante('membro');
-                              setBalcaoNome('');
-                              setBalcaoCpf('');
-                              setBalcaoEmail('');
-                              setBalcaoTelefone('');
-                              setBalcaoCongregacaoId('');
-                              setBalcaoMembro(null);
-                              setBalcaoBuscaMembro('');
-                              setBalcaoResultadosMembro([]);
+                        <div className="relative">
+                          <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                          <input
+                            type="text"
+                            value={balcaoBuscaMembro}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setBalcaoBuscaMembro(val);
+                              if (balcaoMembro) setBalcaoMembro(null);
+                              setBalcaoNome(val);
                             }}
-                            className={`px-3 py-1 rounded-md font-bold transition ${
-                              balcaoTipoParticipante === 'membro'
-                                ? 'bg-white text-slate-900 shadow-xs'
-                                : 'text-slate-500 hover:text-slate-700'
-                            }`}
-                          >
-                            Membro da Igreja
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setBalcaoTipoParticipante('externo');
-                              setBalcaoMembro(null);
-                              setBalcaoBuscaMembro('');
-                              setBalcaoResultadosMembro([]);
-                              setBalcaoNome('');
-                              setBalcaoCpf('');
-                              setBalcaoEmail('');
-                              setBalcaoTelefone('');
-                              setBalcaoCongregacaoId('');
-                            }}
-                            className={`px-3 py-1 rounded-md font-bold transition ${
-                              balcaoTipoParticipante === 'externo'
-                                ? 'bg-white text-slate-900 shadow-xs'
-                                : 'text-slate-500 hover:text-slate-700'
-                            }`}
-                          >
-                            Visitante / Externo
-                          </button>
+                            placeholder="Buscar membro do rol ou digitar nome completo do participante..."
+                            className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:bg-white transition"
+                          />
                         </div>
-                      </div>
-
-                      {balcaoTipoParticipante === 'membro' ? (
-                        <div className="space-y-3">
-                          {balcaoMembro ? (
-                            <div className="flex items-center justify-between p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs">
-                              <div className="flex items-center gap-2 font-bold text-emerald-900">
-                                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        {balcaoResultadosMembro.length > 0 && !balcaoMembro && (
+                          <div className="border border-slate-200 rounded-xl mt-1.5 max-h-48 overflow-y-auto divide-y divide-slate-100 bg-white shadow-lg z-10 relative">
+                            {balcaoResultadosMembro.map(m => (
+                              <button
+                                type="button"
+                                key={m.id}
+                                onClick={() => {
+                                  setBalcaoMembro(m);
+                                  setBalcaoBuscaMembro(m.nome_completo);
+                                  setBalcaoNome(m.nome_completo);
+                                  setBalcaoCpf(m.cpf || '');
+                                  setBalcaoEmail(m.email || '');
+                                  setBalcaoTelefone(m.telefone || '');
+                                  setBalcaoCongregacaoId(m.congregacao_id || '');
+                                  setBalcaoResultadosMembro([]);
+                                }}
+                                className="w-full text-left px-3.5 py-2.5 hover:bg-blue-50 text-xs font-medium text-slate-800 transition flex items-center justify-between cursor-pointer"
+                              >
                                 <div>
-                                  <span>{balcaoMembro.nome_completo}</span>
-                                  {(balcaoMembro.cpf || balcaoMembro.email || balcaoMembro.telefone || balcaoMembro.congregacao_nome) && (
-                                    <p className="text-[11px] font-normal text-emerald-700">
+                                  <span className="font-semibold text-slate-900 block">{m.nome_completo}</span>
+                                  {(m.congregacao_nome || m.cpf || m.telefone || m.email) && (
+                                    <p className="text-[11px] text-slate-400">
                                       {[
-                                        balcaoMembro.congregacao_nome,
-                                        balcaoMembro.cpf ? `CPF: ${balcaoMembro.cpf}` : null,
-                                        balcaoMembro.telefone,
-                                        balcaoMembro.email,
+                                        m.congregacao_nome,
+                                        m.cpf ? `CPF: ${m.cpf}` : null,
+                                        m.telefone,
+                                        m.email,
                                       ].filter(Boolean).join(' • ')}
                                     </p>
                                   )}
                                 </div>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setBalcaoMembro(null);
-                                  setBalcaoBuscaMembro('');
-                                  setBalcaoNome('');
-                                  setBalcaoCpf('');
-                                  setBalcaoEmail('');
-                                  setBalcaoTelefone('');
-                                  setBalcaoCongregacaoId('');
-                                }}
-                                className="text-emerald-700 hover:text-emerald-900 font-semibold underline text-[11px]"
-                              >
-                                Trocar membro
+                                <span className="text-[10px] font-bold text-blue-600 uppercase">Selecionar</span>
                               </button>
-                            </div>
-                          ) : (
-                            <div className="space-y-1.5">
-                              <div className="relative">
-                                <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                                <input
-                                  type="text"
-                                  value={balcaoBuscaMembro}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    setBalcaoBuscaMembro(val);
-                                    if (balcaoMembro) setBalcaoMembro(null);
-                                    setBalcaoNome(val);
-                                  }}
-                                  placeholder="Digite ao menos 3 letras para buscar pelo nome ou informe o nome..."
-                                  className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:bg-white transition"
-                                />
-                              </div>
-                              {balcaoResultadosMembro.length > 0 && !balcaoMembro && (
-                                <div className="border border-slate-200 rounded-xl max-h-48 overflow-y-auto divide-y divide-slate-100 bg-white shadow-xs">
-                                  {balcaoResultadosMembro.map(m => (
-                                    <button
-                                      type="button"
-                                      key={m.id}
-                                      onClick={() => {
-                                        setBalcaoMembro(m);
-                                        setBalcaoBuscaMembro(m.nome_completo);
-                                        setBalcaoNome(m.nome_completo);
-                                        setBalcaoCpf(m.cpf || '');
-                                        setBalcaoEmail(m.email || '');
-                                        setBalcaoTelefone(m.telefone || '');
-                                        setBalcaoCongregacaoId(m.congregacao_id || '');
-                                        setBalcaoResultadosMembro([]);
-                                      }}
-                                      className="w-full text-left px-3.5 py-2.5 hover:bg-blue-50 text-xs font-medium text-slate-800 transition flex items-center justify-between"
-                                    >
-                                      <div>
-                                        <span className="font-semibold text-slate-900 block">{m.nome_completo}</span>
-                                        <p className="text-[11px] text-slate-400">
-                                          {[
-                                            m.congregacao_nome,
-                                            m.cpf ? `CPF: ${m.cpf}` : null,
-                                            m.telefone,
-                                            m.email,
-                                          ].filter(Boolean).join(' • ')}
-                                        </p>
-                                      </div>
-                                      <span className="text-[10px] font-bold text-blue-600 uppercase">Selecionar</span>
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
-                              {balcaoBuscaMembro.length >= 3 && balcaoResultadosMembro.length === 0 && (
-                                <p className="text-[11px] text-slate-400 italic">Nenhum membro encontrado com esse nome. Você pode prosseguir com o preenchimento manual abaixo.</p>
-                              )}
-                            </div>
-                          )}
+                            ))}
+                          </div>
+                        )}
+                        {balcaoMembro && (
+                          <div className="flex items-center justify-between text-xs font-semibold text-emerald-800 mt-1.5 bg-emerald-50/80 border border-emerald-200 rounded-xl px-3 py-1.5 shadow-2xs">
+                            <span className="flex items-center gap-1.5 truncate">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                              <span className="truncate">
+                                Membro vinculado: <strong>{balcaoMembro.nome_completo}</strong>
+                                {balcaoMembro.congregacao_nome && ` (${balcaoMembro.congregacao_nome})`}
+                              </span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setBalcaoMembro(null);
+                                setBalcaoBuscaMembro('');
+                                setBalcaoNome('');
+                                setBalcaoCpf('');
+                                setBalcaoEmail('');
+                                setBalcaoTelefone('');
+                                setBalcaoCongregacaoId('');
+                              }}
+                              className="text-emerald-700 hover:text-emerald-900 font-bold underline text-[11px] ml-2 shrink-0 cursor-pointer"
+                            >
+                              Trocar
+                            </button>
+                          </div>
+                        )}
+                        {balcaoBuscaMembro.length >= 3 && balcaoResultadosMembro.length === 0 && !balcaoMembro && (
+                          <p className="text-[11px] text-slate-400 italic mt-1">
+                            Nenhum membro encontrado com esse nome. O participante será cadastrado com os dados preenchidos abaixo.
+                          </p>
+                        )}
+                      </div>
 
-                          {/* Campos Complementares do Participante Membro */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1">
-                            <div>
-                              <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                                CPF
-                              </label>
-                              <input
-                                type="text"
-                                value={balcaoCpf}
-                                onChange={e => setBalcaoCpf(formatCpf(e.target.value))}
-                                maxLength={14}
-                                placeholder="000.000.000-00"
-                                className="w-full px-3 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:bg-white transition"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                                E-mail
-                              </label>
-                              <input
-                                type="email"
-                                value={balcaoEmail}
-                                onChange={e => setBalcaoEmail(e.target.value)}
-                                placeholder="exemplo@email.com"
-                                className="w-full px-3 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:bg-white transition"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                                Telefone / WhatsApp
-                              </label>
-                              <input
-                                type="tel"
-                                value={balcaoTelefone}
-                                onChange={e => setBalcaoTelefone(formatarTelefoneMembro(e.target.value))}
-                                maxLength={15}
-                                placeholder="(00) 00000-0000"
-                                className="w-full px-3 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:bg-white transition"
-                              />
-                            </div>
-                            {congregacoes.length > 0 && (
-                              <div className="sm:col-span-2 md:col-span-3">
-                                <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                                  Congregação
-                                </label>
-                                <select
-                                  value={balcaoCongregacaoId}
-                                  onChange={e => setBalcaoCongregacaoId(e.target.value)}
-                                  className="w-full px-3 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:bg-white transition"
-                                >
-                                  <option value="">— Selecione ou mantenha do cadastro —</option>
-                                  {congregacoes.map(c => (
-                                    <option key={c.id} value={c.id}>
-                                      {c.nome}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            )}
-                          </div>
+                      {/* Campos Complementares do Participante (CPF, E-mail, Telefone/WhatsApp, Congregação) */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1">
+                        <div>
+                          <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                            CPF
+                          </label>
+                          <input
+                            type="text"
+                            value={balcaoCpf}
+                            onChange={e => setBalcaoCpf(formatCpf(e.target.value))}
+                            maxLength={14}
+                            placeholder="000.000.000-00"
+                            className="w-full px-3 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:bg-white transition"
+                          />
                         </div>
-                      ) : (
-                        <div className="space-y-3">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div className="sm:col-span-2">
-                              <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                                Nome Completo *
-                              </label>
-                              <input
-                                type="text"
-                                value={balcaoNome}
-                                onChange={e => setBalcaoNome(e.target.value)}
-                                placeholder="Nome do participante"
-                                required
-                                className="w-full px-3 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:bg-white transition"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                                CPF
-                              </label>
-                              <input
-                                type="text"
-                                value={balcaoCpf}
-                                onChange={e => setBalcaoCpf(formatCpf(e.target.value))}
-                                maxLength={14}
-                                placeholder="000.000.000-00"
-                                className="w-full px-3 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:bg-white transition"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                                Telefone / WhatsApp
-                              </label>
-                              <input
-                                type="tel"
-                                value={balcaoTelefone}
-                                onChange={e => setBalcaoTelefone(formatarTelefoneMembro(e.target.value))}
-                                maxLength={15}
-                                placeholder="(00) 00000-0000"
-                                className="w-full px-3 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:bg-white transition"
-                              />
-                            </div>
-                            <div className="sm:col-span-2">
-                              <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                                E-mail
-                              </label>
-                              <input
-                                type="email"
-                                value={balcaoEmail}
-                                onChange={e => setBalcaoEmail(e.target.value)}
-                                placeholder="exemplo@email.com"
-                                className="w-full px-3 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:bg-white transition"
-                              />
-                            </div>
-                            {congregacoes.length > 0 && (
-                              <div className="sm:col-span-2">
-                                <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                                  Congregação / Igreja de Origem
-                                </label>
-                                <select
-                                  value={balcaoCongregacaoId}
-                                  onChange={e => setBalcaoCongregacaoId(e.target.value)}
-                                  className="w-full px-3 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:bg-white transition"
-                                >
-                                  <option value="">— Selecione se aplicável —</option>
-                                  {congregacoes.map(c => (
-                                    <option key={c.id} value={c.id}>
-                                      {c.nome}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            )}
-                          </div>
+                        <div>
+                          <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                            E-mail
+                          </label>
+                          <input
+                            type="email"
+                            value={balcaoEmail}
+                            onChange={e => setBalcaoEmail(e.target.value)}
+                            placeholder="exemplo@email.com"
+                            className="w-full px-3 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:bg-white transition"
+                          />
                         </div>
-                      )}
+                        <div>
+                          <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                            Telefone / WhatsApp
+                          </label>
+                          <input
+                            type="tel"
+                            value={balcaoTelefone}
+                            onChange={e => setBalcaoTelefone(formatarTelefoneMembro(e.target.value))}
+                            maxLength={15}
+                            placeholder="(00) 00000-0000"
+                            className="w-full px-3 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:bg-white transition"
+                          />
+                        </div>
+                        {congregacoes.length > 0 && (
+                          <div className="sm:col-span-2 md:col-span-3">
+                            <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                              Congregação / Igreja de Origem
+                            </label>
+                            <select
+                              value={balcaoCongregacaoId}
+                              onChange={e => setBalcaoCongregacaoId(e.target.value)}
+                              className="w-full px-3 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:bg-white transition"
+                            >
+                              <option value="">— Selecione a congregação se aplicável —</option>
+                              {congregacoes.map(c => (
+                                <option key={c.id} value={c.id}>
+                                  {c.nome}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* 3. BENEFÍCIO DE HOSPEDAGEM (Se o evento permitir) */}

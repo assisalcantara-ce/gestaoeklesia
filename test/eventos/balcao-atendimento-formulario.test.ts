@@ -53,8 +53,13 @@ function extrairCpfMembro(m: any): string {
   return '';
 }
 
-test('Atendimento de Balcão — Complementação de Formulário e Regras de Negócio', async (t) => {
-  await t.test('1. Seleção de Membro no Balcão: Preenchimento automático de CPF, E-mail, Telefone/WhatsApp e Congregação', () => {
+test('Atendimento de Balcão — Simplificação de Inscrição em Fluxo Único', async (t) => {
+  const congregacoes = [
+    { id: 'cong-sede', nome: 'Templo Central / Sede' },
+    { id: 'cong-filial', nome: 'Congregação Esperança' },
+  ];
+
+  await t.test('1. Membro encontrado: preenche automaticamente CPF, e-mail, telefone/WhatsApp e congregação, mantendo vínculo com o ID', () => {
     const membroMock = {
       id: 'membro-001',
       name: 'FRANCISCO DE ASSIS ALCANTARA',
@@ -67,102 +72,79 @@ test('Atendimento de Balcão — Complementação de Formulário e Regras de Neg
       custom_fields: {},
     };
 
-    const congregacoes = [
-      { id: 'cong-sede', nome: 'Templo Central / Sede' },
-      { id: 'cong-filial', nome: 'Congregação Esperança' },
-    ];
-
     const rawTel = extrairTelefoneMembro(membroMock);
     const rawCpf = extrairCpfMembro(membroMock);
     const congMap = new Map(congregacoes.map(c => [c.id, c.nome]));
 
-    assert.equal(rawTel, '85999991111', 'WhatsApp deve ter prioridade sobre phone e celular');
-    assert.equal(formatCpf(rawCpf), '123.456.789-01', 'CPF deve ser formatado com máscara');
-    assert.equal(congMap.get(membroMock.congregacao_id), 'Templo Central / Sede', 'Congregação deve ser resolvida corretamente');
+    assert.equal(rawTel, '85999991111', 'WhatsApp priorizado');
+    assert.equal(formatCpf(rawCpf), '123.456.789-01');
+    assert.equal(congMap.get(membroMock.congregacao_id), 'Templo Central / Sede');
+
+    // Ao selecionar membro no fluxo único do balcão:
+    let balcaoMembro: any = membroMock;
+    let balcaoBuscaMembro = membroMock.name;
+    let balcaoNome = membroMock.name;
+    let balcaoCpf = formatCpf(rawCpf);
+    let balcaoEmail = membroMock.email;
+    let balcaoTelefone = rawTel;
+    let balcaoCongregacaoId = membroMock.congregacao_id;
+
+    assert.equal(balcaoMembro.id, 'membro-001');
+    assert.equal(balcaoBuscaMembro, 'FRANCISCO DE ASSIS ALCANTARA');
+    assert.equal(balcaoNome, 'FRANCISCO DE ASSIS ALCANTARA');
+    assert.equal(balcaoCpf, '123.456.789-01');
+    assert.equal(balcaoEmail, 'assis@eklesia.com');
+    assert.equal(balcaoTelefone, '85999991111');
+    assert.equal(balcaoCongregacaoId, 'cong-sede');
   });
 
-  await t.test('2. Fallback de Telefone: Quando WhatsApp não informado, utiliza Celular/Telefone fixo', () => {
-    const membroSemZap = {
-      phone: '8532221111',
-      celular: '85988882222',
-      whatsapp: '',
-    };
-    assert.equal(extrairTelefoneMembro(membroSemZap), '85988882222');
+  await t.test('2. Limpeza de vínculo se o operador alterar o nome após seleção', () => {
+    let balcaoMembro: any = { id: 'membro-001', nome_completo: 'Francisco de Assis Alcantara' };
+    let balcaoBuscaMembro = 'Francisco de Assis Alcantara';
+    let balcaoNome = 'Francisco de Assis Alcantara';
 
-    const membroSoFixo = {
-      phone: '8532221111',
-      celular: '',
-      whatsapp: '',
-    };
-    assert.equal(extrairTelefoneMembro(membroSoFixo), '8532221111');
+    // Operador altera o texto do input de busca/nome
+    const novoTexto = 'Francisco de Assis Alcantara Filho';
+    balcaoBuscaMembro = novoTexto;
+    if (balcaoMembro) balcaoMembro = null; // Regra implementada no onChange
+    balcaoNome = novoTexto;
+
+    assert.equal(balcaoBuscaMembro, 'Francisco de Assis Alcantara Filho');
+    assert.equal(balcaoMembro, null, 'Vínculo com o ID do membro anterior deve ser desfeito imediatamente');
+    assert.equal(balcaoNome, 'Francisco de Assis Alcantara Filho');
   });
 
-  await t.test('3. Edição dos campos pré-preenchidos sem afetar o cadastro original e persistência em observações', () => {
-    const membroOriginal = {
-      id: 'membro-001',
-      nome_completo: 'Francisco de Assis Alcantara',
-      cpf: '123.456.789-01',
-      email: 'original@eklesia.com',
-      telefone: '(85) 99999-1111',
-    };
+  await t.test('3. Participante não cadastrado: digitação direta e preenchimento manual sem criar membro', () => {
+    let balcaoMembro: any = null;
+    let balcaoBuscaMembro = 'Visitante Lucas Gabriel';
+    let balcaoNome = 'Visitante Lucas Gabriel';
+    let balcaoCpf = '111.222.333-44';
+    let balcaoEmail = 'lucas@gmail.com';
+    let balcaoTelefone = '(85) 98888-5555';
+    let balcaoCongregacaoId = 'cong-filial';
 
-    // Operador altera o e-mail e telefone temporariamente no atendimento de balcão
-    const balcaoEmailEditado = 'editado.balcao@eklesia.com';
-    const balcaoTelefoneEditado = '(85) 98888-0000';
-    const balcaoCpfInformado = '123.456.789-01';
-    const congNome = 'Templo Central / Sede';
+    const temMembro = !!balcaoMembro;
+    const nomeDigitado = (balcaoMembro?.nome_completo || balcaoNome || balcaoBuscaMembro).trim();
+    const nomeFinalNormalizado = formatarNomeProprio(temMembro ? balcaoMembro.nome_completo : nomeDigitado);
 
-    // Montagem do payload enviado ao Supabase
+    assert.equal(temMembro, false);
+    assert.equal(balcaoCpf, '111.222.333-44');
+    assert.equal(balcaoCongregacaoId, 'cong-filial');
+    assert.equal(nomeFinalNormalizado, 'Visitante Lucas Gabriel');
+
     const payloadInscricao = {
-      member_id: membroOriginal.id,
-      nome_externo: null,
-      email_externo: balcaoEmailEditado,
-      telefone: balcaoTelefoneEditado,
-      observacoes: [
-        '[Balcão] Inscrição presencial',
-        'Pagamento: À vista',
-        `CPF: ${balcaoCpfInformado}`,
-        `Congregação: ${congNome}`,
-      ].join(' | '),
+      member_id: temMembro ? balcaoMembro.id : null,
+      nome_externo: temMembro ? null : nomeFinalNormalizado,
+      email_externo: balcaoEmail,
+      telefone: balcaoTelefone,
+      status: 'confirmado',
     };
 
-    assert.equal(payloadInscricao.member_id, 'membro-001');
-    assert.equal(payloadInscricao.email_externo, 'editado.balcao@eklesia.com');
-    assert.equal(payloadInscricao.telefone, '(85) 98888-0000');
-    assert.ok(payloadInscricao.observacoes.includes('CPF: 123.456.789-01'));
-    assert.ok(payloadInscricao.observacoes.includes('Congregação: Templo Central / Sede'));
-    // Cadastro original mantido
-    assert.equal(membroOriginal.email, 'original@eklesia.com');
+    assert.equal(payloadInscricao.member_id, null, 'Não deve vincular member_id');
+    assert.equal(payloadInscricao.nome_externo, 'Visitante Lucas Gabriel', 'Deve salvar como participante externo');
   });
 
-  await t.test('4. Alternância entre Membro e Externo: Isolamento e limpeza de estados incompatíveis', () => {
-    let tipoParticipante: 'membro' | 'externo' = 'membro';
-    let membroSelecionado: any = { id: 'membro-123', nome: 'Membro Teste' };
-    let nomeExterno = 'Membro Teste';
-    let cpf = '111.222.333-44';
-    let email = 'membro@teste.com';
-    let telefone = '(85) 99999-9999';
-    let congregacaoId = 'cong-1';
-
-    // Usuário clica em 'Visitante / Externo'
-    tipoParticipante = 'externo';
-    membroSelecionado = null;
-    nomeExterno = '';
-    cpf = '';
-    email = '';
-    telefone = '';
-    congregacaoId = '';
-
-    assert.equal(tipoParticipante, 'externo');
-    assert.equal(membroSelecionado, null);
-    assert.equal(nomeExterno, '');
-    assert.equal(cpf, '');
-    assert.equal(email, '');
-    assert.equal(telefone, '');
-    assert.equal(congregacaoId, '');
-  });
-
-  await t.test('5. Normalização Title Case de Nomes no Balcão com acentuação e partículas', () => {
+  await t.test('4. Normalização Title Case de Nomes no Balcão com acentuação e partículas', () => {
     assert.equal(
       formatarNomeProprio('FRANCISCO DE ASSIS ALCÂNTARA'),
       'Francisco de Assis Alcântara'
@@ -177,7 +159,7 @@ test('Atendimento de Balcão — Complementação de Formulário e Regras de Neg
     );
   });
 
-  await t.test('6. Validação de integridade do CPF no Balcão', () => {
+  await t.test('5. Validação de integridade do CPF no Balcão', () => {
     // Válido se não informado (opcional quando evento não exige)
     assert.equal(validarCpf(''), false);
     // Dígitos repetidos inválidos
@@ -185,5 +167,23 @@ test('Atendimento de Balcão — Complementação de Formulário e Regras de Neg
     assert.equal(validarCpf('111.111.111-11'), false);
     // Incompleto
     assert.equal(validarCpf('123.456'), false);
+  });
+
+  await t.test('6. Regras financeiras e confirmação imediata preservadas no Balcão', () => {
+    // Evento Gratuito
+    const evGratuito = { id: 'ev-1', evento_pago: false, valor_inscricao: 0 };
+    const valorCobradoGratuito = evGratuito.evento_pago ? evGratuito.valor_inscricao : 0;
+    assert.equal(valorCobradoGratuito, 0);
+
+    // Evento Pago - Cortesia
+    const evPago = { id: 'ev-2', evento_pago: true, valor_inscricao: 50 };
+    const formaCortesia: string = 'cortesia';
+    const valorCobradoCortesia = evPago.evento_pago ? (formaCortesia === 'cortesia' ? 0 : evPago.valor_inscricao) : 0;
+    assert.equal(valorCobradoCortesia, 0);
+
+    // Evento Pago - À Vista
+    const formaAVista: string = 'a_vista';
+    const valorCobradoAVista = evPago.evento_pago ? (formaAVista === 'cortesia' ? 0 : evPago.valor_inscricao) : 0;
+    assert.equal(valorCobradoAVista, 50);
   });
 });

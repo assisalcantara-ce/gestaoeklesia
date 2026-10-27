@@ -120,7 +120,7 @@ const normalizeOptionValue = (value: string) =>
 
 export default function GerenciarFuncionarios() {
   const supabase = createClient();
-  const { ctx, bloqueado } = useRequireModulo('gestao');
+  const { ctx, bloqueado } = useRequireModulo('funcionarios');
   const planFeatures = usePlanFeatures();
 
   const [membros, setMembros] = useState<Membro[]>([]);

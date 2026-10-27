@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { resolveTenantAuth } from '@/lib/tenant-auth';
 import { TesourariaService } from '@/services/TesourariaService';
 import { logServerAudit } from '@/lib/audit-logger';
+import { temAcesso } from '@/lib/access-control';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,7 +34,11 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const { admin, ministryId } = context;
+  const { admin, ministryId, nivel } = context;
+
+  if (!temAcesso(nivel, 'tesouraria') && !temAcesso(nivel, 'financeiro')) {
+    return NextResponse.json({ error: 'Acesso negado ao módulo de Tesouraria.' }, { status: 403 });
+  }
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action');
 
@@ -82,7 +87,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { admin, ministryId } = context;
+  const { admin, ministryId, nivel } = context;
+
+  if (!temAcesso(nivel, 'tesouraria') && !temAcesso(nivel, 'financeiro')) {
+    return NextResponse.json({ error: 'Acesso negado ao módulo de Tesouraria.' }, { status: 403 });
+  }
 
   // ── 2. Leitura e validação básica do body ────────────────────────────────
   let body: Record<string, any>;
@@ -213,7 +222,11 @@ export async function PUT(request: NextRequest) {
     );
   }
 
-  const { admin, ministryId } = context;
+  const { admin, ministryId, nivel } = context;
+
+  if (!temAcesso(nivel, 'tesouraria') && !temAcesso(nivel, 'financeiro')) {
+    return NextResponse.json({ error: 'Acesso negado ao módulo de Tesouraria.' }, { status: 403 });
+  }
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
   const action = searchParams.get('action');
@@ -373,7 +386,11 @@ export async function PATCH(request: NextRequest) {
     );
   }
 
-  const { admin, ministryId } = context;
+  const { admin, ministryId, nivel } = context;
+
+  if (!temAcesso(nivel, 'tesouraria') && !temAcesso(nivel, 'financeiro')) {
+    return NextResponse.json({ error: 'Acesso negado ao módulo de Tesouraria.' }, { status: 403 });
+  }
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
 
@@ -444,7 +461,11 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
-  const { admin, ministryId, userId } = context;
+  const { admin, ministryId, userId, nivel } = context;
+
+  if (!temAcesso(nivel, 'tesouraria') && !temAcesso(nivel, 'financeiro')) {
+    return NextResponse.json({ error: 'Acesso negado ao módulo de Tesouraria.' }, { status: 403 });
+  }
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
 

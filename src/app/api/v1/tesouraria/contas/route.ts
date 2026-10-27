@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveTenantAuth } from '@/lib/tenant-auth';
+import { temAcesso } from '@/lib/access-control';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +22,11 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const { admin, ministryId } = ctx;
+  const { admin, ministryId, nivel } = ctx;
+
+  if (!temAcesso(nivel, 'tesouraria') && !temAcesso(nivel, 'financeiro')) {
+    return NextResponse.json({ error: 'Acesso negado ao módulo de Tesouraria.' }, { status: 403 });
+  }
 
   const { data, error } = await admin
     .from('fin_contas')
@@ -50,7 +55,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { admin, ministryId } = ctx;
+  const { admin, ministryId, nivel } = ctx;
+
+  if (!temAcesso(nivel, 'tesouraria') && !temAcesso(nivel, 'financeiro')) {
+    return NextResponse.json({ error: 'Acesso negado ao módulo de Tesouraria.' }, { status: 403 });
+  }
 
   let body: Record<string, any>;
   try {
@@ -129,7 +138,11 @@ export async function PUT(request: NextRequest) {
     );
   }
 
-  const { admin, ministryId } = ctx;
+  const { admin, ministryId, nivel } = ctx;
+
+  if (!temAcesso(nivel, 'tesouraria') && !temAcesso(nivel, 'financeiro')) {
+    return NextResponse.json({ error: 'Acesso negado ao módulo de Tesouraria.' }, { status: 403 });
+  }
   const id = request.nextUrl.searchParams.get('id');
 
   if (!id) {
@@ -233,7 +246,11 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
-  const { admin, ministryId } = ctx;
+  const { admin, ministryId, nivel } = ctx;
+
+  if (!temAcesso(nivel, 'tesouraria') && !temAcesso(nivel, 'financeiro')) {
+    return NextResponse.json({ error: 'Acesso negado ao módulo de Tesouraria.' }, { status: 403 });
+  }
   const id = request.nextUrl.searchParams.get('id');
 
   if (!id) {

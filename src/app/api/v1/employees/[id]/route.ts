@@ -2,6 +2,7 @@ import { getAccessibleMemberIds, resolveTenantAuth } from '@/lib/tenant-auth'
 import { normalizePayloadToUppercase } from '@/lib/uppercase-normalizer'
 import { authTenantErrorResponse, forbiddenResponse } from '@/lib/api-errors'
 import { isFeatureAllowedForTenant } from '@/lib/plan-permissions'
+import { podeAcessarModuloFuncionarios } from '@/lib/access-control'
 import { NextRequest, NextResponse } from 'next/server'
 
 function getSupabaseErrorText(error: any): string {
@@ -43,7 +44,11 @@ export async function GET(
   try {
     const { id } = await params
     const context = await resolveTenantAuth(request)
-    const { supabase, ministryId, admin } = context
+    const { supabase, ministryId, admin, nivel } = context
+
+    if (!podeAcessarModuloFuncionarios(nivel)) {
+      return forbiddenResponse()
+    }
 
     const isAllowed = await isFeatureAllowedForTenant(admin, ministryId, 'employees_module')
     if (!isAllowed) {
@@ -127,7 +132,11 @@ export async function DELETE(
   try {
     const { id } = await params
     const context = await resolveTenantAuth(request)
-    const { supabase, ministryId, admin } = context
+    const { supabase, ministryId, admin, nivel } = context
+
+    if (!podeAcessarModuloFuncionarios(nivel)) {
+      return forbiddenResponse()
+    }
 
     const isAllowed = await isFeatureAllowedForTenant(admin, ministryId, 'employees_module')
     if (!isAllowed) {
@@ -171,7 +180,11 @@ export async function PATCH(
   try {
     const { id } = await params
     const context = await resolveTenantAuth(request)
-    const { supabase, ministryId, admin } = context
+    const { supabase, ministryId, admin, nivel } = context
+
+    if (!podeAcessarModuloFuncionarios(nivel)) {
+      return forbiddenResponse()
+    }
 
     const isAllowed = await isFeatureAllowedForTenant(admin, ministryId, 'employees_module')
     if (!isAllowed) {

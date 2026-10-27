@@ -146,12 +146,17 @@ export const MODULOS_ACESSO: Record<NivelAcesso, string[]> = {
     'agenda',
     'suporte',
     'comissao',
+    'eventos',
+    'ebd',
+    'reunioes',
+    'missoes',
   ],
   tesoureiro_geral: [
     'dashboard',
     'tesouraria',
     'agenda',
     'suporte',
+    'funcionarios',
   ],
   auxiliar_secretaria: [
     'dashboard',
@@ -270,10 +275,15 @@ export const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
     'agenda',
     'suporte',
     'comissao',
+    'eventos',
+    'ebd',
+    'reunioes',
+    'missoes',
   ],
   tesoureiro_geral: [
     'tesouraria',
     'suporte',
+    'funcionarios',
   ],
   auxiliar_secretaria: [
     'secretaria',
@@ -484,4 +494,15 @@ export function isSecretariaLocal(nivel: NivelAcesso | string | null | undefined
   if (!nivel) return false;
   const n = String(nivel).toLowerCase();
   return ['secretaria_local', 'admin_local', 'operador', 'auxiliar_secretaria'].includes(n);
+}
+
+export function podeAcessarModuloFuncionarios(nivel: NivelAcesso | string | null | undefined): boolean {
+  if (!nivel) return false;
+  const n = String(nivel).toLowerCase();
+  // Administrador Geral e Tesouraria Geral têm acesso autorizado à gestão de funcionários
+  if (n === 'administrador' || n === 'tesoureiro_geral') return true;
+  // Secretaria Geral não possui acesso a funcionários
+  if (n === 'secretario_geral') return false;
+  // Outros perfis operacionais locais / supervisores não têm acesso
+  return false;
 }
