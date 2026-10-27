@@ -911,7 +911,7 @@ export function useAgenda() {
     setDeleteConfirmTarget(evento);
   };
 
-  const confirmDeleteAction = async () => {
+  const confirmDeleteAction = async (modo?: string) => {
     if (!deleteConfirmTarget || !ministryId) return;
     const evento = deleteConfirmTarget;
     setDeleteConfirmTarget(null);
@@ -922,7 +922,8 @@ export function useAgenda() {
     }
 
     try {
-      const res = await fetch(`/api/v1/agenda?id=${evento.id}`, {
+      const modoQuery = modo ? `&modo=${encodeURIComponent(modo)}` : '';
+      const res = await fetch(`/api/v1/agenda?id=${evento.id}${modoQuery}`, {
         method: 'DELETE',
       });
 
@@ -932,7 +933,12 @@ export function useAgenda() {
       }
 
       await registrarAcao({ acao: 'deletar', modulo: 'agenda', tabela_afetada: 'agenda_eventos', registro_id: evento.id });
-      flash('ok', 'Compromisso excluído com sucesso.');
+      const msgSucesso = modo === 'toda_serie'
+        ? 'Toda a série de compromissos foi excluída com sucesso.'
+        : modo === 'esta_e_proximas'
+        ? 'Esta e as próximas ocorrências foram excluídas com sucesso.'
+        : 'Compromisso excluído com sucesso.';
+      flash('ok', msgSucesso);
       loadEventos(ministryId);
       if (activePlanning) loadPlanningInfo(ministryId, currentYear);
 

@@ -583,15 +583,16 @@ export default function AgendaPage() {
           onNovoTipoBloqueioChange={setNovoTipoBloqueio}
           onCriarTipo={handleCriarTipo}
           onDeletarTipo={handleDeletarTipo}
+          onDelete={handleDelete}
         />
 
         <ConfirmDeleteModal
           isOpen={!!deleteConfirmTarget}
+          evento={deleteConfirmTarget}
           title="Excluir Compromisso"
-          message={`Tem certeza que deseja excluir o compromisso "${deleteConfirmTarget?.titulo || ''}"? Esta ação não poderá ser desfeita.`}
           confirmText="Excluir"
           cancelText="Cancelar"
-          onConfirm={confirmDeleteAction}
+          onConfirm={(modo) => confirmDeleteAction(modo)}
           onCancel={() => setDeleteConfirmTarget(null)}
         />
       </div>

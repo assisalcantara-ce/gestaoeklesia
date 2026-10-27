@@ -458,14 +458,21 @@ export async function DELETE(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     let id = searchParams.get('id');
+    let modoExclusao = searchParams.get('modo') || searchParams.get('modo_exclusao');
 
-    if (!id) {
+    if (!id || !modoExclusao) {
       try {
         const body = await request.json();
-        id = body?.id;
+        if (!id) id = body?.id;
+        if (!modoExclusao) modoExclusao = body?.modo || body?.modo_exclusao;
       } catch {
         // Ignora body vazio
       }
+    }
+
+    // Default: 'somente_esta' (ou 'unica')
+    if (!modoExclusao) {
+      modoExclusao = 'somente_esta';
     }
 
     if (!id) {
@@ -504,19 +511,128 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
+    // Identificação de série recorrente:
+    // O ID raiz da série é recorrencia_pai_id (se for filha) ou o próprio id (se for o pai/mãe)
+    const isRecorrente = Boolean(
+      existing.recorrente ||
+      existing.recorrencia_pai_id ||
+      (existing.recorrencia_tipo && existing.recorrencia_tipo !== 'nenhuma')
+    );
+    const rootId = existing.recorrencia_pai_id || existing.id;
+
+    let idsToDelete: string[] = [id];
+
+    if (isRecorrente && (modoExclusao === 'esta_e_proximas' || modoExclusao === 'toda_serie')) {
+      // Buscar todos os eventos da série estritamente no mesmo ministério
+      const { data: serieEventos, error: serieError } = await ctx.admin
+        .from('agenda_eventos')
+        .select('id, data_inicio, recorrencia_pai_id')
+        .eq('ministry_id', ctx.ministryId)
+        .or(`id.eq.${rootId},recorrencia_pai_id.eq.${rootId}`);
+
+      if (serieError) {
+        return NextResponse.json({ error: 'Erro ao consultar série recorrente.', detail: serieError.message }, { status: 500 });
+      }
+
+      const allSerie = serieEventos || [];
+
+      if (modoExclusao === 'toda_serie') {
+        // Excluir toda a série: todas as ocorrências passadas e futuras ligadas a esta recorrência
+        idsToDelete = allSerie.map((ev: any) => ev.id);
+      } else if (modoExclusao === 'esta_e_proximas') {
+        // Excluir esta ocorrência e todas as ocorrências futuras a partir da data de início
+        const targetDataInicio = existing.data_inicio;
+        const toDeleteList = allSerie.filter((ev: any) => ev.data_inicio >= targetDataInicio);
+        const toKeepList = allSerie.filter((ev: any) => ev.data_inicio < targetDataInicio);
+
+        idsToDelete = toDeleteList.map((ev: any) => ev.id);
+
+        // Se o evento raiz (rootId) estiver entre os que serão excluídos, mas existem ocorrências anteriores a serem mantidas,
+        // precisamos promover a primeira ocorrência mantida para ser o novo pai da série antes de excluir o rootId,
+        // evitando que o ON DELETE CASCADE apague acidentalmente as ocorrências anteriores preservadas.
+        if (idsToDelete.includes(rootId) && toKeepList.length > 0) {
+          // Ordenar mantidos por data de início ascendente
+          toKeepList.sort((a: any, b: any) => new Date(a.data_inicio).getTime() - new Date(b.data_inicio).getTime());
+          const newParent = toKeepList[0];
+          const otherChildren = toKeepList.slice(1);
+
+          // 1. O novo pai agora tem recorrencia_pai_id = null e recorrente = true
+          await ctx.admin
+            .from('agenda_eventos')
+            .update({
+              recorrencia_pai_id: null,
+              recorrente: true,
+              recorrencia_tipo: existing.recorrencia_tipo || 'semanal',
+              recorrencia_config: existing.recorrencia_config || null,
+            })
+            .eq('id', newParent.id)
+            .eq('ministry_id', ctx.ministryId);
+
+          // 2. Os demais filhos anteriores agora apontam para newParent.id
+          if (otherChildren.length > 0) {
+            const otherIds = otherChildren.map((c: any) => c.id);
+            await ctx.admin
+              .from('agenda_eventos')
+              .update({ recorrencia_pai_id: newParent.id })
+              .in('id', otherIds)
+              .eq('ministry_id', ctx.ministryId);
+          }
+        }
+      }
+    } else if (isRecorrente && (modoExclusao === 'somente_esta' || modoExclusao === 'unica')) {
+      // Se estamos excluindo apenas uma ocorrência e essa ocorrência é exatamente o rootId pai da série,
+      // devemos promover a ocorrência filha mais próxima para ser o novo pai, garantindo que o ON DELETE CASCADE
+      // da FK recorrencia_pai_id não destrua todas as filhas restantes.
+      if (existing.id === rootId) {
+        const { data: filhas, error: filhasErr } = await ctx.admin
+          .from('agenda_eventos')
+          .select('id, data_inicio')
+          .eq('ministry_id', ctx.ministryId)
+          .eq('recorrencia_pai_id', rootId)
+          .order('data_inicio', { ascending: true });
+
+        if (!filhasErr && filhas && filhas.length > 0) {
+          const newParent = filhas[0];
+          const remainingFilhas = filhas.slice(1);
+
+          // Promove a primeira filha a novo pai da série
+          await ctx.admin
+            .from('agenda_eventos')
+            .update({
+              recorrencia_pai_id: null,
+              recorrente: true,
+              recorrencia_tipo: existing.recorrencia_tipo || 'semanal',
+              recorrencia_config: existing.recorrencia_config || null,
+            })
+            .eq('id', newParent.id)
+            .eq('ministry_id', ctx.ministryId);
+
+          // Atualiza as demais filhas para o novo pai
+          if (remainingFilhas.length > 0) {
+            const remainingIds = remainingFilhas.map((f: any) => f.id);
+            await ctx.admin
+              .from('agenda_eventos')
+              .update({ recorrencia_pai_id: newParent.id })
+              .in('id', remainingIds)
+              .eq('ministry_id', ctx.ministryId);
+          }
+        }
+      }
+    }
+
     // Sincronização estrita com Acolhimento e Operação de Cultos:
     // Antes de excluir de agenda_eventos, desativa tokens de acolhimento e cancela cultos operacionais em aberto
-    // mantendo integridade multi-tenant e preservando 100% de dados históricos e visitantes.
+    // para todos os IDs afetados pela exclusão, mantendo integridade multi-tenant e preservando 100% de dados históricos e visitantes.
     const { data: cultosVinculados } = await ctx.admin
       .from('culto_registros')
       .select('id, status, visitantes_presentes')
-      .eq('agenda_evento_id', id)
+      .in('agenda_evento_id', idsToDelete)
       .eq('ministry_id', ctx.ministryId);
 
     if (cultosVinculados && cultosVinculados.length > 0) {
       const cultoIds = cultosVinculados.map((c: any) => c.id);
 
-      // Invalida todos os tokens de acolhimento (QR Code / link de recepção) deste culto
+      // Invalida todos os tokens de acolhimento (QR Code / link de recepção) deste(s) culto(s)
       await ctx.admin
         .from('culto_tokens')
         .update({ is_active: false })
@@ -539,13 +655,20 @@ export async function DELETE(request: NextRequest) {
     const { error: deleteError } = await ctx.admin
       .from('agenda_eventos')
       .delete()
-      .eq('id', id);
+      .in('id', idsToDelete)
+      .eq('ministry_id', ctx.ministryId);
 
     if (deleteError) {
       return NextResponse.json({ error: 'Erro ao excluir compromisso.', detail: deleteError.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, id });
+    return NextResponse.json({
+      ok: true,
+      id,
+      modo_exclusao: modoExclusao,
+      excluidos_qtd: idsToDelete.length,
+      ids_excluidos: idsToDelete,
+    });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Erro interno no servidor.' }, { status: 500 });
   }
