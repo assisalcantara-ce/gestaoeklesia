@@ -96,20 +96,102 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Verificar duplicidade por email
-  // Permite nova inscrição se a anterior foi expirada ou cancelada (ex: PIX vencido)
-  const { data: jaInscrito } = await admin
+  // Validar se há memberToken válido para vincular oficialmente ao member_id do cadastro
+  let verifiedMemberId: string | null = null;
+  if (memberToken) {
+    const verified = verifyMemberPrefillToken(memberToken);
+    if (verified.valido && verified.memberId && verified.eventoId === evento.id && verified.ministryId === evento.ministry_id) {
+      verifiedMemberId = verified.memberId;
+    }
+  }
+
+  // Normalização do CPF quando fornecido
+  const cpfDigitos = cpfCnpj ? cpfCnpj.replace(/\D/g, '') : '';
+  const cpfNormalizado = cpfDigitos.length === 11 ? cpfDigitos : null;
+
+  // ─── Verificação rigorosa de duplicidade por member_id e CPF ──────────────
+  // Regra: Não considerar inscrições canceladas ou expiradas
+  const statusAtivos = ['confirmado', 'aguardando_pagamento', 'lista_espera'];
+
+  // 1. Se for membro vinculado por token/login, prioriza member_id
+  if (verifiedMemberId) {
+    const { data: jaInscritoMembro } = await admin
+      .from('eventos_inscricoes')
+      .select('id, status')
+      .eq('evento_id', evento.id)
+      .eq('member_id', verifiedMemberId)
+      .in('status', statusAtivos)
+      .maybeSingle();
+
+    if (jaInscritoMembro) {
+      return NextResponse.json({
+        error: 'Você já possui uma inscrição ativa neste evento.',
+        inscricao_id: jaInscritoMembro.id,
+        status: jaInscritoMembro.status,
+      }, { status: 409 });
+    }
+  }
+
+  // 2. Se possuir CPF informado, verifica duplicidade por CPF no mesmo evento
+  if (cpfNormalizado) {
+    // 2.a. Buscar se algum membro do tenant possui esse CPF
+    const { data: membroComCpf } = await admin
+      .from('members')
+      .select('id')
+      .eq('ministry_id', evento.ministry_id)
+      .eq('cpf', cpfNormalizado)
+      .maybeSingle();
+
+    if (membroComCpf) {
+      const { data: jaInscritoPorCpfMembro } = await admin
+        .from('eventos_inscricoes')
+        .select('id, status')
+        .eq('evento_id', evento.id)
+        .eq('member_id', membroComCpf.id)
+        .in('status', statusAtivos)
+        .maybeSingle();
+
+      if (jaInscritoPorCpfMembro) {
+        return NextResponse.json({
+          error: 'Já existe uma inscrição ativa para este CPF no evento.',
+          inscricao_id: jaInscritoPorCpfMembro.id,
+          status: jaInscritoPorCpfMembro.status,
+        }, { status: 409 });
+      }
+    }
+
+    // 2.b. Buscar se alguma inscrição externa já registrou esse CPF (observacoes ou coluna dedicada)
+    const { data: jaInscritoPorCpfGeral } = await admin
+      .from('eventos_inscricoes')
+      .select('id, status, observacoes')
+      .eq('evento_id', evento.id)
+      .in('status', statusAtivos)
+      .or(`observacoes.ilike.%CPF: ${cpfNormalizado}%,observacoes.ilike.%CPF: ${cpfCnpj}%`);
+
+    if (jaInscritoPorCpfGeral && jaInscritoPorCpfGeral.length > 0) {
+      return NextResponse.json({
+        error: 'Já existe uma inscrição ativa para este CPF no evento.',
+        inscricao_id: jaInscritoPorCpfGeral[0].id,
+        status: jaInscritoPorCpfGeral[0].status,
+      }, { status: 409 });
+    }
+  }
+
+  // 3. Verificar duplicidade por email (como fallback seguro)
+  // Permite nova inscrição se a anterior foi expirada ou cancelada
+  const { data: jaInscritoEmail } = await admin
     .from('eventos_inscricoes')
     .select('id, status')
     .eq('evento_id', evento.id)
     .eq('email_externo', email)
+    .in('status', statusAtivos)
     .maybeSingle();
 
-  if (jaInscrito && !['expirado', 'cancelado'].includes(jaInscrito.status)) {
+  if (jaInscritoEmail) {
     return NextResponse.json({
-      error: 'Este e-mail já possui uma inscrição neste evento.',
-      inscricao_id: jaInscrito.id,
-      status: jaInscrito.status,
+      error: 'Este e-mail já possui uma inscrição ativa neste evento.',
+      inscricao_id: jaInscritoEmail.id,
+      status: jaInscritoEmail.status,
     }, { status: 409 });
   }
 
@@ -123,41 +205,40 @@ export async function POST(request: NextRequest) {
     statusInscricao = 'aguardando_pagamento';
   }
 
-  // Observações com congregação ou dados adicionais
+  // Observações com congregação ou dados adicionais (incluindo CPF normalizado)
   const obsPartes: string[] = [];
+  if (cpfNormalizado) obsPartes.push(`CPF: ${cpfNormalizado}`);
   if (congregacao) obsPartes.push(`Congregação: ${congregacao}`);
   const observacoes = obsPartes.length > 0 ? obsPartes.join(' | ') : null;
 
-  // Validar se há memberToken válido para vincular oficialmente ao member_id do cadastro
-  let verifiedMemberId: string | null = null;
-  if (memberToken) {
-    const verified = verifyMemberPrefillToken(memberToken);
-    if (verified.valido && verified.memberId && verified.eventoId === evento.id && verified.ministryId === evento.ministry_id) {
-      verifiedMemberId = verified.memberId;
-    }
+  // Inserir inscrição com tratamento atômico de erro de índice único
+  const insertPayload: Record<string, any> = {
+    evento_id: evento.id,
+    ministry_id: evento.ministry_id,
+    member_id: verifiedMemberId,
+    nome_externo: verifiedMemberId ? null : nome,
+    email_externo: email,
+    telefone,
+    status: statusInscricao,
+    observacoes,
+    presente: false,
+  };
+  if (cpfNormalizado) {
+    insertPayload.cpf_normalizado = cpfNormalizado;
   }
 
-  // Inserir inscrição
   const { data: inscricao, error: insErr } = await admin
     .from('eventos_inscricoes')
-    .insert({
-      evento_id: evento.id,
-      ministry_id: evento.ministry_id,
-      member_id: verifiedMemberId,
-      nome_externo: verifiedMemberId ? null : nome,
-      email_externo: email,
-      telefone,
-      status: statusInscricao,
-      observacoes,
-      presente: false,
-    })
+    .insert(insertPayload)
     .select('id, status, tem_brinde')
     .single();
 
   if (insErr || !inscricao) {
-    // Conflito de índice único (race condition)
+    // Conflito de índice único (race condition no banco)
     if (insErr?.code === '23505') {
-      return NextResponse.json({ error: 'Este e-mail já possui uma inscrição neste evento.' }, { status: 409 });
+      return NextResponse.json({
+        error: 'Este participante já possui uma inscrição ativa registrada neste evento.',
+      }, { status: 409 });
     }
     return NextResponse.json({ error: 'Erro ao registrar inscrição. Tente novamente.' }, { status: 500 });
   }

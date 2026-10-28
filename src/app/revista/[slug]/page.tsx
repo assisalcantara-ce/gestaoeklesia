@@ -264,6 +264,43 @@ function RevistaContent() {
     [paginaAtual, totalPaginas, isVirando]
   );
 
+  // Função utilitária para obter o índice da página correspondente ao mês vigente (Timezone: America/Belem)
+  const getIndicePaginaMesVigente = useCallback((): number => {
+    try {
+      const parts = new Intl.DateTimeFormat('pt-BR', {
+        timeZone: 'America/Belem',
+        year: 'numeric',
+        month: 'numeric',
+      }).formatToParts(new Date());
+
+      const anoAtualBrasil = Number(parts.find((p) => p.type === 'year')?.value);
+      const mesAtualBrasil = Number(parts.find((p) => p.type === 'month')?.value); // 1 a 12
+
+      // Se o ano da edição for o mesmo ano do calendário brasileiro vigente
+      if (data?.ano && data.ano === anoAtualBrasil && !isNaN(mesAtualBrasil)) {
+        const mesIndex0 = mesAtualBrasil - 1; // 0 a 11
+        const indicePagina = paginas.findIndex(
+          (pg) => pg.tipo === 'mes' && pg.mesIndex === mesIndex0
+        );
+
+        if (indicePagina !== -1) {
+          return indicePagina;
+        }
+      }
+    } catch {
+      // Fallback seguro caso ocorra erro no formatador de fuso horário
+    }
+
+    // Fallback previsível: primeira página após a capa (editorial ou mês 0)
+    return paginas.length > 1 ? 1 : 0;
+  }, [data?.ano, paginas]);
+
+  // Ação ao clicar no CTA principal "ABRIR REVISTA"
+  const handleAbrirRevista = useCallback(() => {
+    const destinoIndex = getIndicePaginaMesVigente();
+    irParaPagina(destinoIndex);
+  }, [getIndicePaginaMesVigente, irParaPagina]);
+
   const avancarPagina = useCallback(() => {
     if (paginaAtual < totalPaginas - 1) {
       irParaPagina(paginaAtual + 1);
@@ -572,11 +609,12 @@ function RevistaContent() {
                       </div>
                     </div>
 
-                    {/* Rodapé da Capa */}
-                    <div className="relative z-10 pt-8 mt-6 border-t border-white/15 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs text-teal-200/80">
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                    {/* Rodapé e CTA Principal da Capa */}
+                    <div className="relative z-10 pt-8 mt-6 border-t border-white/15 flex flex-col sm:flex-row sm:items-center justify-between gap-6 text-xs text-teal-200/80">
+                      {/* Informações Institucionais (Endereço e Website) */}
+                      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 order-2 sm:order-1 max-w-md">
                         {instituicao.endereco && (
-                          <span className="flex items-center gap-1.5">
+                          <span className="flex items-center gap-1.5 leading-relaxed">
                             <MapPin className="w-3.5 h-3.5 text-teal-300 shrink-0" />
                             {instituicao.endereco}
                           </span>
@@ -593,12 +631,15 @@ function RevistaContent() {
                         )}
                       </div>
 
+                      {/* Botão de Destaque Prioritário "ABRIR REVISTA" */}
                       <button
-                        onClick={avancarPagina}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs uppercase tracking-wider transition shadow-lg self-start sm:self-auto cursor-pointer"
+                        type="button"
+                        onClick={handleAbrirRevista}
+                        className="group relative order-1 sm:order-2 inline-flex items-center justify-center gap-3 h-[58px] min-w-[230px] px-8 rounded-2xl bg-teal-400 hover:bg-teal-300 active:scale-[0.98] text-slate-950 font-black text-[15px] sm:text-base uppercase tracking-wider cursor-pointer border border-teal-200/50 shadow-[0_10px_25px_-5px_rgba(20,184,166,0.4),0_0_20px_rgba(45,212,191,0.35)] hover:shadow-[0_14px_30px_-4px_rgba(20,184,166,0.55),0_0_28px_rgba(45,212,191,0.5)] hover:-translate-y-0.5 focus-visible:outline-hidden focus-visible:ring-4 focus-visible:ring-teal-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 transition-all duration-200 motion-reduce:transform-none motion-reduce:transition-none w-full sm:w-auto shrink-0 select-none"
                       >
-                        <span>Abrir Revista</span>
-                        <ArrowRight className="w-4 h-4" />
+                        <BookOpen className="w-5 h-5 text-slate-950 shrink-0" />
+                        <span className="font-extrabold tracking-wide">Abrir Revista</span>
+                        <ArrowRight className="w-5 h-5 text-slate-950 shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-1 motion-reduce:transform-none" />
                       </button>
                     </div>
                   </div>

@@ -79,6 +79,11 @@ export interface BirthdayItem {
   congregacao_id: string | null;
   congregacao_nome: string | null;
   isHoje: boolean;
+  cpf?: string | null;
+  matricula?: string | null;
+  tipo_cadastro?: string | null;
+  role?: string | null;
+  cargo_ministerial?: string | null;
 }
 
 export interface BirthdaysSummaryData {
@@ -624,7 +629,7 @@ export class SecretaryReportsService {
   ): Promise<BirthdayItem[]> {
     let query = this.supabase
       .from('members')
-      .select('id, name, data_nascimento, phone, celular, whatsapp, congregacao_id, congregacoes(nome)')
+      .select('id, name, cpf, matricula, tipo_cadastro, role, cargo_ministerial, data_nascimento, phone, celular, whatsapp, congregacao_id, congregacoes(nome)')
       .eq('ministry_id', ministryId)
       .eq('status', 'active')
       .not('data_nascimento', 'is', null);
@@ -689,6 +694,11 @@ export class SecretaryReportsService {
           congregacao_id: m.congregacao_id,
           congregacao_nome: (m.congregacoes as any)?.nome || null,
           isHoje,
+          cpf: m.cpf || null,
+          matricula: m.matricula || null,
+          tipo_cadastro: m.tipo_cadastro || null,
+          role: m.role || null,
+          cargo_ministerial: m.cargo_ministerial || null,
         });
       }
     }
@@ -717,7 +727,7 @@ export class SecretaryReportsService {
   ): Promise<BirthdaysSummaryData> {
     let query = this.supabase
       .from('members')
-      .select('id, name, data_nascimento, phone, celular, whatsapp, congregacao_id, congregacoes(nome)')
+      .select('id, name, cpf, matricula, tipo_cadastro, role, cargo_ministerial, data_nascimento, phone, celular, whatsapp, congregacao_id, congregacoes(nome)')
       .eq('ministry_id', ministryId)
       .eq('status', 'active')
       .not('data_nascimento', 'is', null);
@@ -779,6 +789,11 @@ export class SecretaryReportsService {
         congregacao_id: m.congregacao_id,
         congregacao_nome: (m.congregacoes as any)?.nome || null,
         isHoje,
+        cpf: m.cpf || null,
+        matricula: m.matricula || null,
+        tipo_cadastro: m.tipo_cadastro || null,
+        role: m.role || null,
+        cargo_ministerial: m.cargo_ministerial || null,
       };
 
       todos.push(item);

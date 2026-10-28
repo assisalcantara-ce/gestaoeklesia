@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Cake,
   Calendar,
@@ -9,9 +9,16 @@ import {
   Search,
   Printer,
   Sparkles,
+  Filter,
 } from 'lucide-react';
 import type { BirthdayItem } from '@/services/secretary-reports-service';
 import ReportPrintHeader from './ReportPrintHeader';
+import { createClient } from '@/lib/supabase-client';
+import {
+  FiltroFuncaoMinisterial,
+  extrairMapaDirigentes,
+  filtrarPorFuncaoMinisterial,
+} from '@/lib/aniversariantes-filtros-utils';
 
 interface BirthdaysReportTabProps {
   initialBirthdays: {
@@ -39,58 +46,139 @@ export default function BirthdaysReportTab({
   const [tipoFiltro, setTipoFiltro] = useState<'hoje' | 'semana' | 'mes' | 'proximos_30'>('mes');
   const [mesSelecionado, setMesSelecionado] = useState(() => new Date().getMonth() + 1);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filtroFuncao, setFiltroFuncao] = useState<FiltroFuncaoMinisterial>('todos');
+
+  // Mapa de dirigentes resolvido a partir de designações e congregações oficiais
+  const [dirigentesMap, setDirigentesMap] = useState<{
+    memberIds: Set<string>;
+    cpfs: Set<string>;
+    matriculas: Set<string>;
+    nomes: Set<string>;
+  }>(() => ({
+    memberIds: new Set<string>(),
+    cpfs: new Set<string>(),
+    matriculas: new Set<string>(),
+    nomes: new Set<string>(),
+  }));
+
+  useEffect(() => {
+    let isMounted = true;
+    async function carregarDirigentesOficiais() {
+      try {
+        const supabase = createClient();
+        const [desigRes, congRes] = await Promise.all([
+          supabase
+            .from('dirigentes_designacoes')
+            .select('member_id, cpf_dirigente, matricula_dirigente, nome_dirigente, status')
+            .eq('status', 'ativo'),
+          supabase
+            .from('congregacoes')
+            .select('id, dirigente, dirigente_cpf, dirigente_matricula, is_active')
+            .or('is_active.eq.true,is_active.is.null'),
+        ]);
+
+        if (isMounted) {
+          const mapa = extrairMapaDirigentes(
+            desigRes.data || [],
+            congRes.data || []
+          );
+          setDirigentesMap(mapa);
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar mapa de dirigentes oficiais no relatório:', err);
+      }
+    }
+
+    carregarDirigentesOficiais();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const now = new Date();
   const currentMonthNum = now.getMonth() + 1;
   const currentDayNum = now.getDate();
 
-  // Mapa de contagens seguras por mês
-  const contagemPorMes = useMemo(() => {
-    if (initialBirthdays.contagemPorMes) {
-      return initialBirthdays.contagemPorMes;
+  // Helper de filtragem por função ministerial
+  const atendeFuncao = useMemo(() => {
+    return (item: BirthdayItem) =>
+      filtrarPorFuncaoMinisterial(
+        {
+          id: item.id,
+          name: item.name,
+          nome: item.name,
+          cpf: item.cpf,
+          matricula: item.matricula,
+          tipoCadastro: item.tipo_cadastro,
+          tipo_cadastro: item.tipo_cadastro,
+          role: item.role,
+          cargoMinisterial: item.cargo_ministerial,
+          cargo_ministerial: item.cargo_ministerial,
+        },
+        filtroFuncao,
+        dirigentesMap
+      );
+  }, [filtroFuncao, dirigentesMap]);
+
+  // Pools filtrados por função ministerial
+  const poolTodos = useMemo(() => {
+    const raw = initialBirthdays.todos || initialBirthdays.mes || [];
+    return raw.filter(atendeFuncao);
+  }, [initialBirthdays.todos, initialBirthdays.mes, atendeFuncao]);
+
+  const poolHoje = useMemo(() => {
+    return (initialBirthdays.hoje || []).filter(atendeFuncao);
+  }, [initialBirthdays.hoje, atendeFuncao]);
+
+  const poolSemana = useMemo(() => {
+    return (initialBirthdays.semana || []).filter(atendeFuncao);
+  }, [initialBirthdays.semana, atendeFuncao]);
+
+  const poolProximos30 = useMemo(() => {
+    if (initialBirthdays.proximos_30 && initialBirthdays.proximos_30.length > 0) {
+      return initialBirthdays.proximos_30.filter(atendeFuncao);
     }
+    const getDiffDays = (item: BirthdayItem) => {
+      let bday = new Date(now.getFullYear(), item.mes - 1, item.dia);
+      const ref = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      if (bday < ref) bday = new Date(now.getFullYear() + 1, item.mes - 1, item.dia);
+      return Math.round((bday.getTime() - ref.getTime()) / (1000 * 60 * 60 * 24));
+    };
+
+    return poolTodos
+      .map((item) => ({ ...item, diffDays: getDiffDays(item) }))
+      .filter((item) => item.diffDays >= 0 && item.diffDays <= 30)
+      .sort((a, b) => a.diffDays - b.diffDays);
+  }, [initialBirthdays.proximos_30, atendeFuncao, poolTodos, now]);
+
+  // Mapa de contagens seguras por mês (recalculado com o filtro ativo)
+  const contagemPorMes = useMemo(() => {
     const counts: Record<number, number> = {
       1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0,
       7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0,
     };
-    const pool = initialBirthdays.todos || initialBirthdays.mes || [];
-    pool.forEach((item) => {
+    poolTodos.forEach((item) => {
       if (item.mes >= 1 && item.mes <= 12) {
         counts[item.mes] = (counts[item.mes] || 0) + 1;
       }
     });
     return counts;
-  }, [initialBirthdays]);
+  }, [poolTodos]);
 
-  // Lista base filtrada de acordo com a seleção
+  // Lista base filtrada de acordo com o período selecionado
   const listaBase = useMemo(() => {
     if (tipoFiltro === 'hoje') {
-      return initialBirthdays.hoje || [];
+      return poolHoje;
     }
     if (tipoFiltro === 'semana') {
-      return initialBirthdays.semana || [];
+      return poolSemana;
     }
     if (tipoFiltro === 'proximos_30') {
-      if (initialBirthdays.proximos_30 && initialBirthdays.proximos_30.length > 0) {
-        return initialBirthdays.proximos_30;
-      }
-      const pool = initialBirthdays.todos || initialBirthdays.mes || [];
-      const getDiffDays = (item: BirthdayItem) => {
-        let bday = new Date(now.getFullYear(), item.mes - 1, item.dia);
-        const ref = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        if (bday < ref) bday = new Date(now.getFullYear() + 1, item.mes - 1, item.dia);
-        return Math.round((bday.getTime() - ref.getTime()) / (1000 * 60 * 60 * 24));
-      };
-
-      return pool
-        .map((item) => ({ ...item, diffDays: getDiffDays(item) }))
-        .filter((item) => item.diffDays >= 0 && item.diffDays <= 30)
-        .sort((a, b) => a.diffDays - b.diffDays);
+      return poolProximos30;
     }
     // tipoFiltro === 'mes'
-    const pool = initialBirthdays.todos || initialBirthdays.mes || [];
-    return pool.filter((item) => item.mes === mesSelecionado);
-  }, [tipoFiltro, mesSelecionado, initialBirthdays, now]);
+    return poolTodos.filter((item) => item.mes === mesSelecionado);
+  }, [tipoFiltro, mesSelecionado, poolHoje, poolSemana, poolProximos30, poolTodos]);
 
   // Filtro de busca textual
   const listaExibicao = useMemo(() => {
@@ -113,16 +201,22 @@ export default function BirthdaysReportTab({
   }
 
   const getSubtituloPeriodo = () => {
-    if (tipoFiltro === 'hoje') return `Aniversariantes de Hoje (${String(currentDayNum).padStart(2, '0')}/${String(currentMonthNum).padStart(2, '0')})`;
-    if (tipoFiltro === 'semana') return 'Aniversariantes Desta Semana (Domingo a Sábado)';
-    if (tipoFiltro === 'proximos_30') return 'Próximos 30 Dias';
-    return `Mês de ${MESES_NOMES[mesSelecionado - 1]}`;
+    const sufixoFuncao =
+      filtroFuncao === 'ministros'
+        ? ' — Ministros'
+        : filtroFuncao === 'dirigentes'
+        ? ' — Somente Dirigentes'
+        : '';
+    if (tipoFiltro === 'hoje') return `Aniversariantes de Hoje (${String(currentDayNum).padStart(2, '0')}/${String(currentMonthNum).padStart(2, '0')})${sufixoFuncao}`;
+    if (tipoFiltro === 'semana') return `Aniversariantes Desta Semana (Domingo a Sábado)${sufixoFuncao}`;
+    if (tipoFiltro === 'proximos_30') return `Próximos 30 Dias${sufixoFuncao}`;
+    return `Mês de ${MESES_NOMES[mesSelecionado - 1]}${sufixoFuncao}`;
   };
 
-  const totalHoje = initialBirthdays.hoje?.length || 0;
-  const totalSemana = initialBirthdays.semana?.length || 0;
-  const totalProximos30 = initialBirthdays.proximos_30?.length || 0;
-  const totalAnual = initialBirthdays.totalAnual ?? (initialBirthdays.todos?.length || 0);
+  const totalHoje = poolHoje.length;
+  const totalSemana = poolSemana.length;
+  const totalProximos30 = poolProximos30.length;
+  const totalAnual = poolTodos.length;
 
   return (
     <div className="space-y-6">
@@ -199,68 +293,88 @@ export default function BirthdaysReportTab({
           </button>
         </div>
 
-        {/* Botões de Filtro Rápido */}
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100">
-          <button
-            onClick={() => setTipoFiltro('hoje')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${
-              tipoFiltro === 'hoje'
-                ? 'bg-purple-600 text-white shadow-sm'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            Hoje ({totalHoje})
-          </button>
-
-          <button
-            onClick={() => setTipoFiltro('semana')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${
-              tipoFiltro === 'semana'
-                ? 'bg-purple-600 text-white shadow-sm'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <Calendar className="w-3.5 h-3.5" />
-            Esta Semana ({totalSemana})
-          </button>
-
-          <button
-            onClick={() => setTipoFiltro('mes')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
-              tipoFiltro === 'mes'
-                ? 'bg-purple-600 text-white shadow-sm'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Por Mês ({MESES_NOMES[mesSelecionado - 1]}: {contagemPorMes[mesSelecionado] || 0})
-          </button>
-
-          <button
-            onClick={() => setTipoFiltro('proximos_30')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
-              tipoFiltro === 'proximos_30'
-                ? 'bg-purple-600 text-white shadow-sm'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Próximos 30 Dias ({totalProximos30})
-          </button>
-
-          {/* Seletor de Mês (quando tipo === 'mes') */}
-          {tipoFiltro === 'mes' && (
-            <select
-              value={mesSelecionado}
-              onChange={(e) => setMesSelecionado(Number(e.target.value))}
-              className="ml-auto text-xs font-semibold bg-gray-50 border border-gray-300 rounded-lg px-3 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
+        {/* Botões de Filtro Rápido e Seletor de Função Ministerial */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-gray-100">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setTipoFiltro('hoje')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${
+                tipoFiltro === 'hoje'
+                  ? 'bg-purple-600 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
             >
-              {MESES_NOMES.map((m, idx) => (
-                <option key={idx + 1} value={idx + 1}>
-                  {m} ({contagemPorMes[idx + 1] || 0})
-                </option>
-              ))}
+              <Sparkles className="w-3.5 h-3.5" />
+              Hoje ({totalHoje})
+            </button>
+
+            <button
+              onClick={() => setTipoFiltro('semana')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${
+                tipoFiltro === 'semana'
+                  ? 'bg-purple-600 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              Esta Semana ({totalSemana})
+            </button>
+
+            <button
+              onClick={() => setTipoFiltro('mes')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                tipoFiltro === 'mes'
+                  ? 'bg-purple-600 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Por Mês ({MESES_NOMES[mesSelecionado - 1]}: {contagemPorMes[mesSelecionado] || 0})
+            </button>
+
+            <button
+              onClick={() => setTipoFiltro('proximos_30')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                tipoFiltro === 'proximos_30'
+                  ? 'bg-purple-600 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Próximos 30 Dias ({totalProximos30})
+            </button>
+
+            {/* Seletor de Mês (quando tipo === 'mes') */}
+            {tipoFiltro === 'mes' && (
+              <select
+                value={mesSelecionado}
+                onChange={(e) => setMesSelecionado(Number(e.target.value))}
+                className="text-xs font-semibold bg-gray-50 border border-gray-300 rounded-lg px-3 py-1.5 text-gray-700 focus:outline-hidden focus:ring-2 focus:ring-purple-500 cursor-pointer"
+              >
+                {MESES_NOMES.map((m, idx) => (
+                  <option key={idx + 1} value={idx + 1}>
+                    {m} ({contagemPorMes[idx + 1] || 0})
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Seletor de Função Ministerial */}
+          <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-300 rounded-xl px-2.5 py-1.5 shadow-xs">
+            <Filter className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+            <label htmlFor="filtro-funcao-relatorio" className="text-xs font-bold text-gray-600 shrink-0">
+              Função Ministerial:
+            </label>
+            <select
+              id="filtro-funcao-relatorio"
+              value={filtroFuncao}
+              onChange={(e) => setFiltroFuncao(e.target.value as FiltroFuncaoMinisterial)}
+              className="text-xs font-semibold text-gray-800 bg-transparent focus:outline-hidden cursor-pointer"
+            >
+              <option value="todos">Todos os Membros</option>
+              <option value="ministros">Ministros</option>
+              <option value="dirigentes">Somente Dirigentes</option>
             </select>
-          )}
+          </div>
         </div>
 
         {/* Campo de Busca Textual */}
@@ -292,8 +406,14 @@ export default function BirthdaysReportTab({
         {listaExibicao.length === 0 ? (
           <div className="py-16 text-center text-gray-400">
             <Cake className="w-10 h-10 mx-auto text-gray-300 mb-2 stroke-1" />
-            <p className="text-sm font-medium text-gray-500">
-              Nenhum aniversariante encontrado para o período selecionado.
+            <p className="text-sm font-medium text-gray-600">
+              Nenhum aniversariante encontrado para o período selecionado
+              {filtroFuncao === 'ministros' ? ' com função de Ministro' : filtroFuncao === 'dirigentes' ? ' com vínculo de Dirigente' : ''}.
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              {filtroFuncao === 'todos'
+                ? 'Verifique outros meses ou períodos nos seletores acima.'
+                : 'Tente alternar o filtro de função ministerial ou selecionar outro período.'}
             </p>
           </div>
         ) : (

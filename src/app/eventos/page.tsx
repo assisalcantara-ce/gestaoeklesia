@@ -813,6 +813,8 @@ export default function EventosPage() {
   const [buscaMembro, setBuscaMembro] = useState('');
   const [resultadosMembro, setResultadosMembro] = useState<Membro[]>([]);
   const [membroSelecionado, setMembroSelecionado] = useState<Membro | null>(null);
+  const [duplicidadeAvisoInsc, setDuplicidadeAvisoInsc] = useState<string | null>(null);
+  const [duplicidadeChecandoInsc, setDuplicidadeChecandoInsc] = useState(false);
 
   const [inscricaoParaExcluir, setInscricaoParaExcluir] = useState<Inscricao | null>(null);
   const [excluindoInsc, setExcluindoInsc] = useState(false);
@@ -839,6 +841,8 @@ export default function EventosPage() {
   const [balcaoFormaPagamento, setBalcaoFormaPagamento] = useState<'a_vista' | 'pix' | 'cortesia'>('a_vista');
   const [balcaoJustificativa, setBalcaoJustificativa] = useState('');
   const [balcaoSalvando, setBalcaoSalvando] = useState(false);
+  const [balcaoDuplicidadeAviso, setBalcaoDuplicidadeAviso] = useState<string | null>(null);
+  const [balcaoDuplicidadeChecando, setBalcaoDuplicidadeChecando] = useState(false);
   const [balcaoSucesso, setBalcaoSucesso] = useState<{
     inscricaoId: string;
     evento: Evento;
@@ -854,6 +858,7 @@ export default function EventosPage() {
 
   // ── Modal Link Público de Check-in ────────────────────────────────────────
   const [showLinkCheckinModal, setShowLinkCheckinModal] = useState(false);
+  const [gerandoRelatorioPdf, setGerandoRelatorioPdf] = useState(false);
   const [linkCheckinUrl, setLinkCheckinUrl] = useState('');
   const [linkCheckinExpiraEm, setLinkCheckinExpiraEm] = useState<string | null>(null);
   const [loadingLinkCheckin, setLoadingLinkCheckin] = useState(false);
@@ -1431,6 +1436,107 @@ export default function EventosPage() {
     buscarMembroBalcao(balcaoBuscaMembro);
   }, [balcaoBuscaMembro, buscarMembroBalcao]);
 
+  // ── Verificação em tempo real de duplicidade no formulário de inscrição ───────
+  useEffect(() => {
+    if (!showFormInsc || !eventoSelecionado) {
+      setDuplicidadeAvisoInsc(null);
+      return;
+    }
+
+    const memberId = membroSelecionado?.id || formInsc.member_id || null;
+    const cpfLimpo = (formInsc.cpf || '').replace(/\D/g, '');
+
+    if (!memberId && (!cpfLimpo || cpfLimpo.length !== 11)) {
+      setDuplicidadeAvisoInsc(null);
+      return;
+    }
+
+    let cancelado = false;
+    const checar = async () => {
+      setDuplicidadeChecandoInsc(true);
+      try {
+        const res = await fetch('/api/v1/eventos/inscricao/verificar-duplicidade', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            evento_id: eventoSelecionado.id,
+            member_id: memberId,
+            cpf: cpfLimpo.length === 11 ? cpfLimpo : null,
+            ignore_inscricao_id: editingInscId || null,
+          }),
+        });
+        if (!cancelado && res.ok) {
+          const data = await res.json();
+          if (data.duplicado) {
+            setDuplicidadeAvisoInsc(data.mensagem || 'Este participante já possui uma inscrição ativa neste evento.');
+          } else {
+            setDuplicidadeAvisoInsc(null);
+          }
+        }
+      } catch (err) {
+        console.error('Erro ao verificar duplicidade de inscrição:', err);
+      } finally {
+        if (!cancelado) setDuplicidadeChecandoInsc(false);
+      }
+    };
+
+    const timer = setTimeout(checar, 250);
+    return () => {
+      cancelado = true;
+      clearTimeout(timer);
+    };
+  }, [showFormInsc, eventoSelecionado, membroSelecionado, formInsc.member_id, formInsc.cpf, editingInscId]);
+
+  // ── Verificação em tempo real de duplicidade no modal de Balcão ───────────────
+  useEffect(() => {
+    if (!showBalcaoModal || !balcaoEventoId) {
+      setBalcaoDuplicidadeAviso(null);
+      return;
+    }
+
+    const memberId = balcaoMembro?.id || null;
+    const cpfLimpo = (balcaoCpf || '').replace(/\D/g, '');
+
+    if (!memberId && (!cpfLimpo || cpfLimpo.length !== 11)) {
+      setBalcaoDuplicidadeAviso(null);
+      return;
+    }
+
+    let cancelado = false;
+    const checar = async () => {
+      setBalcaoDuplicidadeChecando(true);
+      try {
+        const res = await fetch('/api/v1/eventos/inscricao/verificar-duplicidade', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            evento_id: balcaoEventoId,
+            member_id: memberId,
+            cpf: cpfLimpo.length === 11 ? cpfLimpo : null,
+          }),
+        });
+        if (!cancelado && res.ok) {
+          const data = await res.json();
+          if (data.duplicado) {
+            setBalcaoDuplicidadeAviso(data.mensagem || 'Este participante já possui uma inscrição ativa neste evento.');
+          } else {
+            setBalcaoDuplicidadeAviso(null);
+          }
+        }
+      } catch (err) {
+        console.error('Erro ao verificar duplicidade no balcão:', err);
+      } finally {
+        if (!cancelado) setBalcaoDuplicidadeChecando(false);
+      }
+    };
+
+    const timer = setTimeout(checar, 250);
+    return () => {
+      cancelado = true;
+      clearTimeout(timer);
+    };
+  }, [showBalcaoModal, balcaoEventoId, balcaoMembro, balcaoCpf]);
+
   // ── Memos & Paginação ──────────────────────────────────────────────────────
   const eventosPagos = useMemo(
     () => eventos.filter(e => e.evento_pago === true),
@@ -1953,8 +2059,35 @@ export default function EventosPage() {
       }
       showModal('Sucesso', 'Inscrição atualizada com sucesso.', 'success');
     } else {
+      // 0. Verificação defensiva de duplicidade antes da inserção
+      const memberIdParaCheck = membroSelecionado?.id ?? null;
+      const cpfLimpoParaCheck = formInsc.cpf.replace(/\D/g, '');
+
+      if (memberIdParaCheck || (cpfLimpoParaCheck && cpfLimpoParaCheck.length === 11)) {
+        try {
+          const resCheck = await fetch('/api/v1/eventos/inscricao/verificar-duplicidade', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              evento_id: eventoSelecionado.id,
+              member_id: memberIdParaCheck,
+              cpf: cpfLimpoParaCheck.length === 11 ? cpfLimpoParaCheck : null,
+            }),
+          });
+          if (resCheck.ok) {
+            const dataCheck = await resCheck.json();
+            if (dataCheck.duplicado) {
+              showModal('Inscrição já existente', dataCheck.mensagem || 'Este participante já possui uma inscrição ativa neste evento.', 'error');
+              return;
+            }
+          }
+        } catch {
+          // prossegue para validação no banco
+        }
+      }
+
       // Inserção de nova inscrição
-      const { error } = await supabase.from('eventos_inscricoes').insert({
+      const insertPayload: Record<string, any> = {
         evento_id: eventoSelecionado.id,
         ministry_id: ministryId,
         member_id: membroSelecionado?.id ?? null,
@@ -1966,10 +2099,15 @@ export default function EventosPage() {
         com_hospedagem: formInsc.com_hospedagem,
         status_hospedagem: formInsc.com_hospedagem ? 'solicitada' : 'nao_aplicavel',
         criado_por: user?.id ?? null,
-      });
+      };
+      if (cpfLimpoParaCheck && cpfLimpoParaCheck.length === 11) {
+        insertPayload.cpf_normalizado = cpfLimpoParaCheck;
+      }
+
+      const { error } = await supabase.from('eventos_inscricoes').insert(insertPayload);
 
       if (error) {
-        showModal('Erro', error.code === '23505' ? 'Este membro já está inscrito neste evento.' : error.message, 'error');
+        showModal('Erro', error.code === '23505' ? 'Este participante já possui uma inscrição ativa neste evento.' : error.message, 'error');
         return;
       }
       showModal('Sucesso', 'Inscrição realizada com sucesso.', 'success');
@@ -2106,23 +2244,54 @@ export default function EventosPage() {
         balcaoJustificativa.trim() ? `Obs/Justificativa: ${balcaoJustificativa.trim()}` : null,
       ].filter(Boolean);
 
+      // Verificação defensiva de duplicidade antes de inserir
+      const memberIdParaCheck = temMembro ? balcaoMembro.id : null;
+      if (memberIdParaCheck || (cpfLimpo && cpfLimpo.length === 11)) {
+        try {
+          const resCheck = await fetch('/api/v1/eventos/inscricao/verificar-duplicidade', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              evento_id: evento.id,
+              member_id: memberIdParaCheck,
+              cpf: cpfLimpo.length === 11 ? cpfLimpo : null,
+            }),
+          });
+          if (resCheck.ok) {
+            const dataCheck = await resCheck.json();
+            if (dataCheck.duplicado) {
+              showModal('Inscrição já existente', dataCheck.mensagem || 'Este participante já possui uma inscrição ativa neste evento.', 'error');
+              setBalcaoSalvando(false);
+              return;
+            }
+          }
+        } catch {
+          // prossegue
+        }
+      }
+
       // 3. Inserir inscrição confirmada
+      const balcaoPayload: Record<string, any> = {
+        evento_id: evento.id,
+        ministry_id: ministryId,
+        member_id: temMembro ? balcaoMembro.id : null,
+        nome_externo: temMembro ? null : nomeFinalNormalizado,
+        email_externo: balcaoEmail.trim() || null,
+        telefone: balcaoTelefone.trim() || null,
+        status: 'confirmado',
+        confirmado_em: new Date().toISOString(),
+        com_hospedagem: balcaoHospedagem,
+        status_hospedagem: balcaoHospedagem ? 'confirmada' : 'nao_aplicavel',
+        observacoes: obsPartes.join(' | '),
+        criado_por: user?.id ?? null,
+      };
+      if (cpfLimpo && cpfLimpo.length === 11) {
+        balcaoPayload.cpf_normalizado = cpfLimpo;
+      }
+
       const { data: novaInsc, error: inscError } = await supabase
         .from('eventos_inscricoes')
-        .insert({
-          evento_id: evento.id,
-          ministry_id: ministryId,
-          member_id: temMembro ? balcaoMembro.id : null,
-          nome_externo: temMembro ? null : nomeFinalNormalizado,
-          email_externo: balcaoEmail.trim() || null,
-          telefone: balcaoTelefone.trim() || null,
-          status: 'confirmado',
-          confirmado_em: new Date().toISOString(),
-          com_hospedagem: balcaoHospedagem,
-          status_hospedagem: balcaoHospedagem ? 'confirmada' : 'nao_aplicavel',
-          observacoes: obsPartes.join(' | '),
-          criado_por: user?.id ?? null,
-        })
+        .insert(balcaoPayload)
         .select('id, tem_brinde')
         .single();
 
@@ -5291,6 +5460,17 @@ export default function EventosPage() {
                         placeholder="Restrições, necessidades especiais, etc."
                       />
                     </div>
+
+                    {/* Alerta em tempo real de inscrição duplicada */}
+                    {duplicidadeAvisoInsc && (
+                      <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2.5 text-rose-800">
+                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        <div className="text-xs space-y-0.5">
+                          <p className="font-bold text-rose-900">Inscrição já existente no evento</p>
+                          <p className="text-rose-700 leading-relaxed">{duplicidadeAvisoInsc}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-100">
@@ -5299,6 +5479,7 @@ export default function EventosPage() {
                       onClick={() => {
                         setShowFormInsc(false);
                         setEditingInscId(null);
+                        setDuplicidadeAvisoInsc(null);
                       }}
                       className="px-4 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
                     >
@@ -5306,10 +5487,11 @@ export default function EventosPage() {
                     </button>
                     <button
                       type="button"
+                      disabled={Boolean(duplicidadeAvisoInsc) || duplicidadeChecandoInsc}
                       onClick={handleSaveInscricao}
-                      className="px-5 py-2.5 rounded-xl bg-[#0f3460] text-white text-xs font-bold hover:bg-[#162a47] transition shadow-xs cursor-pointer"
+                      className="px-5 py-2.5 rounded-xl bg-[#0f3460] text-white text-xs font-bold hover:bg-[#162a47] transition shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {editingInscId ? 'Salvar Alterações' : 'Confirmar Inscrição'}
+                      {duplicidadeChecandoInsc ? 'Verificando...' : editingInscId ? 'Salvar Alterações' : 'Confirmar Inscrição'}
                     </button>
                   </div>
                 </div>
@@ -5802,10 +5984,47 @@ export default function EventosPage() {
               )}
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+              <button
+                type="button"
+                disabled={gerandoRelatorioPdf}
+                onClick={async () => {
+                  if (!eventoSelecionado) return;
+                  setGerandoRelatorioPdf(true);
+                  try {
+                    const res = await fetch(`/api/v1/eventos/${eventoSelecionado.id}/relatorio/pdf`);
+                    if (!res.ok) {
+                      const errData = await res.json().catch(() => ({}));
+                      throw new Error(errData.error || `Erro ao gerar PDF (${res.status})`);
+                    }
+                    const blob = await res.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    window.open(url, '_blank');
+                  } catch (err: any) {
+                    showModal('Erro ao gerar relatório', err?.message || 'Falha ao processar PDF institucional.', 'error');
+                  } finally {
+                    setGerandoRelatorioPdf(false);
+                  }
+                }}
+                className="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-50"
+                title="Gerar e imprimir Relatório Gerencial completo do evento em PDF"
+              >
+                {gerandoRelatorioPdf ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Gerando PDF Gerencial...</span>
+                  </>
+                ) : (
+                  <>
+                    <Printer className="w-4 h-4" />
+                    <span>Gerar Relatório PDF</span>
+                  </>
+                )}
+              </button>
+
               <button
                 onClick={() => exportarCSVInscricoes(inscricoes, eventoSelecionado.titulo)}
-                className="inline-flex items-center gap-2 bg-[#0f3460] text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-[#162a47] transition shadow-xs"
+                className="inline-flex items-center gap-2 bg-[#0f3460] text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-[#162a47] transition shadow-xs cursor-pointer"
               >
                 <Download className="w-4 h-4" />
                 <span>Exportar Lista de Participantes (CSV)</span>
@@ -6291,22 +6510,35 @@ export default function EventosPage() {
                         : 0;
 
                       return (
-                        <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200/90 flex items-center justify-between">
-                          <div>
-                            <span className="text-xs font-bold text-slate-800 block">Total a receber:</span>
-                            <span className="text-[11px] text-slate-500">
-                              {ev.evento_pago
-                                ? balcaoFormaPagamento === 'cortesia'
-                                  ? 'Cortesia autorizada (R$ 0,00)'
-                                  : balcaoFormaPagamento === 'pix'
-                                  ? 'Pagamento via PIX presencial'
-                                  : 'Pagamento à vista presencial'
-                                : 'Inscrição gratuita'}
+                        <div className="space-y-3">
+                          {/* Aviso em tempo real de inscrição duplicada no Balcão */}
+                          {balcaoDuplicidadeAviso && (
+                            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2.5 text-rose-800">
+                              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                              <div className="text-xs space-y-0.5">
+                                <p className="font-bold text-rose-900">Participante já inscrito neste evento</p>
+                                <p className="text-rose-700 leading-relaxed">{balcaoDuplicidadeAviso}</p>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200/90 flex items-center justify-between">
+                            <div>
+                              <span className="text-xs font-bold text-slate-800 block">Total a receber:</span>
+                              <span className="text-[11px] text-slate-500">
+                                {ev.evento_pago
+                                  ? balcaoFormaPagamento === 'cortesia'
+                                    ? 'Cortesia autorizada (R$ 0,00)'
+                                    : balcaoFormaPagamento === 'pix'
+                                    ? 'Pagamento via PIX presencial'
+                                    : 'Pagamento à vista presencial'
+                                  : 'Inscrição gratuita'}
+                              </span>
+                            </div>
+                            <span className="text-lg font-black text-slate-900">
+                              R$ {valorFinal.toFixed(2).replace('.', ',')}
                             </span>
                           </div>
-                          <span className="text-lg font-black text-slate-900">
-                            R$ {valorFinal.toFixed(2).replace('.', ',')}
-                          </span>
                         </div>
                       );
                     })()}
@@ -6315,21 +6547,26 @@ export default function EventosPage() {
                     <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
                       <button
                         type="button"
-                        onClick={() => setShowBalcaoModal(false)}
+                        onClick={() => {
+                          setShowBalcaoModal(false);
+                          setBalcaoDuplicidadeAviso(null);
+                        }}
                         className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition"
                       >
                         Cancelar
                       </button>
                       <button
                         type="submit"
-                        disabled={balcaoSalvando}
-                        className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition shadow-xs disabled:opacity-50 active:scale-95"
+                        disabled={balcaoSalvando || Boolean(balcaoDuplicidadeAviso) || balcaoDuplicidadeChecando}
+                        className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition shadow-xs disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
                       >
                         {balcaoSalvando ? (
                           <>
                             <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                             <span>Processando...</span>
                           </>
+                        ) : balcaoDuplicidadeChecando ? (
+                          <span>Verificando...</span>
                         ) : (
                           <>
                             <Check className="w-4 h-4" />

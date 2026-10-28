@@ -1,9 +1,15 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { Cake, Mail, Image as ImageIcon, CheckCircle, AlertCircle, Save, Trash2, Loader2, Sparkles } from 'lucide-react';
+import { Cake, Mail, Image as ImageIcon, CheckCircle, AlertCircle, Save, Trash2, Loader2, Sparkles, Filter } from 'lucide-react';
 import { Membro } from '@/hooks/secretaria/useMembros';
 import { authenticatedFetch } from '@/lib/api-client';
+import { createClient } from '@/lib/supabase-client';
+import {
+  FiltroFuncaoMinisterial,
+  extrairMapaDirigentes,
+  filtrarPorFuncaoMinisterial,
+} from '@/lib/aniversariantes-filtros-utils';
 
 interface MembrosAniversariantesViewProps {
   membros: Membro[];
@@ -21,6 +27,55 @@ export default function MembrosAniversariantesView({
   membros,
 }: MembrosAniversariantesViewProps) {
   const [mesSelecionado, setMesSelecionado] = useState<number>(() => new Date().getMonth() + 1);
+  const [filtroFuncao, setFiltroFuncao] = useState<FiltroFuncaoMinisterial>('todos');
+
+  // Mapa de dirigentes resolvido a partir das designações e congregações oficiais
+  const [dirigentesMap, setDirigentesMap] = useState<{
+    memberIds: Set<string>;
+    cpfs: Set<string>;
+    matriculas: Set<string>;
+    nomes: Set<string>;
+  }>(() => ({
+    memberIds: new Set<string>(),
+    cpfs: new Set<string>(),
+    matriculas: new Set<string>(),
+    nomes: new Set<string>(),
+  }));
+
+  // Carregar dirigentes oficiais para cruzamento em tempo real
+  useEffect(() => {
+    let isMounted = true;
+    async function carregarDirigentesOficiais() {
+      try {
+        const supabase = createClient();
+        const [desigRes, congRes] = await Promise.all([
+          supabase
+            .from('dirigentes_designacoes')
+            .select('member_id, cpf_dirigente, matricula_dirigente, nome_dirigente, status')
+            .eq('status', 'ativo'),
+          supabase
+            .from('congregacoes')
+            .select('id, dirigente, dirigente_cpf, dirigente_matricula, is_active')
+            .or('is_active.eq.true,is_active.is.null'),
+        ]);
+
+        if (isMounted) {
+          const mapa = extrairMapaDirigentes(
+            desigRes.data || [],
+            congRes.data || []
+          );
+          setDirigentesMap(mapa);
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar mapa de dirigentes oficiais:', err);
+      }
+    }
+
+    carregarDirigentesOficiais();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Estados da Mensagem e Imagem
   const [mensagemTemplate, setMensagemTemplate] = useState<string>(() => {
@@ -143,14 +198,35 @@ export default function MembrosAniversariantesView({
     }
   };
 
-  // Contagem de aniversariantes por mês para os cards superiores
+  // Membros elegíveis após aplicação do filtro de função ministerial
+  const membrosFiltradosPorFuncao = useMemo(() => {
+    return membros.filter((m) =>
+      filtrarPorFuncaoMinisterial(
+        {
+          id: m.id,
+          nome: m.nome,
+          name: m.nome,
+          cpf: m.cpf,
+          matricula: m.matricula,
+          tipoCadastro: m.tipoCadastro,
+          role: m.tipoCadastro,
+          cargoMinisterial: m.cargoMinisterial,
+          cargo_ministerial: m.cargoMinisterial,
+        },
+        filtroFuncao,
+        dirigentesMap
+      )
+    );
+  }, [membros, filtroFuncao, dirigentesMap]);
+
+  // Contagem de aniversariantes por mês para os cards superiores (recalculado com o filtro de função)
   const contagemPorMes = useMemo(() => {
     const contagem: Record<number, number> = {
       1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0,
       7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0
     };
 
-    membros.forEach(m => {
+    membrosFiltradosPorFuncao.forEach(m => {
       if (!m.dataNascimento) return;
       let mesMembro = 0;
       const raw = m.dataNascimento.trim();
@@ -167,11 +243,11 @@ export default function MembrosAniversariantesView({
     });
 
     return contagem;
-  }, [membros]);
+  }, [membrosFiltradosPorFuncao]);
 
   // Lista de aniversariantes filtrados do mês selecionado
   const aniversariantesDoMes = useMemo(() => {
-    return membros.filter(membro => {
+    return membrosFiltradosPorFuncao.filter(membro => {
       if (!membro.dataNascimento) return false;
       let mesMembro = 0;
       const raw = membro.dataNascimento.trim();
@@ -191,7 +267,7 @@ export default function MembrosAniversariantesView({
       };
       return getDia(a.dataNascimento || '') - getDia(b.dataNascimento || '');
     });
-  }, [membros, mesSelecionado]);
+  }, [membrosFiltradosPorFuncao, mesSelecionado]);
 
   const formatarDia = (dataNascimento?: string) => {
     if (!dataNascimento) return '-';
@@ -299,18 +375,43 @@ export default function MembrosAniversariantesView({
         
         {/* Lado Esquerdo: Lista de Aniversariantes */}
         <div className="lg:col-span-2 bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+          <div className="px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gray-50">
             <h3 className="font-bold text-gray-800 flex items-center gap-2 text-base">
               <Cake className="w-5 h-5 text-teal-600" />
               Aniversariantes de {MESES[mesSelecionado - 1]} ({aniversariantesDoMes.length})
             </h3>
+
+            {/* Seletor de Função Ministerial */}
+            <div className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-xl px-2.5 py-1.5 shadow-xs">
+              <Filter className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+              <label htmlFor="filtro-funcao-aniv" className="text-xs font-bold text-gray-600 shrink-0">
+                Função:
+              </label>
+              <select
+                id="filtro-funcao-aniv"
+                value={filtroFuncao}
+                onChange={(e) => setFiltroFuncao(e.target.value as FiltroFuncaoMinisterial)}
+                className="text-xs font-semibold text-gray-800 bg-transparent focus:outline-hidden cursor-pointer"
+              >
+                <option value="todos">Todos os Membros</option>
+                <option value="ministros">Ministros</option>
+                <option value="dirigentes">Somente Dirigentes</option>
+              </select>
+            </div>
           </div>
 
           {aniversariantesDoMes.length === 0 ? (
             <div className="p-12 text-center text-gray-500 space-y-3">
               <Cake className="w-12 h-12 text-gray-300 mx-auto" />
-              <p className="font-semibold text-gray-600">Nenhum aniversariante em {MESES[mesSelecionado - 1]}</p>
-              <p className="text-xs text-gray-400">Não há membros com data de nascimento cadastrada neste mês.</p>
+              <p className="font-semibold text-gray-600">
+                Nenhum aniversariante em {MESES[mesSelecionado - 1]}
+                {filtroFuncao === 'ministros' ? ' com função de Ministro' : filtroFuncao === 'dirigentes' ? ' com vínculo de Dirigente' : ''}
+              </p>
+              <p className="text-xs text-gray-400">
+                {filtroFuncao === 'todos'
+                  ? 'Não há membros com data de nascimento cadastrada neste mês.'
+                  : 'Nenhum membro atende ao filtro de função ministerial selecionado para este mês.'}
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
