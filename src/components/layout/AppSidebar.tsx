@@ -29,6 +29,7 @@ const PATH_TO_MENU_ID: { path: string; id: string }[] = [
   { path: '/secretaria/relatorio-espiritual',  id: 'relatorio-espiritual' },
   { path: '/acolhimento/visitantes',           id: 'visitantes'           },
   { path: '/secretaria/cartas',                id: 'cartas'               },
+  { path: '/secretaria/escala-pregadores',     id: 'escala-pregadores'     },
   { path: '/secretaria/membros',               id: 'membros'              },
   { path: '/presidencia/prestacao-contas-oficial', id: 'prestacao-contas-oficial' },
   { path: '/presidencia/prestacao-contas',         id: 'prestacao-contas'         },

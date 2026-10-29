@@ -50,6 +50,7 @@ export const NAVIGATION_STRUCTURE: NavigationGroup[] = [
     groupName: "SECRETARIA",
     items: [
       { id: 'membros', label: 'Membros', icon: '👥', path: '/secretaria/membros', modulo: 'secretaria' },
+      { id: 'escala-pregadores', label: 'Escala de Pregadores', icon: '🎙️', path: '/secretaria/escala-pregadores', modulo: 'secretaria_local' },
       { id: 'departamentos', label: 'Departamentos', icon: '🏷️', path: '/secretaria/departamentos', modulo: 'secretaria_local' },
       { id: 'apresentacao-criancas', label: 'Apresentação de Crianças', icon: '🧒', path: '/secretaria/apresentacao-criancas', modulo: 'secretaria_local', featureFlag: 'kids_module', planFeature: 'has_modulo_kids' },
       { id: 'batismo-aguas', label: 'Batismo nas Águas', icon: '✝️', path: '/secretaria/batismo-aguas', modulo: 'secretaria_local' },
