@@ -406,6 +406,14 @@ export default function EventoFormModal({
                     onChange={(e) => {
                       if (isSecretarioLocal) return;
                       const selectedId = e.target.value;
+                      if (selectedId === 'EXCETO_SEDE') {
+                        onFormChange({
+                          church_id: 'EXCETO_SEDE',
+                          local: 'Todas as Congregações (Exceto a Sede)',
+                          escopo: 'organizacao',
+                        });
+                        return;
+                      }
                       const selectedCong = (congregacoes || []).find((c) => c.id === selectedId);
                       onFormChange({
                         church_id: selectedId,
@@ -417,6 +425,9 @@ export default function EventoFormModal({
                   >
                     <option value="" className="font-bold text-[#062E6F]">
                       🌐 Todo o Campo (Todas as Congregações)
+                    </option>
+                    <option value="EXCETO_SEDE" className="font-bold text-amber-700">
+                      🏛️ Todas as Congregações (Exceto a Sede)
                     </option>
                     {congregacoes && congregacoes.length > 0 ? (
                       <optgroup label="Congregações Individuais">
@@ -434,7 +445,7 @@ export default function EventoFormModal({
                       )
                     )}
                     {/* Preserva exibição de unidade já vinculada se ela não estiver na lista ativa atual */}
-                    {form.church_id && !congregacoes?.some((c) => c.id === form.church_id) && (
+                    {form.church_id && form.church_id !== 'EXCETO_SEDE' && !congregacoes?.some((c) => c.id === form.church_id) && (
                       <option value={form.church_id}>
                         {form.local ? `${form.local} (Unidade vinculada)` : 'Unidade vinculada'}
                       </option>

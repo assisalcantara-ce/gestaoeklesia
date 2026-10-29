@@ -507,7 +507,21 @@ export function useAgenda() {
 
       const { data, error } = await query;
       if (error) throw error;
-      setEventos(data || []);
+
+      let eventosCarregados = data || [];
+
+      // Se a agenda visualizada for a Sede, oculta eventos que têm escopo explícito "exceto sede"
+      const congregacaoVisualizada = congregacoes.find(c => c.id === agendaVisualizada);
+      if (congregacaoVisualizada?.is_sede) {
+        eventosCarregados = eventosCarregados.filter((e: AgendaEvento) => {
+          const isExcetoSede = 
+            e.regra_posicionamento === 'exceto_sede' || 
+            (e.local && e.local.toLowerCase().includes('exceto a sede'));
+          return !isExcetoSede;
+        });
+      }
+
+      setEventos(eventosCarregados);
     } catch (err) {
       console.error(err);
       flash('erro', 'Erro ao carregar os compromissos da agenda.');
@@ -607,7 +621,10 @@ export function useAgenda() {
       }
 
       if (!resolvedChurchId) {
-        if (!resolvedLocal || resolvedLocal === 'Sede Geral') {
+        if (evento.regra_posicionamento === 'exceto_sede' || (resolvedLocal && resolvedLocal.toLowerCase().includes('exceto a sede'))) {
+          resolvedChurchId = 'EXCETO_SEDE';
+          resolvedLocal = 'Todas as Congregações (Exceto a Sede)';
+        } else if (!resolvedLocal || resolvedLocal === 'Sede Geral') {
           resolvedLocal = 'Todo o Campo (Todas as Congregações)';
         }
       }
@@ -788,11 +805,17 @@ export function useAgenda() {
         dataFimEfetiva = form.data_fim ? localInputToUtcIso(form.data_fim) : null;
       }
 
-      const finalChurchId = isSecretarioLocal && userCongregacaoId ? userCongregacaoId : (form.church_id || null);
+      const isExcetoSede = form.church_id === 'EXCETO_SEDE';
+      const finalChurchId = isSecretarioLocal && userCongregacaoId 
+        ? userCongregacaoId 
+        : (isExcetoSede ? null : (form.church_id || null));
       const finalGeraBloqueio = isSecretarioLocal ? false : form.gera_bloqueio;
       const finalCalendarioOficial = isSecretarioLocal ? false : form.calendario_oficial;
       const finalEscopo = isSecretarioLocal ? 'divisao1' : (finalChurchId ? (form.escopo || 'divisao1') : 'organizacao');
-      const finalLocal = finalChurchId ? form.local : (form.local || 'Todo o Campo (Todas as Congregações)');
+      const finalLocal = isExcetoSede 
+        ? 'Todas as Congregações (Exceto a Sede)' 
+        : (finalChurchId ? form.local : (form.local || 'Todo o Campo (Todas as Congregações)'));
+      const finalRegraPosicionamento = isExcetoSede ? 'exceto_sede' : (form.regra_posicionamento || null);
 
       // Pré-validação de Conflitos e Bloqueios Oficiais no cliente
       const conflict = await PlanningConflictService.verificarConflito(
@@ -858,7 +881,7 @@ export function useAgenda() {
         escopo: finalEscopo,
         calendario_oficial: finalCalendarioOficial,
         gera_bloqueio: finalGeraBloqueio,
-        regra_posicionamento: form.regra_posicionamento || null,
+        regra_posicionamento: finalRegraPosicionamento,
         recorrente: form.recorrencia_tipo !== 'nenhuma',
         recorrencia_tipo: form.recorrencia_tipo,
         recorrencia_config: form.recorrencia_tipo !== 'nenhuma' ? recorrenciaConfig : null,

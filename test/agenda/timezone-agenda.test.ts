@@ -1,10 +1,8 @@
 import { 
-  INSTITUTIONAL_TIMEZONE, 
   formatHoraLocal, 
   isoToDateTimeLocalInput, 
   localInputToUtcIso, 
   getLocalDateStr,
-  buildUtcIsoFromLocal
 } from '@/lib/timezone-utils';
 import { AgendaRecorrenciaService } from '@/lib/agenda-recorrencia-service';
 

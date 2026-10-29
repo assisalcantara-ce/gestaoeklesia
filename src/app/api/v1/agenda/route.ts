@@ -376,7 +376,11 @@ export async function PUT(request: NextRequest) {
 
     let finalLocal = updates.local !== undefined ? updates.local : existing.local;
     if (!targetChurchId && (!finalLocal || finalLocal === 'Sede Geral')) {
-      finalLocal = 'Todo o Campo (Todas as Congregações)';
+      if (updates.regra_posicionamento === 'exceto_sede' || existing.regra_posicionamento === 'exceto_sede') {
+        finalLocal = 'Todas as Congregações (Exceto a Sede)';
+      } else {
+        finalLocal = 'Todo o Campo (Todas as Congregações)';
+      }
     }
 
     const payloadAtualizacao: any = {
