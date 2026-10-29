@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { AgendaEvento } from '@/hooks/agenda/useAgenda';
 import { getEventoVisual, AgendaCategoryKey } from '@/lib/agenda-visual-utils';
+import { formatHoraLocal } from '@/lib/timezone-utils';
 
 export type CalendarViewMode = 'mes' | 'semana' | 'dia' | 'lista';
 
@@ -66,8 +67,7 @@ export default function AgendaCalendarView({
   };
 
   const formatHora = (dataInicio: string) => {
-    if (!dataInicio || !dataInicio.includes('T')) return '';
-    return dataInicio.split('T')[1].substring(0, 5);
+    return formatHoraLocal(dataInicio);
   };
 
   const monthTitle = `${MESES_PT[currentMonth - 1]} de ${currentYear}`;

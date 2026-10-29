@@ -17,6 +17,8 @@
  *   - Preservação de fuso e horário local
  */
 
+import { formatHoraLocal, getLocalDateStr, buildUtcIsoFromLocal } from './timezone-utils';
+
 export const TIPOS_VALIDOS_AGENDA_EVENTOS = ['culto', 'reuniao', 'aula', 'evento', 'tarefa', 'outro'] as const;
 export type TipoAgendaEventoValido = typeof TIPOS_VALIDOS_AGENDA_EVENTOS[number];
 
@@ -239,16 +241,16 @@ export class AgendaRecorrenciaService {
       }
     }
 
-    const horaInicial = dataInicialObj.getHours();
-    const minutoInicial = dataInicialObj.getMinutes();
-    const segundoInicial = dataInicialObj.getSeconds();
+    // Extrai hora e minuto no fuso institucional de Belém (UTC-3) para garantir consistência
+    const horaFormatada = formatHoraLocal(dataInicialObj);
+    const [hNum, mNum] = horaFormatada.split(':').map(Number);
+    const horaInicial = isNaN(hNum) ? dataInicialObj.getHours() : hNum;
+    const minutoInicial = isNaN(mNum) ? dataInicialObj.getMinutes() : mNum;
+    const segundoInicial = 0;
 
     // Se a frequência for 'nenhuma', retorna apenas a ocorrência base
     if (!config || config.frequencia === 'nenhuma') {
-      const y = dataInicialObj.getFullYear();
-      const m = String(dataInicialObj.getMonth() + 1).padStart(2, '0');
-      const d = String(dataInicialObj.getDate()).padStart(2, '0');
-      const dataBaseStr = `${y}-${m}-${d}`;
+      const dataBaseStr = getLocalDateStr(dataInicialObj);
 
       return [
         {
@@ -261,7 +263,7 @@ export class AgendaRecorrenciaService {
     }
 
     // Determina o ano base e limite final da geração
-    const anoBase = config.anoReferencia || dataInicialObj.getFullYear();
+    const anoBase = config.anoReferencia || parseInt(getLocalDateStr(dataInicialObj).split('-')[0], 10) || dataInicialObj.getFullYear();
 
     let dataLimiteFinal: Date;
     if (config.dataFimRecorrencia) {
@@ -288,8 +290,8 @@ export class AgendaRecorrenciaService {
     // Ponto de início: se anoReferencia for definido, inicia desde 01 de janeiro do ano escolhido
     // Caso contrário, respeita a data inicial fornecida
     const dataPontoDePartida = config.anoReferencia
-      ? new Date(config.anoReferencia, 0, 1, horaInicial, minutoInicial, segundoInicial)
-      : dataInicialObj;
+      ? new Date(config.anoReferencia, 0, 1)
+      : new Date(dataInicialObj.getFullYear(), dataInicialObj.getMonth(), dataInicialObj.getDate());
 
     // 1. RECORRÊNCIA SEMANAL
     if (config.frequencia === 'semanal') {
@@ -303,10 +305,11 @@ export class AgendaRecorrenciaService {
         if (diasSemanaAlvo.includes(cursor.getDay())) {
           const dataStr = formatarDataStr(cursor);
           if (!excecoesSet.has(dataStr)) {
-            const dataOcorr = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate(), horaInicial, minutoInicial, segundoInicial);
+            const dataInicioIso = buildUtcIsoFromLocal(cursor.getFullYear(), cursor.getMonth(), cursor.getDate(), horaInicial, minutoInicial, segundoInicial);
+            const dataInicioMs = new Date(dataInicioIso).getTime();
             ocorrencias.push({
-              dataInicio: dataOcorr.toISOString(),
-              dataFim: duracaoMs > 0 ? new Date(dataOcorr.getTime() + duracaoMs).toISOString() : null,
+              dataInicio: dataInicioIso,
+              dataFim: duracaoMs > 0 ? new Date(dataInicioMs + duracaoMs).toISOString() : null,
               numeroOcorrencia: ocorrencias.length + 1,
               dataBaseStr: dataStr,
             });
@@ -337,9 +340,11 @@ export class AgendaRecorrenciaService {
 
             const dataStr = formatarDataStr(dataOrdinal);
             if (!excecoesSet.has(dataStr)) {
+              const dataInicioIso = buildUtcIsoFromLocal(dataOrdinal.getFullYear(), dataOrdinal.getMonth(), dataOrdinal.getDate(), horaInicial, minutoInicial, segundoInicial);
+              const dataInicioMs = new Date(dataInicioIso).getTime();
               ocorrencias.push({
-                dataInicio: dataOrdinal.toISOString(),
-                dataFim: duracaoMs > 0 ? new Date(dataOrdinal.getTime() + duracaoMs).toISOString() : null,
+                dataInicio: dataInicioIso,
+                dataFim: duracaoMs > 0 ? new Date(dataInicioMs + duracaoMs).toISOString() : null,
                 numeroOcorrencia: ocorrencias.length + 1,
                 dataBaseStr: dataStr,
               });
@@ -363,10 +368,10 @@ export class AgendaRecorrenciaService {
 
     // 3. RECORRÊNCIA MENSAL POR DIA FIXO (ex: todo dia 15)
     else if (config.frequencia === 'mensal_dia') {
-      const diaAlvo = config.diaDoMes || dataInicialObj.getDate();
+      const diaAlvo = config.diaDoMes || parseInt(getLocalDateStr(dataInicialObj).split('-')[2], 10) || dataInicialObj.getDate();
 
-      let anoCursor = dataInicialObj.getFullYear();
-      let mesCursor = dataInicialObj.getMonth();
+      let anoCursor = dataPontoDePartida.getFullYear();
+      let mesCursor = dataPontoDePartida.getMonth();
 
       while (ocorrencias.length < maxItems) {
         const maxDiasMes = this.getDiasNoMes(anoCursor, mesCursor);
@@ -375,16 +380,18 @@ export class AgendaRecorrenciaService {
 
         const dataMensal = new Date(anoCursor, mesCursor, diaEfetivo, horaInicial, minutoInicial, segundoInicial, 0);
 
-        if (dataMensal.getTime() >= dataInicialObj.getTime()) {
+        if (dataMensal.getTime() >= dataPontoDePartida.getTime()) {
           if (dataMensal.getTime() > dataLimiteFinal.getTime()) {
             break;
           }
 
           const dataStr = formatarDataStr(dataMensal);
           if (!excecoesSet.has(dataStr)) {
+            const dataInicioIso = buildUtcIsoFromLocal(anoCursor, mesCursor, diaEfetivo, horaInicial, minutoInicial, segundoInicial);
+            const dataInicioMs = new Date(dataInicioIso).getTime();
             ocorrencias.push({
-              dataInicio: dataMensal.toISOString(),
-              dataFim: duracaoMs > 0 ? new Date(dataMensal.getTime() + duracaoMs).toISOString() : null,
+              dataInicio: dataInicioIso,
+              dataFim: duracaoMs > 0 ? new Date(dataInicioMs + duracaoMs).toISOString() : null,
               numeroOcorrencia: ocorrencias.length + 1,
               dataBaseStr: dataStr,
             });
@@ -405,25 +412,28 @@ export class AgendaRecorrenciaService {
 
     // 4. RECORRÊNCIA ANUAL (ex: 29 de fevereiro trata anos bissextos)
     else if (config.frequencia === 'anual') {
-      const mesAlvo = dataInicialObj.getMonth();
-      const diaAlvo = dataInicialObj.getDate();
-      let anoCursor = dataInicialObj.getFullYear();
+      const localDataParts = getLocalDateStr(dataInicialObj).split('-');
+      const mesAlvo = parseInt(localDataParts[1], 10) - 1;
+      const diaAlvo = parseInt(localDataParts[2], 10);
+      let anoCursor = dataPontoDePartida.getFullYear();
 
       while (ocorrencias.length < maxItems) {
         const maxDias = this.getDiasNoMes(anoCursor, mesAlvo);
         const diaEfetivo = Math.min(diaAlvo, maxDias);
 
         const dataAnual = new Date(anoCursor, mesAlvo, diaEfetivo, horaInicial, minutoInicial, segundoInicial, 0);
-        if (dataAnual.getTime() >= dataInicialObj.getTime()) {
+        if (dataAnual.getTime() >= dataPontoDePartida.getTime()) {
           if (dataAnual.getTime() > dataLimiteFinal.getTime()) {
             break;
           }
 
           const dataStr = formatarDataStr(dataAnual);
           if (!excecoesSet.has(dataStr)) {
+            const dataInicioIso = buildUtcIsoFromLocal(anoCursor, mesAlvo, diaEfetivo, horaInicial, minutoInicial, segundoInicial);
+            const dataInicioMs = new Date(dataInicioIso).getTime();
             ocorrencias.push({
-              dataInicio: dataAnual.toISOString(),
-              dataFim: duracaoMs > 0 ? new Date(dataAnual.getTime() + duracaoMs).toISOString() : null,
+              dataInicio: dataInicioIso,
+              dataFim: duracaoMs > 0 ? new Date(dataInicioMs + duracaoMs).toISOString() : null,
               numeroOcorrencia: ocorrencias.length + 1,
               dataBaseStr: dataStr,
             });

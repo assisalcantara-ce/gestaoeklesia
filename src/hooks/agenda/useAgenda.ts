@@ -13,6 +13,7 @@ import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organi
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { PlanningConflictService } from '@/lib/planning-conflict-service';
 import { AgendaRecorrenciaService, RecorrenciaConfig, normalizarTipoAgendaEvento } from '@/lib/agenda-recorrencia-service';
+import { getLocalDateStr, formatHoraLocal, isoToDateTimeLocalInput, localInputToUtcIso, buildUtcIsoFromLocal } from '@/lib/timezone-utils';
 import { Calendar as CalendarIcon, LayoutDashboard, BookOpen, Gavel } from 'lucide-react';
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
@@ -615,9 +616,9 @@ export function useAgenda() {
         titulo: evento.titulo || '',
         descricao: evento.descricao || '',
         tipo_id: evento.tipo_id || '',
-        data_inicio: evento.data_inicio ? evento.data_inicio.slice(0, 16) : '',
-        data_fim: evento.data_fim ? evento.data_fim.slice(0, 16) : '',
-        hora_inicio: evento.data_inicio ? evento.data_inicio.slice(11, 16) : '19:30',
+        data_inicio: evento.data_inicio ? isoToDateTimeLocalInput(evento.data_inicio) : '',
+        data_fim: evento.data_fim ? isoToDateTimeLocalInput(evento.data_fim) : '',
+        hora_inicio: evento.data_inicio ? formatHoraLocal(evento.data_inicio) : '19:30',
         duracao_minutos: evento.data_inicio && evento.data_fim 
           ? Math.max(30, Math.round((new Date(evento.data_fim).getTime() - new Date(evento.data_inicio).getTime()) / 60000))
           : 120,
@@ -757,8 +758,15 @@ export function useAgenda() {
           minuto: mPart,
         }) || new Date(anoRef, 0, 1, hPart, mPart, 0);
 
-        const dataInicioBaseStr = primeiraData.toISOString();
-        const dataFimBaseStr = new Date(primeiraData.getTime() + duracaoMs).toISOString();
+        const dataInicioBaseStr = buildUtcIsoFromLocal(
+          primeiraData.getFullYear(),
+          primeiraData.getMonth(),
+          primeiraData.getDate(),
+          hPart,
+          mPart,
+          0
+        );
+        const dataFimBaseStr = duracaoMs > 0 ? new Date(new Date(dataInicioBaseStr).getTime() + duracaoMs).toISOString() : null;
 
         ocorrenciasGeradas = AgendaRecorrenciaService.gerarOcorrencias({
           dataInicio: dataInicioBaseStr,
@@ -775,9 +783,9 @@ export function useAgenda() {
           dataFimEfetiva = dataFimBaseStr;
         }
       } else {
-        // Evento único ou edição de evento existente
-        dataInicioEfetiva = new Date(form.data_inicio).toISOString();
-        dataFimEfetiva = form.data_fim ? new Date(form.data_fim).toISOString() : null;
+        // Evento único ou edição de evento existente: interpreta estritamente no fuso institucional (America/Belem, UTC-3)
+        dataInicioEfetiva = localInputToUtcIso(form.data_inicio);
+        dataFimEfetiva = form.data_fim ? localInputToUtcIso(form.data_fim) : null;
       }
 
       const finalChurchId = isSecretarioLocal && userCongregacaoId ? userCongregacaoId : (form.church_id || null);
@@ -1222,20 +1230,6 @@ export function useAgenda() {
     const [yearStr, monthStr] = filtroMes.split('-');
     const currentMonthPrefix = `${yearStr}-${monthStr.padStart(2, '0')}`;
 
-    const getLocalDateStr = (val: string): string => {
-      if (!val) return '';
-      // Se for formato local 'YYYY-MM-DD...', extrai os 10 primeiros caracteres diretamente
-      if (!val.includes('Z') && !val.includes('+') && !val.slice(11).includes('-')) {
-        return val.slice(0, 10);
-      }
-      const d = new Date(val);
-      if (isNaN(d.getTime())) return val.split('T')[0];
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${y}-${m}-${day}`;
-    };
-
     eventos.forEach(e => {
       const startDayStr = getLocalDateStr(e.data_inicio);
       const endDayStr = e.data_fim ? getLocalDateStr(e.data_fim) : startDayStr;
@@ -1270,19 +1264,6 @@ export function useAgenda() {
   }, [eventos, filtroMes]);
 
   const eventosColunaDireita = useMemo(() => {
-    const getLocalDateStr = (val: string): string => {
-      if (!val) return '';
-      if (!val.includes('Z') && !val.includes('+') && !val.slice(11).includes('-')) {
-        return val.slice(0, 10);
-      }
-      const d = new Date(val);
-      if (isNaN(d.getTime())) return val.split('T')[0];
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${y}-${m}-${day}`;
-    };
-
     if (selectedDate) {
       return eventos.filter(e => {
         const startDay = getLocalDateStr(e.data_inicio);

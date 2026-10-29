@@ -3,6 +3,7 @@
 import { ChevronRight, Calendar } from 'lucide-react';
 import { AgendaEvento } from '@/hooks/agenda/useAgenda';
 import { getEventoVisual, AgendaCategoryKey } from '@/lib/agenda-visual-utils';
+import { formatHoraLocal } from '@/lib/timezone-utils';
 
 interface AgendaUpcomingPanelProps {
   proximosEventos: AgendaEvento[];
@@ -73,9 +74,9 @@ export default function AgendaUpcomingPanel({
   };
 
   const formatHorario = (inicio: string, fim?: string | null) => {
-    const horaInicio = inicio.includes('T') ? inicio.split('T')[1].substring(0, 5) : '';
-    const horaFim = fim && fim.includes('T') ? fim.split('T')[1].substring(0, 5) : null;
-    if (horaInicio && horaFim && horaFim !== '00:00') {
+    const horaInicio = formatHoraLocal(inicio);
+    const horaFim = fim ? formatHoraLocal(fim) : null;
+    if (horaInicio && horaFim && horaFim !== '00:00' && horaFim !== horaInicio) {
       return `${horaInicio} - ${horaFim}`;
     }
     return horaInicio || 'Dia todo';
