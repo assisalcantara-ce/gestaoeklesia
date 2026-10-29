@@ -43,6 +43,7 @@ const SIDEBAR_COLLAPSED_STORAGE_KEY = '@gestaoeklesia/sidebar_collapsed';
 
 // Mapa estático path → id de menu (mais específico primeiro)
 const PATH_TO_MENU_ID: { path: string; id: string }[] = [
+  { path: '/secretaria/escala-pregadores',      id: 'escala-pregadores'    },
   { path: '/secretaria/estrutura-hierarquica', id: 'estrutura-hierarquica' },
   { path: '/secretaria/apresentacao-criancas', id: 'apresentacao-criancas' },
   { path: '/secretaria/batismo-aguas',         id: 'batismo-aguas'        },
@@ -172,6 +173,7 @@ export default function Sidebar() {
     'consagracao': 'comissao',
     'comissoes': 'comissao',
     'secretaria': 'secretaria',
+    'escala-pregadores': 'secretaria',
     'estrutura-hierarquica': 'secretaria',
     'membros': 'secretaria',
     'dirigentes': 'secretaria',
@@ -227,6 +229,7 @@ export default function Sidebar() {
       submenu: [
         { id: 'estrutura-hierarquica', label: 'Estrutura Hierárquica', path: '/secretaria/estrutura-hierarquica', modulo: 'gestao' },
         { id: 'membros', label: 'Membros', path: '/secretaria/membros' },
+        { id: 'escala-pregadores', label: 'Escala de Pregadores', path: '/secretaria/escala-pregadores', modulo: 'secretaria_local' },
         { id: 'dirigentes', label: 'Dirigentes', path: '/secretaria/dirigentes', modulo: 'gestao' },
         { id: 'departamentos', label: 'Departamentos', path: '/secretaria/departamentos', modulo: 'secretaria_local' },
         { id: 'apresentacao-criancas', label: 'Apresentação de Crianças', path: '/secretaria/apresentacao-criancas', modulo: 'secretaria_local', featureFlag: 'kids_module', planFeature: 'has_modulo_kids' },

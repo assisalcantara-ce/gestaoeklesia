@@ -2153,7 +2153,14 @@ export default function EventosPage() {
         insertPayload.cpf_normalizado = cpfLimpoParaCheck;
       }
 
-      const { error } = await supabase.from('eventos_inscricoes').insert(insertPayload);
+      let { error } = await supabase.from('eventos_inscricoes').insert(insertPayload);
+
+      // Fallback resiliente caso a coluna cpf_normalizado ainda não exista no schema cache do Supabase
+      if (error && error.message && error.message.includes('cpf_normalizado') && insertPayload.cpf_normalizado) {
+        delete insertPayload.cpf_normalizado;
+        const retry = await supabase.from('eventos_inscricoes').insert(insertPayload);
+        error = retry.error;
+      }
 
       if (error) {
         showModal('Erro', error.code === '23505' ? 'Este participante já possui uma inscrição ativa neste evento.' : error.message, 'error');

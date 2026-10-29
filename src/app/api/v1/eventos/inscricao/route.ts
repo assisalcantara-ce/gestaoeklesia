@@ -212,7 +212,7 @@ export async function POST(request: NextRequest) {
   if (congregacao) obsPartes.push(`Congregação: ${congregacao}`);
   const observacoes = obsPartes.length > 0 ? obsPartes.join(' | ') : null;
 
-  // Inserir inscrição com tratamento atômico de erro de índice único
+  // Inserir inscrição com tratamento atômico de erro de índice único e fallback caso schema cache não tenha cpf_normalizado
   const insertPayload: Record<string, any> = {
     evento_id: evento.id,
     ministry_id: evento.ministry_id,
@@ -228,11 +228,23 @@ export async function POST(request: NextRequest) {
     insertPayload.cpf_normalizado = cpfNormalizado;
   }
 
-  const { data: inscricao, error: insErr } = await admin
+  let { data: inscricao, error: insErr } = await admin
     .from('eventos_inscricoes')
     .insert(insertPayload)
     .select('id, status, tem_brinde')
     .single();
+
+  // Fallback se a coluna cpf_normalizado ainda não existir no schema cache do Supabase
+  if (insErr && insErr.message && insErr.message.includes('cpf_normalizado') && insertPayload.cpf_normalizado) {
+    delete insertPayload.cpf_normalizado;
+    const retry = await admin
+      .from('eventos_inscricoes')
+      .insert(insertPayload)
+      .select('id, status, tem_brinde')
+      .single();
+    inscricao = retry.data;
+    insErr = retry.error;
+  }
 
   if (insErr || !inscricao) {
     // Conflito de índice único (race condition no banco)
