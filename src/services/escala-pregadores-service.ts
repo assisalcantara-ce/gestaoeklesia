@@ -102,7 +102,7 @@ export class EscalaPregadoresService {
       rangeFim = endOfMonth.toISOString();
     }
 
-    // Busca eventos na agenda_eventos
+    // Busca eventos na agenda_eventos (sem embutir congregacoes diretamente para evitar falha no schema cache do PostgREST)
     let queryEventos = client
       .from('agenda_eventos')
       .select(`
@@ -117,8 +117,7 @@ export class EscalaPregadoresService {
         local,
         status,
         visibilidade,
-        agenda_tipos ( id, nome, categoria, cor ),
-        congregacoes ( id, nome, is_sede )
+        agenda_tipos ( id, nome, categoria, cor )
       `)
       .eq('ministry_id', ministryId)
       .neq('status', 'cancelado')
@@ -146,6 +145,21 @@ export class EscalaPregadoresService {
 
     const eventoIds = eventos.map((e) => e.id);
 
+    // Busca congregações do ministério para mapear igreja/congregação aos eventos de forma desacoplada do PostgREST
+    const { data: congregacoesData } = await client
+      .from('congregacoes')
+      .select('id, nome, is_sede')
+      .eq('ministry_id', ministryId);
+
+    const mapaCongregacoes = new Map<string, { id: string; nome: string; is_sede?: boolean }>();
+    (congregacoesData || []).forEach((c: any) => {
+      mapaCongregacoes.set(c.id, {
+        id: c.id,
+        nome: c.nome,
+        is_sede: c.is_sede,
+      });
+    });
+
     // Busca escalas ativas para os eventos carregados
     const { data: escalas, error: errEscalas } = await client
       .from('agenda_escala_pregadores')
@@ -168,8 +182,10 @@ export class EscalaPregadoresService {
 
     const resultado = eventos.map((evt) => {
       const escalaAtiva = mapaEscalaPorEvento.get(evt.id) || null;
+      const cong = evt.church_id ? mapaCongregacoes.get(evt.church_id) || null : null;
       return {
         ...evt,
+        congregacoes: cong,
         escala: escalaAtiva,
         possui_pregador: !!escalaAtiva,
       };

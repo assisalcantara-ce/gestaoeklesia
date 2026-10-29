@@ -139,7 +139,7 @@ export function useEscalaPregadores() {
   useEffect(() => {
     async function carregarCongregacoes() {
       try {
-        const res = await fetch('/api/v1/congregacoes');
+        const res = await fetch('/api/v1/secretaria/escala-pregadores?acao=congregacoes');
         if (res.ok) {
           const json = await res.json();
           if (Array.isArray(json)) setCongregacoes(json);

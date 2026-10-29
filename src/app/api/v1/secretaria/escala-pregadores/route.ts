@@ -91,6 +91,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data: historico });
     }
 
+    // 4. Listagem de Congregações do Ministério (para filtros do módulo)
+    if (acao === 'congregacoes') {
+      const { data: congregacoes, error: errCong } = await ctx.admin
+        .from('congregacoes')
+        .select('id, nome, is_sede')
+        .eq('ministry_id', ctx.ministryId)
+        .order('nome');
+
+      if (errCong) {
+        return NextResponse.json({ error: errCong.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ data: congregacoes || [] });
+    }
+
     return NextResponse.json({ error: 'Ação não reconhecida.', code: 'INVALID_ACTION' }, { status: 400 });
   } catch (err: any) {
     console.error('Erro em GET /api/v1/secretaria/escala-pregadores:', err);

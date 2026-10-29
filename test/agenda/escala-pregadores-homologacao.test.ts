@@ -94,6 +94,24 @@ describe('Homologação Funcional: Escala de Pregadores (Etapa 5)', () => {
 
     const mockClient = {
       from(table: string) {
+        if (table === 'congregacoes') {
+          return {
+            select(_cols: string) {
+              return {
+                eq(_c: string, _v: any) {
+                  return Promise.resolve({
+                    data: [
+                      { id: 'cong-sede', nome: 'Sede Central', is_sede: true },
+                      { id: 'cong-norte', nome: 'Congregação Norte', is_sede: false },
+                    ],
+                    error: null,
+                  });
+                },
+              };
+            },
+          };
+        }
+
         if (table === 'agenda_eventos') {
           return {
             select(_cols: string) {

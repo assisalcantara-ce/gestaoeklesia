@@ -52,6 +52,24 @@ describe('Serviço Backend: EscalaPregadoresService (Etapa 2)', () => {
           };
         }
 
+        if (table === 'congregacoes') {
+          return {
+            select(_cols: string) {
+              return {
+                eq(_col: string, _val: any) {
+                  return Promise.resolve({
+                    data: [
+                      { id: 'cong-1', nome: 'Sede Central', is_sede: true },
+                      { id: 'cong-2', nome: 'Congregação Norte', is_sede: false },
+                    ],
+                    error: null,
+                  });
+                },
+              };
+            },
+          };
+        }
+
         if (table === 'members') {
           return {
             select(_cols: string) {
