@@ -584,6 +584,12 @@ const parseDateParts = (s: string | null | undefined) => {
 const fmtBRL = (v: number) =>
   v === 0 ? 'Gratuito' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+const isEventoPago = (ev?: { evento_pago?: boolean | null; valor_inscricao?: number | string | null } | null): boolean => {
+  if (!ev) return false;
+  const valor = typeof ev.valor_inscricao === 'number' ? ev.valor_inscricao : Number(ev.valor_inscricao) || 0;
+  return Boolean(ev.evento_pago || valor > 0);
+};
+
 // Retorna a data no fuso de Brasília (America/Sao_Paulo / UTC-3) no formato YYYY-MM-DD
 const hojeBrasiliaDataStr = (d: Date = new Date()): string => {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(d);
@@ -1100,8 +1106,22 @@ export default function EventosPage() {
       const perms = ((mu as { permissions?: string[] } | null)?.permissions ?? []);
       const role = ((mu as { role?: string } | null)?.role ?? '');
       const isAdmin = userCtx.isAdmin || perms.includes('ADMINISTRADOR') || role === 'admin';
-      const isSecret = perms.includes('SECRETARIO');
-      const isFinanc = perms.includes('FINANCEIRO');
+      const isSecret =
+        perms.includes('SECRETARIO') ||
+        perms.includes('SECRETARIO_GERAL') ||
+        perms.includes('SECRETARIA') ||
+        userCtx.nivel === 'secretario_geral' ||
+        userCtx.nivel === 'secretaria_local' ||
+        userCtx.nivel === 'auxiliar_secretaria';
+      const isFinanc =
+        perms.includes('FINANCEIRO') ||
+        perms.includes('TESOUREIRO_GERAL') ||
+        perms.includes('TESOURARIA_LOCAL') ||
+        perms.includes('FINANCEIRO_LOCAL') ||
+        userCtx.nivel === 'tesoureiro_geral' ||
+        userCtx.nivel === 'financeiro' ||
+        userCtx.nivel === 'tesouraria_local' ||
+        userCtx.nivel === 'financeiro_local';
       setScope({
         canWrite: isAdmin || isSecret,
         canDelete: isAdmin,
@@ -1539,13 +1559,13 @@ export default function EventosPage() {
 
   // ── Memos & Paginação ──────────────────────────────────────────────────────
   const eventosPagos = useMemo(
-    () => eventos.filter(e => e.evento_pago === true),
+    () => eventos.filter(e => isEventoPago(e)),
     [eventos]
   );
 
   useEffect(() => {
     if (aba === 'pagamentos') {
-      if (eventoSelecionado && !eventoSelecionado.evento_pago) {
+      if (eventoSelecionado && !isEventoPago(eventoSelecionado)) {
         const primeiroPago = eventosPagos[0] || null;
         setEventoSelecionado(primeiroPago);
       } else if (!eventoSelecionado && eventosPagos.length > 0) {
@@ -1554,8 +1574,19 @@ export default function EventosPage() {
     }
   }, [aba, eventoSelecionado, eventosPagos]);
 
+  // Se o modal de balcão estiver aberto com um evento gratuito ou se o evento selecionado mudar para gratuito, fecha o balcão
   useEffect(() => {
-    if (aba === 'pagamentos' && eventoSelecionado && eventoSelecionado.evento_pago) {
+    if (showBalcaoModal && balcaoEventoId) {
+      const evAtual = eventos.find(e => e.id === balcaoEventoId);
+      if (evAtual && !isEventoPago(evAtual)) {
+        setShowBalcaoModal(false);
+        setAba('inscricoes');
+      }
+    }
+  }, [showBalcaoModal, balcaoEventoId, eventos]);
+
+  useEffect(() => {
+    if (aba === 'pagamentos' && eventoSelecionado && isEventoPago(eventoSelecionado)) {
       carregarPagamentos(eventoSelecionado.id);
     }
   }, [aba, eventoSelecionado, carregarPagamentos]);
@@ -1934,6 +1965,11 @@ export default function EventosPage() {
 
   // ── Inscrições ─────────────────────────────────────────────────────────────
   const abrirNovaInscricao = () => {
+    // Para eventos pagos, inscrições administrativas devem ser realizadas exclusivamente via Balcão
+    if (eventoSelecionado && isEventoPago(eventoSelecionado)) {
+      abrirBalcao(eventoSelecionado.id);
+      return;
+    }
     setEditingInscId(null);
     setFormInsc(FORM_INSCRICAO_INICIAL);
     setMembroSelecionado(null);
@@ -1980,6 +2016,19 @@ export default function EventosPage() {
 
   const handleSaveInscricao = async () => {
     if (!ministryId || !eventoSelecionado) return;
+
+    // Inscrições administrativas novas em eventos pagos devem ser realizadas obrigatoriamente pelo Balcão
+    if (!editingInscId && isEventoPago(eventoSelecionado)) {
+      showModal(
+        'Inscrição em Evento Pago',
+        'Inscrições administrativas em eventos pagos devem ser realizadas exclusivamente através do Balcão para garantir o registro do pagamento ou cortesia.',
+        'info'
+      );
+      setShowFormInsc(false);
+      abrirBalcao(eventoSelecionado.id);
+      return;
+    }
+
     const temMembro = !!membroSelecionado;
     const nomeDigitado = (formInsc.nome_externo || buscaMembro).trim();
     if (!temMembro && !nomeDigitado) {
@@ -2147,10 +2196,25 @@ export default function EventosPage() {
   // ── Ações do Balcão (Atendimento Presencial) ─────────────────────────────
   const abrirBalcao = (eventoIdPreferido?: string) => {
     let idPadrao = eventoIdPreferido || (eventoSelecionado ? eventoSelecionado.id : '');
-    if (!idPadrao) {
-      const primeiroAberto = eventos.find(e => e.aceita_inscricao && e.status !== 'cancelado');
-      idPadrao = primeiroAberto ? primeiroAberto.id : (eventos[0]?.id ?? '');
+    let evAlvo = eventos.find(e => e.id === idPadrao);
+
+    // Balcão destina-se exclusivamente a eventos pagos. Se o evento preferido for gratuito, busca o primeiro pago
+    if (!evAlvo || !isEventoPago(evAlvo)) {
+      const primeiroPagoAberto = eventosPagos.find(e => e.aceita_inscricao && e.status !== 'cancelado');
+      evAlvo = primeiroPagoAberto || eventosPagos[0];
+      idPadrao = evAlvo?.id ?? '';
     }
+
+    if (!idPadrao || !evAlvo || !isEventoPago(evAlvo)) {
+      showModal(
+        'Balcão Indisponível',
+        'O Balcão é exclusivo para eventos pagos. Para eventos gratuitos, utilize a opção "Inscrever" na aba Inscrições.',
+        'info'
+      );
+      setAba('inscricoes');
+      return;
+    }
+
     setBalcaoEventoId(idPadrao);
     setBalcaoMembro(null);
     setBalcaoBuscaMembro('');
@@ -2178,6 +2242,17 @@ export default function EventosPage() {
     const evento = eventos.find(e => e.id === balcaoEventoId);
     if (!evento) {
       showModal('Evento não encontrado', 'O evento selecionado não foi localizado.', 'error');
+      return;
+    }
+
+    if (!isEventoPago(evento)) {
+      showModal(
+        'Operação não permitida',
+        'O Balcão é restrito a eventos pagos. Realize inscrições em eventos gratuitos através do botão Inscrever na aba Inscrições.',
+        'error'
+      );
+      setShowBalcaoModal(false);
+      setAba('inscricoes');
       return;
     }
 
@@ -2289,56 +2364,46 @@ export default function EventosPage() {
         balcaoPayload.cpf_normalizado = cpfLimpo;
       }
 
-      const { data: novaInsc, error: inscError } = await supabase
-        .from('eventos_inscricoes')
-        .insert(balcaoPayload)
-        .select('id, tem_brinde')
-        .single();
-
-      if (inscError) {
-        if (inscError.code === '23505') {
-          showModal('Inscrição duplicada', 'Este participante já possui uma inscrição registrada para este evento.', 'error');
-        } else {
-          showModal('Erro ao registrar inscrição', inscError.message, 'error');
-        }
-        setBalcaoSalvando(false);
-        return;
-      }
-
-      // 4. Registrar transação se o evento for pago
+      // 3. Execução Atômica via RPC transacional do Balcão
       const valorCobrado = evento.evento_pago
         ? balcaoFormaPagamento === 'cortesia'
           ? 0
           : (typeof evento.valor_inscricao === 'number' ? evento.valor_inscricao : Number(evento.valor_inscricao) || 0)
         : 0;
 
-      if (evento.evento_pago) {
-        const prefixoId = balcaoFormaPagamento === 'pix'
-          ? 'BALCAO-PIX'
-          : balcaoFormaPagamento === 'cortesia'
-          ? 'CORTESIA'
-          : 'BALCAO';
+      const { data: rpcRes, error: rpcError } = await (supabase.rpc as any)('registrar_inscricao_balcao_rpc', {
+        p_ministry_id: ministryId,
+        p_evento_id: evento.id,
+        p_forma_pagamento: evento.evento_pago ? balcaoFormaPagamento : 'a_vista',
+        p_member_id: temMembro ? balcaoMembro.id : null,
+        p_nome_externo: temMembro ? null : nomeFinalNormalizado,
+        p_email_externo: balcaoEmail.trim() || null,
+        p_telefone: balcaoTelefone.trim() || null,
+        p_cpf: cpfLimpo || null,
+        p_congregacao_id: balcaoCongregacaoId || null,
+        p_com_hospedagem: balcaoHospedagem,
+        p_observacoes: obsPartes.join(' | ') || null,
+        p_justificativa_cortesia: balcaoFormaPagamento === 'cortesia' ? balcaoJustificativa.trim() : null,
+      });
 
-        const { error: pagError } = await supabase.from('eventos_pagamentos').insert({
-          ministry_id: ministryId,
-          inscricao_id: novaInsc.id,
-          gateway: 'balcao',
-          gateway_charge_id: `${prefixoId}-${novaInsc.id.substring(0, 8).toUpperCase()}`,
-          payment_method: balcaoFormaPagamento,
-          valor: valorCobrado,
-          status: 'pago',
-          paid_at: new Date().toISOString(),
-        });
-        if (pagError) {
-          console.warn('[Balcão] Aviso ao registrar transação de pagamento:', pagError.message);
+      if (rpcError) {
+        if (rpcError.code === '23505' || rpcError.message?.includes('DUPLICIDADE')) {
+          showModal('Inscrição duplicada', 'Este participante já possui uma inscrição registrada para este evento.', 'error');
+        } else {
+          showModal('Erro ao registrar inscrição no Balcão', rpcError.message, 'error');
         }
+        setBalcaoSalvando(false);
+        return;
       }
 
-      // 5. Sucesso e dados para comprovante
+      const novaInscId = rpcRes?.inscricao_id;
+      const temBrinde = !!rpcRes?.tem_brinde;
+
+      // 4. Sucesso e dados para comprovante
       const nomePart = nomeFinalNormalizado;
 
       setBalcaoSucesso({
-        inscricaoId: novaInsc.id,
+        inscricaoId: novaInscId,
         evento,
         nomeParticipante: nomePart,
         emailParticipante: balcaoEmail.trim() || undefined,
@@ -2346,7 +2411,7 @@ export default function EventosPage() {
         formaPagamento: formaTexto,
         valorPago: valorCobrado,
         comHospedagem: balcaoHospedagem,
-        temBrinde: !!novaInsc.tem_brinde,
+        temBrinde,
         dataHora: new Date().toLocaleString('pt-BR'),
       });
 
@@ -3509,7 +3574,7 @@ export default function EventosPage() {
 
           <button
             onClick={() => {
-              if (eventoSelecionado && !eventoSelecionado.evento_pago) {
+              if (eventoSelecionado && !isEventoPago(eventoSelecionado)) {
                 setEventoSelecionado(eventosPagos.length > 0 ? eventosPagos[0] : null);
               } else if (!eventoSelecionado && eventosPagos.length > 0) {
                 setEventoSelecionado(eventosPagos[0]);
@@ -3541,11 +3606,11 @@ export default function EventosPage() {
             <span>Relatórios</span>
           </button>
 
-          {scope.canWrite && (
+          {scope.canWrite && isEventoPago(eventoSelecionado) && (
             <button
               onClick={() => abrirBalcao(eventoSelecionado?.id)}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-bold transition-all whitespace-nowrap shadow-xs bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-600 active:scale-95"
-              title="Atendimento e Inscrição Presencial"
+              title="Atendimento e Inscrição Presencial (Exclusivo para eventos com taxa de inscrição)"
             >
               <Store className="w-3.5 h-3.5" />
               <span>Balcão</span>
@@ -5229,13 +5294,25 @@ export default function EventosPage() {
               </select>
 
               {scope.canWrite && (
-                <button
-                  onClick={abrirNovaInscricao}
-                  className="inline-flex items-center gap-1.5 bg-[#0f3460] text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-[#162a47] transition shadow-xs cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Inscrever</span>
-                </button>
+                isEventoPago(eventoSelecionado) ? (
+                  <button
+                    onClick={() => abrirBalcao(eventoSelecionado.id)}
+                    className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer active:scale-95"
+                    title="Realizar inscrição presencial e recebimento pelo Balcão"
+                  >
+                    <Store className="w-4 h-4" />
+                    <span>Inscrever (Balcão)</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={abrirNovaInscricao}
+                    className="inline-flex items-center gap-1.5 bg-[#0f3460] text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-[#162a47] transition shadow-xs cursor-pointer"
+                    title="Realizar inscrição no evento gratuito"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Inscrever</span>
+                  </button>
+                )
               )}
 
               {eventoSelecionado.inclui_certificado && (
@@ -6207,13 +6284,11 @@ export default function EventosPage() {
                         onChange={e => setBalcaoEventoId(e.target.value)}
                         className="w-full px-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:bg-white transition"
                       >
-                        <option value="">Selecione um evento...</option>
-                        {eventos.map(ev => (
+                        <option value="">Selecione um evento pago...</option>
+                        {eventosPagos.map(ev => (
                           <option key={ev.id} value={ev.id}>
                             {ev.titulo} — {new Date(ev.data_inicio).toLocaleDateString('pt-BR')} (
-                            {ev.evento_pago
-                              ? `R$ ${typeof ev.valor_inscricao === 'number' ? ev.valor_inscricao.toFixed(2).replace('.', ',') : ev.valor_inscricao}`
-                              : 'Gratuito'}
+                            R$ {typeof ev.valor_inscricao === 'number' ? ev.valor_inscricao.toFixed(2).replace('.', ',') : ev.valor_inscricao}
                             )
                           </option>
                         ))}

@@ -92,6 +92,7 @@ export async function POST(
         capacidade,
         data_inicio,
         valor_inscricao,
+        evento_pago,
         congregacao_id,
         inclui_hospedagem,
         vagas_hospedagem
@@ -138,7 +139,8 @@ export async function POST(
     }
 
     // 6. Determinar vagas e status da inscrição
-    const isPago = Number(evento.valor_inscricao ?? 0) > 0;
+    const valorNum = typeof evento.valor_inscricao === 'number' ? evento.valor_inscricao : Number(evento.valor_inscricao) || 0;
+    const isPago = Boolean(evento.evento_pago || valorNum > 0);
     let statusInscricao: 'confirmado' | 'lista_espera' | 'aguardando_pagamento' = 'confirmado';
     let temVaga = true;
 

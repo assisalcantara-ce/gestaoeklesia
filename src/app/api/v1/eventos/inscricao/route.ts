@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
   // Buscar evento público
   const { data: evento, error: evErr } = await admin
     .from('eventos')
-    .select('id, titulo, ministry_id, status, is_publico, aceita_inscricao, capacidade, data_inicio, data_fim, valor_inscricao')
+    .select('id, titulo, ministry_id, status, is_publico, aceita_inscricao, capacidade, data_inicio, data_fim, valor_inscricao, evento_pago')
     .eq('slug', slug)
     .maybeSingle();
 
@@ -196,7 +196,8 @@ export async function POST(request: NextRequest) {
   }
 
   // Determinar status da inscrição: confirmado, aguardando_pagamento ou lista_espera
-  const isPago = Number(evento.valor_inscricao) > 0;
+  const valorNum = typeof evento.valor_inscricao === 'number' ? evento.valor_inscricao : Number(evento.valor_inscricao) || 0;
+  const isPago = Boolean(evento.evento_pago || valorNum > 0);
   let statusInscricao: 'confirmado' | 'lista_espera' | 'aguardando_pagamento' = 'confirmado';
 
   if (statusInfo.is_lista_espera || statusInfo.status_inscricao === 'lotado') {
