@@ -52,7 +52,7 @@ export function ModalSubstituirPregador({
       setErro(null);
       onBuscarMinistros('');
     }
-  }, [aberto, evento, onBuscarMinistros]);
+  }, [aberto, evento?.id]);
 
   if (!aberto || !evento || !evento.escala_ativa) return null;
 
@@ -175,17 +175,20 @@ export function ModalSubstituirPregador({
                 .map((m) => {
                   const isSelected = selectedMinistroId === m.id;
                   return (
-                    <div
+                    <button
                       key={m.id}
+                      type="button"
                       onClick={() => setSelectedMinistroId(m.id)}
-                      className={`p-3 flex items-center justify-between cursor-pointer transition-colors ${
+                      className={`w-full text-left p-3 flex items-center justify-between transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 ${
                         isSelected
-                          ? 'bg-blue-50 border-l-4 border-l-blue-600'
-                          : 'hover:bg-slate-100'
+                          ? 'bg-blue-50/90 border-l-4 border-l-blue-600 ring-1 ring-blue-200'
+                          : 'hover:bg-slate-100/80 active:bg-slate-200/60'
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="relative w-8 h-8 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 flex items-center justify-center font-bold text-xs text-slate-600">
+                        <div className={`relative w-8 h-8 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center font-bold text-xs ${
+                          isSelected ? 'bg-blue-200 text-blue-800' : 'bg-slate-200 text-slate-600'
+                        }`}>
                           {m.foto_url ? (
                             <Image src={m.foto_url} alt={m.name} fill className="object-cover" unoptimized />
                           ) : (
@@ -193,7 +196,9 @@ export function ModalSubstituirPregador({
                           )}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-900 truncate">{m.name}</p>
+                          <p className={`text-xs font-bold truncate ${isSelected ? 'text-blue-900' : 'text-slate-900'}`}>
+                            {m.name}
+                          </p>
                           <p className="text-[11px] text-slate-500 truncate">
                             {m.cargo_ministerial || 'Ministro'} • {m.congregacao_nome || 'Sem congregação'}
                           </p>
@@ -210,7 +215,7 @@ export function ModalSubstituirPregador({
                           </span>
                         )}
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
             </div>

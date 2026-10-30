@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Search, X, Star, AlertCircle } from 'lucide-react';
+import { Search, X, Star, AlertCircle, CheckCircle2, UserCheck } from 'lucide-react';
 import { AgendaEventoComEscala, MinistroRodizio } from '@/hooks/secretaria/useEscalaPregadores';
 import { formatHoraLocal, getLocalDateStr } from '@/lib/timezone-utils';
 
@@ -40,6 +40,8 @@ export function ModalAtribuirPregador({
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
+  const selectedMinistro = ministros.find((m) => m.id === selectedMinistroId) || null;
+
   useEffect(() => {
     if (aberto) {
       setBusca('');
@@ -50,7 +52,7 @@ export function ModalAtribuirPregador({
       setErro(null);
       onBuscarMinistros('');
     }
-  }, [aberto, onBuscarMinistros]);
+  }, [aberto]);
 
   if (!aberto || !evento) return null;
 
@@ -132,6 +134,44 @@ export function ModalAtribuirPregador({
             </div>
           </div>
 
+          {/* Ministro Selecionado com destaque visual */}
+          {selectedMinistro ? (
+            <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl flex items-center justify-between gap-3 animate-in fade-in duration-150">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="relative w-10 h-10 rounded-full bg-blue-200 overflow-hidden flex-shrink-0 flex items-center justify-center font-bold text-xs text-blue-800 border border-blue-300">
+                  {selectedMinistro.foto_url ? (
+                    <Image src={selectedMinistro.foto_url} alt={selectedMinistro.name} fill className="object-cover" unoptimized />
+                  ) : (
+                    selectedMinistro.name.charAt(0).toUpperCase()
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <UserCheck className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+                    <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wide">
+                      Ministro Selecionado
+                    </span>
+                  </div>
+                  <p className="text-sm font-bold text-slate-900 truncate">{selectedMinistro.name}</p>
+                  <p className="text-xs text-slate-600 truncate">
+                    {selectedMinistro.cargo_ministerial || 'Ministro'} • {selectedMinistro.congregacao_nome || 'Sem congregação'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedMinistroId(null)}
+                className="text-xs font-semibold text-slate-500 hover:text-red-600 px-2.5 py-1 rounded-lg hover:bg-white border border-transparent hover:border-slate-200 transition-colors flex-shrink-0"
+              >
+                Trocar
+              </button>
+            </div>
+          ) : (
+            <div className="p-2.5 bg-slate-100/70 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-500">
+              Nenhum ministro selecionado. Clique em um ministro da lista abaixo para escalar.
+            </div>
+          )}
+
           {/* Lista com Indicadores de Rodízio */}
           <div className="border border-slate-200 rounded-xl max-h-56 overflow-y-auto divide-y divide-slate-100 bg-slate-50/50">
             {loadingMinistros ? (
@@ -144,17 +184,20 @@ export function ModalAtribuirPregador({
               ministros.map((m) => {
                 const isSelected = selectedMinistroId === m.id;
                 return (
-                  <div
+                  <button
                     key={m.id}
+                    type="button"
                     onClick={() => setSelectedMinistroId(m.id)}
-                    className={`p-3 flex items-center justify-between cursor-pointer transition-colors ${
+                    className={`w-full text-left p-3 flex items-center justify-between transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 ${
                       isSelected
-                        ? 'bg-blue-50 border-l-4 border-l-blue-600'
-                        : 'hover:bg-slate-100'
+                        ? 'bg-blue-50/90 border-l-4 border-l-blue-600 ring-1 ring-blue-200'
+                        : 'hover:bg-slate-100/80 active:bg-slate-200/60'
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="relative w-9 h-9 rounded-full bg-slate-200 overflow-hidden flex-shrink-0 flex items-center justify-center font-bold text-xs text-slate-600">
+                      <div className={`relative w-9 h-9 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center font-bold text-xs ${
+                        isSelected ? 'bg-blue-200 text-blue-800' : 'bg-slate-200 text-slate-600'
+                      }`}>
                         {m.foto_url ? (
                           <Image src={m.foto_url} alt={m.name} fill className="object-cover" unoptimized />
                         ) : (
@@ -163,8 +206,15 @@ export function ModalAtribuirPregador({
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <p className="text-sm font-bold text-slate-900 truncate">{m.name}</p>
-                          {m.is_menos_escalado && (
+                          <p className={`text-sm font-bold truncate ${isSelected ? 'text-blue-900' : 'text-slate-900'}`}>
+                            {m.name}
+                          </p>
+                          {isSelected && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-600 text-white shadow-xs">
+                              <CheckCircle2 className="w-2.5 h-2.5" /> Selecionado
+                            </span>
+                          )}
+                          {m.is_menos_escalado && !isSelected && (
                             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
                               <Star className="w-2.5 h-2.5 fill-current" /> Menos Escalado
                             </span>
@@ -184,7 +234,7 @@ export function ModalAtribuirPregador({
                         {m.ultima_escala_em ? `Última: ${m.ultima_escala_em}` : 'Nunca escalado'}
                       </span>
                     </div>
-                  </div>
+                  </button>
                 );
               })
             )}
@@ -244,7 +294,7 @@ export function ModalAtribuirPregador({
             <button
               type="submit"
               disabled={salvando || !selectedMinistroId}
-              className="px-5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg shadow-sm transition-colors disabled:opacity-50"
+              className="px-5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {salvando ? 'Salvando...' : 'Confirmar Escala'}
             </button>
