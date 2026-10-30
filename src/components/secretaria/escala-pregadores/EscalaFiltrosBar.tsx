@@ -14,7 +14,7 @@ interface EscalaFiltrosBarProps {
   onRefresh: () => void;
 }
 
-const MESES_NOMES = [
+export const MESES_NOMES = [
   { valor: '01', nome: 'Janeiro' },
   { valor: '02', nome: 'Fevereiro' },
   { valor: '03', nome: 'Março' },
