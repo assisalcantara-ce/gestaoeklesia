@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Search, X, Star, AlertCircle, CheckCircle2, UserCheck } from 'lucide-react';
+import { Search, X, Star, AlertCircle, UserCheck } from 'lucide-react';
 import { AgendaEventoComEscala, MinistroRodizio } from '@/hooks/secretaria/useEscalaPregadores';
 import { formatHoraLocal, getLocalDateStr } from '@/lib/timezone-utils';
 
@@ -114,31 +114,11 @@ export function ModalAtribuirPregador({
             </div>
           )}
 
-          {/* Campo de Busca de Ministros */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Buscar Ministro Ativo (Rodízio Ministerial)
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Filtrar por nome, cargo ou congregação..."
-                value={busca}
-                onChange={(e) => {
-                  setBusca(e.target.value);
-                  onBuscarMinistros(e.target.value);
-                }}
-                className="w-full text-sm rounded-lg border border-slate-300 pl-9 pr-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              />
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-            </div>
-          </div>
-
-          {/* Ministro Selecionado com destaque visual */}
+          {/* Se houver ministro selecionado: exibe apenas o card com botão vermelho X */}
           {selectedMinistro ? (
-            <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl flex items-center justify-between gap-3 animate-in fade-in duration-150">
+            <div className="p-3.5 bg-blue-50/90 border-2 border-blue-200 rounded-xl flex items-center justify-between gap-3 animate-in fade-in duration-150">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="relative w-10 h-10 rounded-full bg-blue-200 overflow-hidden flex-shrink-0 flex items-center justify-center font-bold text-xs text-blue-800 border border-blue-300">
+                <div className="relative w-11 h-11 rounded-full bg-blue-200 overflow-hidden flex-shrink-0 flex items-center justify-center font-bold text-xs text-blue-800 border-2 border-blue-300 shadow-xs">
                   {selectedMinistro.foto_url ? (
                     <Image src={selectedMinistro.foto_url} alt={selectedMinistro.name} fill className="object-cover" unoptimized />
                   ) : (
@@ -160,85 +140,95 @@ export function ModalAtribuirPregador({
               </div>
               <button
                 type="button"
-                onClick={() => setSelectedMinistroId(null)}
-                className="text-xs font-semibold text-slate-500 hover:text-red-600 px-2.5 py-1 rounded-lg hover:bg-white border border-transparent hover:border-slate-200 transition-colors flex-shrink-0"
+                onClick={() => {
+                  setSelectedMinistroId(null);
+                  onBuscarMinistros('');
+                }}
+                className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 active:bg-red-200 rounded-lg border border-red-200 transition-colors flex-shrink-0 shadow-xs"
+                title="Remover seleção e buscar outro ministro"
+                aria-label="Remover ministro selecionado"
               >
-                Trocar
+                <X className="w-4 h-4 stroke-[2.5]" />
               </button>
             </div>
           ) : (
-            <div className="p-2.5 bg-slate-100/70 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-500">
-              Nenhum ministro selecionado. Clique em um ministro da lista abaixo para escalar.
-            </div>
-          )}
-
-          {/* Lista com Indicadores de Rodízio */}
-          <div className="border border-slate-200 rounded-xl max-h-56 overflow-y-auto divide-y divide-slate-100 bg-slate-50/50">
-            {loadingMinistros ? (
-              <div className="p-6 text-center text-xs text-slate-500">Buscando ministros ativos...</div>
-            ) : ministros.length === 0 ? (
-              <div className="p-6 text-center text-xs text-slate-500">
-                Nenhum ministro com status ministerial ativo encontrado.
+            /* Sem seleção: exibe campo de busca e lista de ministros */
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Buscar Ministro Ativo (Rodízio Ministerial)
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Filtrar por nome, cargo ou congregação..."
+                    value={busca}
+                    onChange={(e) => {
+                      setBusca(e.target.value);
+                      onBuscarMinistros(e.target.value);
+                    }}
+                    className="w-full text-sm rounded-lg border border-slate-300 pl-9 pr-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    autoFocus
+                  />
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                </div>
               </div>
-            ) : (
-              ministros.map((m) => {
-                const isSelected = selectedMinistroId === m.id;
-                return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setSelectedMinistroId(m.id)}
-                    className={`w-full text-left p-3 flex items-center justify-between transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 ${
-                      isSelected
-                        ? 'bg-blue-50/90 border-l-4 border-l-blue-600 ring-1 ring-blue-200'
-                        : 'hover:bg-slate-100/80 active:bg-slate-200/60'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className={`relative w-9 h-9 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center font-bold text-xs ${
-                        isSelected ? 'bg-blue-200 text-blue-800' : 'bg-slate-200 text-slate-600'
-                      }`}>
-                        {m.foto_url ? (
-                          <Image src={m.foto_url} alt={m.name} fill className="object-cover" unoptimized />
-                        ) : (
-                          m.name.charAt(0).toUpperCase()
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <p className={`text-sm font-bold truncate ${isSelected ? 'text-blue-900' : 'text-slate-900'}`}>
-                            {m.name}
-                          </p>
-                          {isSelected && (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-600 text-white shadow-xs">
-                              <CheckCircle2 className="w-2.5 h-2.5" /> Selecionado
-                            </span>
-                          )}
-                          {m.is_menos_escalado && !isSelected && (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
-                              <Star className="w-2.5 h-2.5 fill-current" /> Menos Escalado
-                            </span>
+
+              {/* Lista com Indicadores de Rodízio */}
+              <div className="border border-slate-200 rounded-xl max-h-56 overflow-y-auto divide-y divide-slate-100 bg-slate-50/50">
+                {loadingMinistros ? (
+                  <div className="p-6 text-center text-xs text-slate-500">Buscando ministros ativos...</div>
+                ) : ministros.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-500">
+                    Nenhum ministro com status ministerial ativo encontrado.
+                  </div>
+                ) : (
+                  ministros.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setSelectedMinistroId(m.id)}
+                      className="w-full text-left p-3 flex items-center justify-between transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 hover:bg-slate-100/80 active:bg-slate-200/60"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="relative w-9 h-9 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center font-bold text-xs bg-slate-200 text-slate-600">
+                          {m.foto_url ? (
+                            <Image src={m.foto_url} alt={m.name} fill className="object-cover" unoptimized />
+                          ) : (
+                            m.name.charAt(0).toUpperCase()
                           )}
                         </div>
-                        <p className="text-xs text-slate-500 truncate">
-                          {m.cargo_ministerial || 'Ministro'} • {m.congregacao_nome || 'Sem congregação'}
-                        </p>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-bold truncate text-slate-900">
+                              {m.name}
+                            </p>
+                            {m.is_menos_escalado && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
+                                <Star className="w-2.5 h-2.5 fill-current" /> Menos Escalado
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 truncate">
+                            {m.cargo_ministerial || 'Ministro'} • {m.congregacao_nome || 'Sem congregação'}
+                          </p>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="text-right flex-shrink-0 pl-2">
-                      <span className="text-xs font-semibold text-slate-700 block">
-                        {m.total_escalas} {m.total_escalas === 1 ? 'escala' : 'escalas'}
-                      </span>
-                      <span className="text-[11px] text-slate-400 block">
-                        {m.ultima_escala_em ? `Última: ${m.ultima_escala_em}` : 'Nunca escalado'}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })
-            )}
-          </div>
+                      <div className="text-right flex-shrink-0 pl-2">
+                        <span className="text-xs font-semibold text-slate-700 block">
+                          {m.total_escalas} {m.total_escalas === 1 ? 'escala' : 'escalas'}
+                        </span>
+                        <span className="text-[11px] text-slate-400 block">
+                          {m.ultima_escala_em ? `Última: ${m.ultima_escala_em}` : 'Nunca escalado'}
+                        </span>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Dados Adicionais da Homilética */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">

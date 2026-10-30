@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Search, X, Star, AlertCircle } from 'lucide-react';
+import { Search, X, Star, AlertCircle, UserCheck } from 'lucide-react';
 import { AgendaEventoComEscala, MinistroRodizio } from '@/hooks/secretaria/useEscalaPregadores';
 
 interface ModalSubstituirPregadorProps {
@@ -40,6 +40,8 @@ export function ModalSubstituirPregador({
   const [observacoes, setObservacoes] = useState('');
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+
+  const selectedSubstituto = ministros.find((m) => m.id === selectedMinistroId) || null;
 
   useEffect(() => {
     if (aberto && evento?.escala_ativa) {
@@ -150,75 +152,108 @@ export function ModalSubstituirPregador({
             />
           </div>
 
-          {/* Selecionar Novo Ministro */}
+          {/* Selecionar Novo Ministro Substituto */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              Selecionar Novo Ministro Substituto
+              Ministro Substituto
             </label>
-            <div className="relative mb-2">
-              <input
-                type="text"
-                placeholder="Filtrar ministro..."
-                value={busca}
-                onChange={(e) => {
-                  setBusca(e.target.value);
-                  onBuscarMinistros(e.target.value);
-                }}
-                className="w-full text-sm rounded-lg border border-slate-300 pl-9 pr-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              />
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-            </div>
 
-            <div className="border border-slate-200 rounded-xl max-h-48 overflow-y-auto divide-y divide-slate-100 bg-slate-50/50">
-              {ministros
-                .filter((m) => m.id !== evento.escala_ativa?.member_id)
-                .map((m) => {
-                  const isSelected = selectedMinistroId === m.id;
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => setSelectedMinistroId(m.id)}
-                      className={`w-full text-left p-3 flex items-center justify-between transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 ${
-                        isSelected
-                          ? 'bg-blue-50/90 border-l-4 border-l-blue-600 ring-1 ring-blue-200'
-                          : 'hover:bg-slate-100/80 active:bg-slate-200/60'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className={`relative w-8 h-8 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center font-bold text-xs ${
-                          isSelected ? 'bg-blue-200 text-blue-800' : 'bg-slate-200 text-slate-600'
-                        }`}>
-                          {m.foto_url ? (
-                            <Image src={m.foto_url} alt={m.name} fill className="object-cover" unoptimized />
-                          ) : (
-                            m.name.charAt(0).toUpperCase()
+            {selectedSubstituto ? (
+              <div className="p-3.5 bg-blue-50/90 border-2 border-blue-200 rounded-xl flex items-center justify-between gap-3 animate-in fade-in duration-150">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="relative w-11 h-11 rounded-full bg-blue-200 overflow-hidden flex-shrink-0 flex items-center justify-center font-bold text-xs text-blue-800 border-2 border-blue-300 shadow-xs">
+                    {selectedSubstituto.foto_url ? (
+                      <Image src={selectedSubstituto.foto_url} alt={selectedSubstituto.name} fill className="object-cover" unoptimized />
+                    ) : (
+                      selectedSubstituto.name.charAt(0).toUpperCase()
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <UserCheck className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+                      <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wide">
+                        Substituto Selecionado
+                      </span>
+                    </div>
+                    <p className="text-sm font-bold text-slate-900 truncate">{selectedSubstituto.name}</p>
+                    <p className="text-xs text-slate-600 truncate">
+                      {selectedSubstituto.cargo_ministerial || 'Ministro'} • {selectedSubstituto.congregacao_nome || 'Sem congregação'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedMinistroId(null);
+                    onBuscarMinistros('');
+                  }}
+                  className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 active:bg-red-200 rounded-lg border border-red-200 transition-colors flex-shrink-0 shadow-xs"
+                  title="Remover substituto e buscar outro"
+                  aria-label="Remover ministro substituto selecionado"
+                >
+                  <X className="w-4 h-4 stroke-[2.5]" />
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Filtrar por nome, cargo ou congregação..."
+                    value={busca}
+                    onChange={(e) => {
+                      setBusca(e.target.value);
+                      onBuscarMinistros(e.target.value);
+                    }}
+                    className="w-full text-sm rounded-lg border border-slate-300 pl-9 pr-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    autoFocus
+                  />
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                </div>
+
+                <div className="border border-slate-200 rounded-xl max-h-48 overflow-y-auto divide-y divide-slate-100 bg-slate-50/50">
+                  {ministros
+                    .filter((m) => m.id !== evento.escala_ativa?.member_id)
+                    .map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setSelectedMinistroId(m.id)}
+                        className="w-full text-left p-3 flex items-center justify-between transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 hover:bg-slate-100/80 active:bg-slate-200/60"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="relative w-8 h-8 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center font-bold text-xs bg-slate-200 text-slate-600">
+                            {m.foto_url ? (
+                              <Image src={m.foto_url} alt={m.name} fill className="object-cover" unoptimized />
+                            ) : (
+                              m.name.charAt(0).toUpperCase()
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold truncate text-slate-900">
+                              {m.name}
+                            </p>
+                            <p className="text-[11px] text-slate-500 truncate">
+                              {m.cargo_ministerial || 'Ministro'} • {m.congregacao_nome || 'Sem congregação'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="text-right flex-shrink-0">
+                          <span className="text-xs font-semibold text-slate-700 block">
+                            {m.total_escalas} esc.
+                          </span>
+                          {m.is_menos_escalado && (
+                            <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-0.5 justify-end">
+                              <Star className="w-2.5 h-2.5 fill-current" /> Menos escalado
+                            </span>
                           )}
                         </div>
-                        <div className="min-w-0">
-                          <p className={`text-xs font-bold truncate ${isSelected ? 'text-blue-900' : 'text-slate-900'}`}>
-                            {m.name}
-                          </p>
-                          <p className="text-[11px] text-slate-500 truncate">
-                            {m.cargo_ministerial || 'Ministro'} • {m.congregacao_nome || 'Sem congregação'}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="text-right flex-shrink-0">
-                        <span className="text-xs font-semibold text-slate-700 block">
-                          {m.total_escalas} esc.
-                        </span>
-                        {m.is_menos_escalado && (
-                          <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-0.5 justify-end">
-                            <Star className="w-2.5 h-2.5 fill-current" /> Menos escalado
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
-            </div>
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Rodapé */}
