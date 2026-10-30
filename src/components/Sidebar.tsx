@@ -382,7 +382,7 @@ export default function Sidebar() {
     >
       {/* ─── 1. ÁREA DE BRANDING (TOPO) ─── */}
       <div
-        className={`border-b border-white/[0.08] relative bg-gradient-to-b from-[#112d4a]/50 to-transparent transition-all duration-300 ${
+        className={`border-b border-white/[0.08] relative bg-gradient-to-b from-[#112d4a]/50 to-transparent transition-all duration-300 shrink-0 ${
           isCollapsed
             ? 'py-3.5 px-2 flex flex-col items-center gap-2.5'
             : 'px-4 py-5 flex items-center justify-between'
@@ -439,14 +439,14 @@ export default function Sidebar() {
       {trialDaysLeft !== null && trialDaysLeft >= 0 && (
         isCollapsed ? (
           <div
-            className="mx-2 mt-2 mb-1 p-2 rounded-xl bg-amber-500/10 border border-amber-400/30 flex items-center justify-center cursor-pointer transition-colors hover:bg-amber-500/20"
+            className="mx-2 mt-2 mb-1 p-2 rounded-xl bg-amber-500/10 border border-amber-400/30 flex items-center justify-center cursor-pointer transition-colors hover:bg-amber-500/20 shrink-0"
             title={trialDaysLeft === 0 ? 'Último dia de acesso gratuito!' : `Restam ${trialDaysLeft} ${trialDaysLeft === 1 ? 'dia' : 'dias'} de teste`}
             onClick={() => router.push('/trial-expirado')}
           >
             <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
           </div>
         ) : (
-          <div className="mx-3 mt-3 mb-1 p-3 rounded-xl bg-amber-500/10 border border-amber-400/30 shadow-inner">
+          <div className="mx-3 mt-3 mb-1 p-3 rounded-xl bg-amber-500/10 border border-amber-400/30 shadow-inner shrink-0">
             <div className="flex items-center gap-2">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
               <p className="text-amber-300 text-xs font-bold uppercase tracking-wider">Período de Teste</p>
@@ -467,7 +467,7 @@ export default function Sidebar() {
       )}
 
       {/* ─── 2. NAVEGAÇÃO / MENU (SCROLL INDEPENDENTE) ─── */}
-      <nav className={`flex-1 ${isCollapsed ? 'px-2' : 'px-3'} py-3 overflow-y-auto sidebar-scrollbar space-y-1`}>
+      <nav className={`flex-1 min-h-0 ${isCollapsed ? 'px-2' : 'px-3'} py-3 overflow-y-auto sidebar-scrollbar space-y-1`}>
         {menuItems.map((item) => {
           const IconComponent = item.icon;
           const hasSub = !!item.submenu || !!item.ebdMenu;
@@ -607,7 +607,7 @@ export default function Sidebar() {
 
       {/* ─── 3. RODAPÉ ESTÁVEL (LOGOUT + VERSÃO) ─── */}
       <div
-        className={`border-t border-white/[0.08] bg-gradient-to-b from-transparent to-[#040e1a]/80 ${
+        className={`border-t border-white/[0.08] bg-gradient-to-b from-transparent to-[#040e1a]/80 shrink-0 ${
           isCollapsed ? 'p-2 space-y-2 flex flex-col items-center' : 'p-4 space-y-3.5'
         }`}
       >
@@ -664,7 +664,7 @@ export default function Sidebar() {
       )}
 
       {/* Sidebar Fixo Desktop */}
-      <div className="hidden md:flex h-screen flex-shrink-0">
+      <div className="hidden md:flex h-full flex-shrink-0 select-none">
         {sidebarContent}
       </div>
     </>

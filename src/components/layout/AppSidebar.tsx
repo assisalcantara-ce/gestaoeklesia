@@ -202,9 +202,9 @@ export default function AppSidebar({ setIsMobileMenuOpen }: AppSidebarProps) {
   };
 
   return (
-    <div className="w-64 bg-[#0A2A4F] text-white shadow-lg flex flex-col h-dvh min-h-screen md:h-full shrink-0">
+    <div className="w-64 bg-[#0A2A4F] text-white shadow-lg flex flex-col h-dvh min-h-screen md:h-full shrink-0 select-none">
       {/* LOGO */}
-      <div className="p-4 border-b border-white/5 flex items-center justify-center mb-1">
+      <div className="p-4 border-b border-white/5 flex items-center justify-center mb-1 shrink-0">
         <Image
           src={BRAND.logoHorizontal}
           alt="Gestão Eklésia"
@@ -218,7 +218,7 @@ export default function AppSidebar({ setIsMobileMenuOpen }: AppSidebarProps) {
 
       {/* TRIAL BANNER */}
       {trialDaysLeft !== null && trialDaysLeft >= 0 && (
-        <div className="mx-4 mt-3 mb-1 p-3 rounded-xl bg-amber-500/20 border border-amber-400/30">
+        <div className="mx-4 mt-3 mb-1 p-3 rounded-xl bg-amber-500/20 border border-amber-400/30 shrink-0">
           <p className="text-amber-300 text-xs font-semibold">🎯 Teste gratuito</p>
           <p className="text-white/80 text-xs mt-1">
             {trialDaysLeft === 0
@@ -235,7 +235,7 @@ export default function AppSidebar({ setIsMobileMenuOpen }: AppSidebarProps) {
       )}
 
       {/* MENU */}
-      <nav className="flex-1 px-0 py-2 overflow-y-auto space-y-1">
+      <nav className="flex-1 min-h-0 px-0 py-2 overflow-y-auto space-y-1">
         {filteredGroups.map((group) => {
           const isGroupOpen = expandedGroup === group.groupName;
           const isGroupActive = group.items.some(
@@ -359,7 +359,7 @@ export default function AppSidebar({ setIsMobileMenuOpen }: AppSidebarProps) {
       </nav>
 
       {/* FOOTER */}
-      <div className="p-3 border-t border-white/5 space-y-2">
+      <div className="p-3 border-t border-white/5 space-y-2 shrink-0">
         <button
           onClick={() => {
             supabase.auth.signOut().finally(() => router.push('/'));
