@@ -15,6 +15,7 @@ import { createClient } from '@/lib/supabase-client';
 import { CheckCircle, Clock, FileText, Printer, Send, XCircle } from 'lucide-react';
 import { CartasService } from '@/services/cartas-service';
 import { isSecretariaGeral } from '@/lib/access-control';
+import { buildAccentInsensitiveRegex } from '@/lib/search-normalizer';
 
 type TipoCarta = 'mudanca' | 'transito' | 'desligamento' | 'recomendacao';
 type StatusPedido = 'pendente' | 'autorizado' | 'rejeitado';
@@ -189,9 +190,20 @@ export default function CartaPedidosPage() {
   useEffect(() => {
     if (skipSearchRef.current) { skipSearchRef.current = false; return; }
     const q = membroSearch.trim();
-    if (q.length < 2 || !userCtx.ministryId) { setMembrosEncontrados([]); return; }
     const timer = setTimeout(async () => {
-      const { data } = await supabase.from('members').select('id, name, cargo_ministerial').eq('ministry_id', userCtx.ministryId!).ilike('name', `%${q}%`).limit(8);
+      const regex = buildAccentInsensitiveRegex(q);
+      let query = supabase
+        .from('members')
+        .select('id, name, cargo_ministerial')
+        .eq('ministry_id', userCtx.ministryId!);
+
+      if (regex) {
+        query = query.filter('name', 'imatch', regex);
+      } else {
+        query = query.ilike('name', `%${q}%`);
+      }
+
+      const { data } = await query.limit(8);
       setMembrosEncontrados(data ?? []);
     }, 300);
     return () => clearTimeout(timer);

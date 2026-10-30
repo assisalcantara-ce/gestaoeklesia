@@ -10,6 +10,7 @@ import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organi
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { useAppDialog } from '@/providers/AppDialogProvider';
 import { Plus, Printer, X, Users, Search, XCircle, IdCard, ClipboardList } from 'lucide-react';
+import { buildAccentInsensitiveRegex, includesNormalized } from '@/lib/search-normalizer';
 
 // --- Tipos ---
 
@@ -403,13 +404,19 @@ export default function EbdAlunosPage() {
     setBuscandoAluno(true);
     buscaAlunoRef.current = setTimeout(async () => {
       if (!ministryId) { setBuscandoAluno(false); return; }
-      const { data } = await supabase
+      const regex = buildAccentInsensitiveRegex(buscaAluno);
+      let query = supabase
         .from('members')
         .select('id, name, phone, email, congregacao_id')
-        .eq('ministry_id', ministryId)
-        .ilike('name', `${buscaAluno}%`)
-        .order('name')
-        .limit(8);
+        .eq('ministry_id', ministryId);
+
+      if (regex) {
+        query = query.filter('name', 'imatch', regex);
+      } else {
+        query = query.ilike('name', `${buscaAluno}%`);
+      }
+
+      const { data } = await query.order('name').limit(8);
       setSugestoesAluno(data ?? []);
       setBuscandoAluno(false);
     }, 300);
@@ -422,7 +429,7 @@ export default function EbdAlunosPage() {
       const t = turmas.find(t => t.id === m.turma_id);
       if (!t || t.classe_id !== filtroClasse) return false;
     }
-    if (busca && !m.aluno_nome?.toLowerCase().includes(busca.toLowerCase())) return false;
+    if (busca && !includesNormalized(m.aluno_nome, busca)) return false;
     return true;
   });
 

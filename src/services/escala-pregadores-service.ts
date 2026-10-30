@@ -10,6 +10,7 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
+import { buildMemberSearchOrFilter } from '@/lib/search-normalizer';
 
 export interface MinistroElegivel {
   id: string;
@@ -340,8 +341,10 @@ export class EscalaPregadoresService {
       .order('name', { ascending: true });
 
     if (termoBusca && termoBusca.trim()) {
-      const termo = termoBusca.trim();
-      queryMembros = queryMembros.or(`name.ilike.%${termo}%,cargo_ministerial.ilike.%${termo}%,matricula.ilike.%${termo}%`);
+      const orFilter = buildMemberSearchOrFilter(termoBusca.trim());
+      if (orFilter) {
+        queryMembros = queryMembros.or(orFilter);
+      }
     }
 
     const { data: ministros, error: errMembros } = await queryMembros;

@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { buildMemberSearchOrFilter } from '@/lib/search-normalizer';
 
 // ─── TYPES & INTERFACES ────────────────────────────────────────────────────────
 
@@ -573,7 +574,7 @@ export class SecretaryReportsService {
   /**
    * 4. Evolução de Novos Cadastros (Últimos 12 ou N meses)
    */
-  async getGrowthTrends(ministryId: string, monthsCount = 12): Promise<GrowthTrendItem[]> {
+  async getGrowthTrends(ministryId: string, monthsCount = 12, congregacaoId?: string | null): Promise<GrowthTrendItem[]> {
     const now = new Date();
     const months: { key: string; label: string; start: string; end: string }[] = [];
 
@@ -591,11 +592,17 @@ export class SecretaryReportsService {
 
     const oldestStart = months[0].start;
 
-    const { data, error } = await this.supabase
+    let query = this.supabase
       .from('members')
       .select('member_since, created_at')
       .eq('ministry_id', ministryId)
       .or(`member_since.gte.${oldestStart.slice(0, 10)},created_at.gte.${oldestStart}`);
+
+    if (congregacaoId) {
+      query = query.eq('congregacao_id', congregacaoId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       throw new Error(`Erro ao buscar evolução de crescimento: ${error.message}`);
@@ -614,6 +621,107 @@ export class SecretaryReportsService {
       label: m.label,
       novosCadastros: grouped[m.key] || 0,
     }));
+  }
+
+  /**
+   * 4.1 Distribuição Quantitativa por Congregação
+   */
+  async getCongregacoesDistribution(
+    ministryId: string,
+    congregacaoId?: string | null
+  ): Promise<
+    Array<{
+      id: string;
+      nome: string;
+      total: number;
+      totalMembros: number;
+      totalAtivos: number;
+      totalCongregados: number;
+      totalCriancas: number;
+      totalMinistros: number;
+      percentual: number;
+    }>
+  > {
+    let query = this.supabase
+      .from('members')
+      .select('congregacao_id, status, tipo_cadastro, cargo_ministerial, congregacoes(id, nome)')
+      .eq('ministry_id', ministryId);
+
+    if (congregacaoId) {
+      query = query.eq('congregacao_id', congregacaoId);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw new Error(`Erro ao buscar distribuição por congregação: ${error.message}`);
+    }
+
+    const members = data || [];
+    const totalGeral = members.length;
+    const map: Record<
+      string,
+      {
+        nome: string;
+        total: number;
+        totalMembros: number;
+        totalAtivos: number;
+        totalCongregados: number;
+        totalCriancas: number;
+        totalMinistros: number;
+      }
+    > = {};
+
+    for (const m of members) {
+      const congId = m.congregacao_id || 'sem_congregacao';
+      const congNome = (m.congregacoes as any)?.nome || 'Sede / Não Vinculado';
+      if (!map[congId]) {
+        map[congId] = {
+          nome: congNome,
+          total: 0,
+          totalMembros: 0,
+          totalAtivos: 0,
+          totalCongregados: 0,
+          totalCriancas: 0,
+          totalMinistros: 0,
+        };
+      }
+
+      map[congId].total++;
+      map[congId].totalMembros++;
+
+      if (m.status === 'active') {
+        map[congId].totalAtivos++;
+      }
+
+      const tipo = (m.tipo_cadastro || '').toLowerCase();
+      if (tipo === 'congregado') {
+        map[congId].totalCongregados++;
+      } else if (tipo === 'crianca') {
+        map[congId].totalCriancas++;
+      }
+
+      const cargo = (m.cargo_ministerial || '').toLowerCase();
+      if (
+        tipo === 'ministro' ||
+        (cargo && cargo !== 'membro' && cargo !== 'nenhum' && cargo !== 'congregado')
+      ) {
+        map[congId].totalMinistros++;
+      }
+    }
+
+    return Object.entries(map)
+      .map(([id, info]) => ({
+        id,
+        nome: info.nome,
+        total: info.total,
+        totalMembros: info.totalMembros,
+        totalAtivos: info.totalAtivos,
+        totalCongregados: info.totalCongregados,
+        totalCriancas: info.totalCriancas,
+        totalMinistros: info.totalMinistros,
+        percentual: totalGeral > 0 ? Number(((info.total / totalGeral) * 100).toFixed(1)) : 0,
+      }))
+      .sort((a, b) => b.total - a.total);
   }
 
   /**
@@ -1117,8 +1225,13 @@ export class SecretaryReportsService {
       .eq('ministry_id', ministryId);
 
     if (params.search && params.search.trim()) {
-      const term = `%${params.search.trim()}%`;
-      query = query.or(`name.ilike.${term},cpf.ilike.${term},matricula.ilike.${term}`);
+      const orFilter = buildMemberSearchOrFilter(params.search.trim());
+      if (orFilter) {
+        query = query.or(orFilter);
+      } else {
+        const term = `%${params.search.trim()}%`;
+        query = query.or(`name.ilike.${term},cpf.ilike.${term},matricula.ilike.${term}`);
+      }
     }
 
     if (params.status) {

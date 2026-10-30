@@ -14,6 +14,7 @@ import { authTenantErrorResponse } from '@/lib/api-errors'
 import { MemberMatriculaService } from '@/lib/services/member-matricula-service'
 import { logServerAudit } from '@/lib/audit-logger'
 import { normalizeMemberStatus, type MemberDbStatus } from '@/lib/member-status'
+import { buildMemberSearchOrFilter } from '@/lib/search-normalizer'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
@@ -136,10 +137,9 @@ export async function GET(request: NextRequest) {
     }
 
     if (searchParam) {
-      // Sanitizar caracteres especiais de regex/postgrest para busca segura
-      const sanitized = searchParam.replace(/[,()]/g, '')
-      if (sanitized) {
-        query = query.or(`name.ilike.%${sanitized}%,cpf.ilike.%${sanitized}%,matricula.ilike.%${sanitized}%`)
+      const orFilter = buildMemberSearchOrFilter(searchParam);
+      if (orFilter) {
+        query = query.or(orFilter);
       }
     }
 

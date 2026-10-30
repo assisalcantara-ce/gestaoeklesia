@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase-client';
 import { loadOrgNomenclaturasFromSupabaseOrMigrate } from '@/lib/org-nomenclaturas';
 import { useAppDialog } from '@/providers/AppDialogProvider';
 import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
+import { buildAccentInsensitiveRegex } from '@/lib/search-normalizer';
 
 export interface Divisao1 {
   id: string;
@@ -911,12 +912,19 @@ export function useCongregacoes() {
       setPastorStatus('loading');
       setPastorMsg('Buscando...');
 
-      const { data, error } = await supabase
+      const regex = buildAccentInsensitiveRegex(q);
+      let query = supabase
         .from('members')
         .select('id, name, cpf, data_nascimento, role, profissao, phone, custom_fields')
-        .eq('ministry_id', ministryId)
-        .ilike('name', `%${q}%`)
-        .limit(7);
+        .eq('ministry_id', ministryId);
+
+      if (regex) {
+        query = query.filter('name', 'imatch', regex);
+      } else {
+        query = query.ilike('name', `%${q}%`);
+      }
+
+      const { data, error } = await query.limit(7);
 
       if (error) throw error;
 
@@ -967,12 +975,19 @@ export function useCongregacoes() {
       setDirigenteStatus('loading');
       setDirigenteMsg('Buscando...');
 
-      const { data, error } = await supabase
+      const regex = buildAccentInsensitiveRegex(q);
+      let query = supabase
         .from('members')
         .select('id, name, cpf, data_nascimento, role, profissao, phone, custom_fields')
-        .eq('ministry_id', ministryId)
-        .ilike('name', `%${q}%`)
-        .limit(8);
+        .eq('ministry_id', ministryId);
+
+      if (regex) {
+        query = query.filter('name', 'imatch', regex);
+      } else {
+        query = query.ilike('name', `%${q}%`);
+      }
+
+      const { data, error } = await query.limit(8);
 
       if (error) throw error;
 

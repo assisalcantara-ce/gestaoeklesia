@@ -14,6 +14,7 @@ import { substituirPlaceholdersCertificado } from '@/lib/certificados-utils';
 import { getFontesCertificadosHeadHtml, getFontesReadyPrintScript, buildTextoEstiloRenderizacao } from '@/lib/certificados-fontes';
 import { Pencil, Printer, Trash2 } from 'lucide-react';
 import { sincronizarAgenda } from '@/lib/agenda-sync-service';
+import { buildAccentInsensitiveRegex } from '@/lib/search-normalizer';
 
 type CertificadoTemplate = {
   id: string;
@@ -240,13 +241,20 @@ export default function BatismoAguasPage() {
         return;
       }
       setSearchLoading(true);
-      const { data } = await supabase
+      const regex = buildAccentInsensitiveRegex(termo);
+      let query = supabase
         .from('members')
         .select('id, name, data_nascimento, sexo, celular, congregacao_id, congregacao')
         .eq('ministry_id', ministryId)
-        .eq('tipo_cadastro', 'congregado')
-        .ilike('name', `%${termo}%`)
-        .limit(10);
+        .eq('tipo_cadastro', 'congregado');
+
+      if (regex) {
+        query = query.filter('name', 'imatch', regex);
+      } else {
+        query = query.ilike('name', `%${termo}%`);
+      }
+
+      const { data } = await query.limit(10);
 
       const mapped: CandidatoSugestao[] = (data || []).map((m: any) => ({
         id: m.id,

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase-client';
 import { safeResponseJson } from '@/lib/api-client';
+import { buildMemberSearchOrFilter } from '@/lib/search-normalizer';
 
 const TIPOS_RECEBIMENTO_OPCOES = [
   { value: 'dizimo', label: 'Dízimo', cor: 'bg-blue-100 text-blue-800' },
@@ -168,12 +169,19 @@ export default function EditarClassificacaoLancamentoModal({
 
       // Fallback: busca direta no Supabase com tenant filter
       if (membrosEncontrados.length === 0 && lancamento?.ministry_id) {
-        const { data: directData } = await supabase
+        const orFilter = buildMemberSearchOrFilter(cleanTerm);
+        let directQuery = supabase
           .from('members')
           .select('id, name, cpf, matricula, role, tipo_cadastro, custom_fields, congregacao_id')
-          .eq('ministry_id', lancamento.ministry_id)
-          .or(`name.ilike.%${cleanTerm}%,cpf.ilike.%${cleanTerm}%,matricula.ilike.%${cleanTerm}%`)
-          .limit(10);
+          .eq('ministry_id', lancamento.ministry_id);
+
+        if (orFilter) {
+          directQuery = directQuery.or(orFilter);
+        } else {
+          directQuery = directQuery.or(`name.ilike.%${cleanTerm}%,cpf.ilike.%${cleanTerm}%,matricula.ilike.%${cleanTerm}%`);
+        }
+
+        const { data: directData } = await directQuery.limit(10);
 
         if (directData && directData.length > 0) {
           membrosEncontrados = directData;

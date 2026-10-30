@@ -17,10 +17,14 @@ import {
   ExternalLink,
   ChevronDown,
   ChevronUp,
+  FileText,
+  Loader2,
 } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/api-client';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import ReportPrintHeader from './ReportPrintHeader';
+import { fetchConfiguracaoIgrejaFromSupabase, formatarEnderecoCompleto } from '@/lib/igreja-config-utils';
+import { gerarRelatorioGerencialSecretariaPDF, DadosRelatorioGerencialSecretaria } from '@/lib/secretaria-relatorio-gerencial-pdf';
 
 interface CustomReportBuilderTabProps {
   congregacaoId?: string | null;
@@ -222,11 +226,87 @@ export default function CustomReportBuilderTab({
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+
+  // ─── GERAR RELATÓRIO CONSOLIDADO EM PDF (PRESIDÊNCIA) ───────────────────────
+  const handleGerarPDFConsolidado = async () => {
+    try {
+      setGeneratingPdf(true);
+
+      // 1. Obter dados agregados consolidados da Secretaria
+      const url = new URL('/api/v1/secretaria/relatorios/summary', window.location.origin);
+      if (congregacaoId && congregacaoId !== 'todas') {
+        url.searchParams.set('congregacao_id', congregacaoId);
+      }
+      const res = await authenticatedFetch(url.toString(), {
+        headers: { 'Cache-Control': 'no-cache' },
+      });
+      if (!res.ok) throw new Error('Não foi possível obter dados consolidados para o relatório.');
+      const json = await res.json();
+      const summaryData = json.data;
+
+      // 2. Obter configurações da igreja/ministério
+      const configIgreja = await fetchConfiguracaoIgrejaFromSupabase().catch(() => null);
+
+      const nomeMinisterio = configIgreja?.nome || 'Igreja Evangélica';
+      const enderecoCompleto = configIgreja
+        ? formatarEnderecoCompleto({
+            logradouro: configIgreja.logradouro,
+            numero: configIgreja.numero,
+            complemento: configIgreja.complemento,
+            bairro: configIgreja.bairro,
+            cidade: configIgreja.cidade,
+            estado: configIgreja.estado,
+            cep: configIgreja.cep,
+          }) || configIgreja.endereco
+        : '';
+
+      const escopoNome =
+        !congregacaoId || congregacaoId === 'todas'
+          ? 'Todas as Congregações'
+          : congregacaoNome || 'Unidade Local';
+
+      const dataFormatada = new Intl.DateTimeFormat('pt-BR', {
+        dateStyle: 'long',
+        timeStyle: 'short',
+      }).format(new Date());
+
+      const payload: DadosRelatorioGerencialSecretaria = {
+        nomeMinisterio,
+        subtituloMinisterio: configIgreja?.descricao || 'Convenção e Ministério Eclesiástico',
+        cnpjMinisterio: configIgreja?.cnpj || null,
+        enderecoMinisterio: enderecoCompleto || null,
+        telefoneMinisterio: configIgreja?.telefone || null,
+        emailMinisterio: configIgreja?.email || null,
+        responsavelMinisterio: configIgreja?.responsavel || 'Pastor Presidente',
+        logoMinisterioUrl: configIgreja?.logo || null,
+        escopoCongregacao: escopoNome,
+        dataEmissao: dataFormatada,
+        emitidoPor: 'Secretaria Geral',
+        executiveMetrics: summaryData.executiveMetrics,
+        demographics: summaryData.demographics,
+        growthTrends: summaryData.growthTrends || [],
+        congregacoesDistribution: summaryData.congregacoesDistribution || [],
+        lettersStats: summaryData.lettersStats,
+        baptismsAndActs: summaryData.baptismsAndActs,
+      };
+
+      const doc = await gerarRelatorioGerencialSecretariaPDF(payload);
+      const safeEscopo = escopoNome.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      const filename = `relatorio_gerencial_secretaria_${safeEscopo}_${new Date().toISOString().slice(0, 10)}.pdf`;
+      doc.save(filename);
+    } catch (err: any) {
+      console.error('Erro ao gerar relatório executivo em PDF:', err);
+      alert(`Erro ao gerar PDF: ${err.message || 'Tente novamente.'}`);
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
 
   // ─── APLICAÇÃO DE PRESET RÁPIDO ────────────────────────────────────────────
   const handleApplyPreset = (preset: ReportPreset) => {
@@ -815,7 +895,7 @@ export default function CustomReportBuilderTab({
             </div>
           )}
 
-          {/* Barra de Ação: Selecionar Colunas & Gerar Relatório */}
+          {/* Barra de Ação: Selecionar Colunas, Filtrar Dados e Gerar Relatório PDF */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-gray-100">
             <button
               onClick={() => setShowColumnsModal(!showColumnsModal)}
@@ -825,23 +905,47 @@ export default function CustomReportBuilderTab({
               Selecionar Colunas ({selectedColumns.length}/{ALL_COLUMNS.length})
             </button>
 
-            <button
-              onClick={() => executeQuery(1, limit)}
-              disabled={loading}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-[#123b63] hover:bg-[#0e2f50] text-white text-xs font-bold rounded-xl transition shadow-sm disabled:opacity-50"
-            >
-              {loading ? (
-                <>
-                  <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                  Gerando Relatório...
-                </>
-              ) : (
-                <>
-                  <SlidersHorizontal className="w-4 h-4" />
-                  GERAR RELATÓRIO
-                </>
-              )}
-            </button>
+            <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+              {/* Botão de Pesquisa/Filtro de Dados na Tabela */}
+              <button
+                onClick={() => executeQuery(1, limit)}
+                disabled={loading}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-xl transition shadow-sm disabled:opacity-50 border border-gray-300"
+                title="Filtrar dados na tabela abaixo"
+              >
+                {loading ? (
+                  <>
+                    <div className="w-4 h-4 rounded-full border-2 border-[#123b63] border-t-transparent animate-spin" />
+                    Filtrando...
+                  </>
+                ) : (
+                  <>
+                    <SlidersHorizontal className="w-4 h-4 text-[#123b63]" />
+                    FILTRAR TABELA
+                  </>
+                )}
+              </button>
+
+              {/* Botão Principal: GERAR RELATÓRIO (PDF Executivo Consolidado) */}
+              <button
+                onClick={handleGerarPDFConsolidado}
+                disabled={generatingPdf || loading}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-[#123b63] hover:bg-[#0e2f50] text-white text-xs font-bold rounded-xl transition shadow-sm disabled:opacity-50"
+                title="Gerar documento executivo consolidado em PDF com gráficos para a Presidência"
+              >
+                {generatingPdf ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-[#c59b27]" />
+                    Gerando Relatório PDF...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-4 h-4 text-[#c59b27]" />
+                    GERAR RELATÓRIO (PDF)
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 

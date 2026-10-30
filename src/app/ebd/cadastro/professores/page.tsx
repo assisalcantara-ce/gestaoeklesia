@@ -10,6 +10,7 @@ import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organi
 import { useAppDialog } from '@/providers/AppDialogProvider';
 import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { Plus, Pencil, Trash2, X, GraduationCap, Printer, Search } from 'lucide-react';
+import { buildAccentInsensitiveRegex } from '@/lib/search-normalizer';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Congregacao  { id: string; nome: string; }
@@ -91,14 +92,20 @@ export default function EbdProfessoresPage() {
 
     buscaRef.current = setTimeout(async () => {
       setBuscandoMembro(true);
-      const { data } = await supabase
+      const regex = buildAccentInsensitiveRegex(buscaMembro);
+      let query = supabase
         .from('members')
         .select('id, name, phone, email')
         .eq('ministry_id', ministryId)
-        .eq('status', 'active')
-        .ilike('name', `${buscaMembro}%`)
-        .order('name')
-        .limit(8);
+        .eq('status', 'active');
+
+      if (regex) {
+        query = query.filter('name', 'imatch', regex);
+      } else {
+        query = query.ilike('name', `${buscaMembro}%`);
+      }
+
+      const { data } = await query.order('name').limit(8);
       setSugestoes(data ?? []);
       setBuscandoMembro(false);
     }, 300);

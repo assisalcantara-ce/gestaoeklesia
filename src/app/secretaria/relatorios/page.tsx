@@ -13,6 +13,8 @@ import {
   SlidersHorizontal,
   RefreshCw,
   Building2,
+  FileText,
+  Loader2,
 } from 'lucide-react';
 import PageLayout from '@/components/PageLayout';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
@@ -27,6 +29,8 @@ import GrowthMovementTab from '@/components/secretaria/relatorios/GrowthMovement
 import MinisterialLettersReportTab from '@/components/secretaria/relatorios/MinisterialLettersReportTab';
 import BaptismsAndActsReportTab from '@/components/secretaria/relatorios/BaptismsAndActsReportTab';
 import CustomReportBuilderTab from '@/components/secretaria/relatorios/CustomReportBuilderTab';
+import { fetchConfiguracaoIgrejaFromSupabase, formatarEnderecoCompleto } from '@/lib/igreja-config-utils';
+import { gerarRelatorioGerencialSecretariaPDF, DadosRelatorioGerencialSecretaria } from '@/lib/secretaria-relatorio-gerencial-pdf';
 
 // ─── DEFINIÇÃO DE ABAS ─────────────────────────────────────────────────────────
 
@@ -118,6 +122,86 @@ export default function RelatoriosSecretariaPage() {
     loadSummaryData();
   }, [userCtx.loading, loadSummaryData]);
 
+  // Estado de geração do relatório PDF executivo
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+
+  const handleGerarPDFExecutivo = async () => {
+    try {
+      setGeneratingPdf(true);
+
+      // 1. Obter dados mais recentes se não houver ou para garantir frescor
+      let dataToUse = summaryData;
+      if (!dataToUse) {
+        const url = new URL('/api/v1/secretaria/relatorios/summary', window.location.origin);
+        if (selectedCongregacao && selectedCongregacao !== 'todas') {
+          url.searchParams.set('congregacao_id', selectedCongregacao);
+        }
+        const res = await authenticatedFetch(url.toString(), {
+          headers: { 'Cache-Control': 'no-cache' },
+        });
+        if (!res.ok) throw new Error('Não foi possível obter os dados consolidados.');
+        const json = await res.json();
+        dataToUse = json.data;
+      }
+
+      // 2. Obter dados de perfil da Igreja / Ministério
+      const configIgreja = await fetchConfiguracaoIgrejaFromSupabase().catch(() => null);
+
+      const nomeMinisterio = configIgreja?.nome || 'Igreja Evangélica';
+      const enderecoCompleto = configIgreja
+        ? formatarEnderecoCompleto({
+            logradouro: configIgreja.logradouro,
+            numero: configIgreja.numero,
+            complemento: configIgreja.complemento,
+            bairro: configIgreja.bairro,
+            cidade: configIgreja.cidade,
+            estado: configIgreja.estado,
+            cep: configIgreja.cep,
+          }) || configIgreja.endereco
+        : '';
+
+      const escopoNome =
+        selectedCongregacao === 'todas'
+          ? 'Todas as Congregações'
+          : congregacoes.find((c) => c.id === selectedCongregacao)?.nome || 'Unidade Local';
+
+      const dataFormatada = new Intl.DateTimeFormat('pt-BR', {
+        dateStyle: 'long',
+        timeStyle: 'short',
+      }).format(new Date());
+
+      const payload: DadosRelatorioGerencialSecretaria = {
+        nomeMinisterio,
+        subtituloMinisterio: configIgreja?.descricao || 'Convenção e Ministério Eclesiástico',
+        cnpjMinisterio: configIgreja?.cnpj || null,
+        enderecoMinisterio: enderecoCompleto || null,
+        telefoneMinisterio: configIgreja?.telefone || null,
+        emailMinisterio: configIgreja?.email || null,
+        responsavelMinisterio: configIgreja?.responsavel || 'Pastor Presidente',
+        logoMinisterioUrl: configIgreja?.logo || null,
+        escopoCongregacao: escopoNome,
+        dataEmissao: dataFormatada,
+        emitidoPor: 'Secretaria Geral',
+        executiveMetrics: dataToUse.executiveMetrics,
+        demographics: dataToUse.demographics,
+        growthTrends: dataToUse.growthTrends || [],
+        congregacoesDistribution: dataToUse.congregacoesDistribution || [],
+        lettersStats: dataToUse.lettersStats,
+        baptismsAndActs: dataToUse.baptismsAndActs,
+      };
+
+      const doc = await gerarRelatorioGerencialSecretariaPDF(payload);
+      const safeEscopo = escopoNome.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      const filename = `relatorio_gerencial_secretaria_${safeEscopo}_${new Date().toISOString().slice(0, 10)}.pdf`;
+      doc.save(filename);
+    } catch (err: any) {
+      console.error('Erro ao gerar PDF gerencial:', err);
+      alert(`Erro ao gerar PDF institucional: ${err?.message || 'Tente novamente.'}`);
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
   const handleRefresh = () => {
     setRefreshing(true);
     loadSummaryData();
@@ -164,6 +248,27 @@ export default function RelatoriosSecretariaPage() {
             title="Atualizar dados"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-[#123b63]' : ''}`} />
+          </button>
+
+          {/* Botão Oficial: Gerar Relatório Executivo (PDF Institucional para Presidência) */}
+          <button
+            onClick={handleGerarPDFExecutivo}
+            disabled={generatingPdf || loading || !summaryData}
+            className="flex items-center gap-2 px-3.5 py-1.5 bg-[#123b63] hover:bg-[#0e2f50] text-white text-xs font-bold rounded-xl transition shadow-sm disabled:opacity-50"
+            title="Gerar documento executivo consolidado em PDF para apresentação à Presidência"
+          >
+            {generatingPdf ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Gerando PDF...</span>
+              </>
+            ) : (
+              <>
+                <FileText className="w-4 h-4 text-[#c59b27]" />
+                <span className="hidden sm:inline">Gerar Relatório Executivo (PDF)</span>
+                <span className="sm:hidden">Gerar PDF</span>
+              </>
+            )}
           </button>
         </div>
       }

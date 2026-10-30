@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageLayout from '@/components/PageLayout';
-import Tabs from '@/components/Tabs';
 import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
 import { useRequireSupabaseAuth } from '@/hooks/useRequireSupabaseAuth';
@@ -32,6 +31,15 @@ import {
   CheckCircle,
   Clock,
   XCircle,
+  FileText,
+  Inbox,
+  History,
+  Shield,
+  FileSignature,
+  Search,
+  UserCheck,
+  Loader2,
+  X,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { CartasService, type VerificacaoAutorizacaoCarta } from '@/services/cartas-service';
@@ -203,6 +211,13 @@ export default function CartasPage() {
   const [records, setRecords] = useState<CartaRegistro[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState<string>('');
+  const [selectedMemberObject, setSelectedMemberObject] = useState<Member | null>(null);
+
+  // Estados para busca dinâmica de membros
+  const [memberSearchTerm, setMemberSearchTerm] = useState('');
+  const [memberSearchResults, setMemberSearchResults] = useState<Member[]>([]);
+  const [isSearchingMembers, setIsSearchingMembers] = useState(false);
+  const [searchMemberError, setSearchMemberError] = useState<string | null>(null);
   const [configIgreja, setConfigIgreja] = useState<ConfiguracaoIgreja>({
     nome: 'Igreja/Ministerio',
     endereco: '',
@@ -225,26 +240,55 @@ export default function CartasPage() {
 
   const [previewScale, setPreviewScale] = useState(1);
   const previewContainerRef = useRef<HTMLDivElement>(null);
+  const formCardRef = useRef<HTMLDivElement>(null);
+  const previewHeaderRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const updatePreviewScale = () => {
-      if (!previewContainerRef.current) return;
-      const containerWidth = previewContainerRef.current.clientWidth;
-      if (!containerWidth) return;
-      const padding = 24;
-      const availableWidth = containerWidth - padding;
-      if (availableWidth < CANVAS_A4.width) {
-        const fit = Math.max(0.35, Math.min(1, availableWidth / CANVAS_A4.width));
-        setPreviewScale(Math.round(fit * 100) / 100);
-      } else {
-        setPreviewScale(1);
-      }
+    if (!previewContainerRef.current) return;
+
+    const el = previewContainerRef.current;
+    const calculateScale = () => {
+      const containerWidth = el.clientWidth;
+      if (!containerWidth || containerWidth <= 0) return;
+
+      const paddingX = 24; // folga interna horizontal
+      const availW = Math.max(100, containerWidth - paddingX);
+
+      // Altura disponível: alinhar borda inferior do card de preview exatamente à borda inferior do formulário
+      const formH = formCardRef.current?.clientHeight || 0;
+      const headerH = previewHeaderRef.current?.clientHeight || 56;
+      // Deduzimos o cabeçalho, padding do card (40px), gaps e mais 60px para calibrar a borda inferior na mesma linha horizontal
+      const availableCardHeight = formH > 300 ? formH - headerH - 124 : 540;
+      const availH = Math.max(220, availableCardHeight);
+
+      const scaleW = availW / CANVAS_A4.width;
+      const scaleH = availH / CANVAS_A4.height;
+
+      // O menor fator garante que o documento caiba 100% sem cortes e alinhe perfeitamente na base
+      const fit = Math.min(scaleW, scaleH);
+      const finalScale = Math.max(0.15, Math.min(1, Math.round(fit * 1000) / 1000));
+      setPreviewScale(finalScale);
     };
 
-    updatePreviewScale();
-    window.addEventListener('resize', updatePreviewScale);
-    return () => window.removeEventListener('resize', updatePreviewScale);
-  }, [canvasContent.width]);
+    calculateScale();
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        calculateScale();
+      });
+      resizeObserver.observe(el);
+      if (formCardRef.current) {
+        resizeObserver.observe(formCardRef.current);
+      }
+    }
+
+    window.addEventListener('resize', calculateScale);
+    return () => {
+      if (resizeObserver) resizeObserver.disconnect();
+      window.removeEventListener('resize', calculateScale);
+    };
+  }, [canvasContent.width, activeTab, selectedTemplate, selectedMemberId]);
 
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -432,23 +476,18 @@ export default function CartasPage() {
 
   const pedidosPendentesCount = pedidosRecebidos.filter(p => p.status === 'pendente').length;
 
-  const tabs = [
-    { id: 'emitir', label: 'Emitir', icon: '📄' },
-    {
-      id: 'pedidos',
-      label: pedidosPendentesCount > 0 ? `Pedidos (${pedidosPendentesCount})` : 'Pedidos',
-      icon: '📬',
-    },
-    { id: 'historico', label: 'Histórico', icon: '🗂️' },
-  ];
-
-  const visibleTabs = tabs;
   const templatesFiltrados = templates;
 
-  const selectedMember = useMemo(
-    () => members.find((m) => m.id === selectedMemberId) || null,
-    [members, selectedMemberId]
-  );
+  const selectedMember = useMemo(() => {
+    if (selectedMemberObject && selectedMemberObject.id === selectedMemberId) {
+      return selectedMemberObject;
+    }
+    return (
+      members.find((m) => m.id === selectedMemberId) ||
+      memberSearchResults.find((m) => m.id === selectedMemberId) ||
+      null
+    );
+  }, [members, selectedMemberId, selectedMemberObject, memberSearchResults]);
 
   const [autorizacaoStatus, setAutorizacaoStatus] = useState<VerificacaoAutorizacaoCarta>({
     status: 'isento',
@@ -1203,14 +1242,38 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
     }
   };
 
-  const loadMembers = async () => {
-    try {
-      const res = await fetchMembers(1, 500, { status: 'active' });
-      const list = ((res as any)?.data || []) as Member[];
-      setMembers(list);
-    } catch (err) {
-      setMembers([]);
+  // Busca dinâmica de membros (com debounce e mínimo de 3 caracteres)
+  useEffect(() => {
+    const term = memberSearchTerm.trim();
+    if (term.length < 3) {
+      setMemberSearchResults([]);
+      setIsSearchingMembers(false);
+      setSearchMemberError(null);
+      return;
     }
+
+    setIsSearchingMembers(true);
+    setSearchMemberError(null);
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetchMembers(1, 15, { status: 'active', search: term });
+        const list = ((res as any)?.data || []) as Member[];
+        setMemberSearchResults(list);
+      } catch (err: any) {
+        setSearchMemberError(err?.message || 'Erro ao consultar membros.');
+        setMemberSearchResults([]);
+      } finally {
+        setIsSearchingMembers(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [memberSearchTerm, fetchMembers]);
+
+  const loadMembers = async () => {
+    // Não carrega lista massiva antecipada para manter alta performance
+    setMembers([]);
   };
 
   useEffect(() => {
@@ -1844,101 +1907,194 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
         </div>
       )}
 
-      <div className="relative font-sans">
-        <div className="absolute inset-0 -z-10">
-          <div className="absolute inset-0 bg-gradient-to-br from-[#fff7ed] via-white to-[#e0f2fe]" />
-          <div className="absolute -right-16 -top-20 h-72 w-72 rounded-full bg-[#f97316]/15 blur-3xl" />
-          <div className="absolute -left-10 bottom-0 h-72 w-72 rounded-full bg-[#0ea5e9]/15 blur-3xl" />
-        </div>
-
-        <div className="mb-6 rounded-2xl border border-white/70 bg-white/70 p-6 shadow-lg backdrop-blur motion-safe:animate-fade-in">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="space-y-2">
-              <p className="text-xs uppercase tracking-[0.3em] text-amber-600">Secretaria geral</p>
-              <h2 className="font-serif text-2xl md:text-3xl font-bold text-[#123b63]">
-                Cartas e Declarações com elegância e rapidez
-              </h2>
-              <p className="text-sm text-gray-600 max-w-xl">
-                Crie modelos com identidade visual, emita em segundos e reimprima com consistência.
-              </p>
-            </div>
-            <div className="grid w-full max-w-xl grid-cols-1 gap-3 sm:grid-cols-3">
-              <div
-                className="rounded-xl border border-white/70 bg-white/80 p-3 text-center shadow-sm backdrop-blur motion-safe:animate-rise-in flex flex-col justify-between"
-                style={{ animationDelay: '0.05s' }}
-              >
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-gray-400">Modelos</p>
-                  <p className="text-lg font-semibold text-[#123b63]">{templates.length}</p>
-                </div>
+      <div className="relative font-sans space-y-6">
+        {/* Cabeçalho Limpo e Profissional */}
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-blue-50 text-blue-700 border border-blue-200">
+                  <Shield className="w-3 h-3 text-blue-600" />
+                  Secretaria Geral
+                </span>
                 {userCtx.isMaster && (
                   <button
                     type="button"
                     onClick={() => router.push('/configuracoes/cartas')}
-                    className="mt-1 text-[10px] text-teal-700 hover:text-teal-900 font-bold underline"
-                    title="Gerenciar modelos de cartas e declarações em Configurações (exclusivo MASTER)"
+                    className="text-[11px] font-semibold text-slate-500 hover:text-blue-700 underline transition"
+                    title="Configurações de modelos"
                   >
-                    Gerenciar (Configurações) →
+                    Gerenciar Modelos &rarr;
                   </button>
                 )}
               </div>
-              <div
-                className="rounded-xl border border-white/70 bg-white/80 p-3 text-center shadow-sm backdrop-blur motion-safe:animate-rise-in"
-                style={{ animationDelay: '0.1s' }}
-              >
-                <p className="text-[11px] uppercase tracking-[0.2em] text-gray-400">Emitidos</p>
-                <p className="text-lg font-semibold text-[#123b63]">{records.length}</p>
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                Emissão de Cartas e Declarações
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-500 font-medium max-w-xl">
+                Emissão ágil e segura de documentos ministeriais oficiais com padronização visual e rastreabilidade por QR Code.
+              </p>
+            </div>
+
+            {/* Indicadores Consolidados */}
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+              <div className="px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-center min-w-[76px]">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Modelos</span>
+                <span className="text-base font-extrabold text-slate-800">{templates.length}</span>
               </div>
-              <div
-                className="rounded-xl border border-white/70 bg-white/80 p-3 text-center shadow-sm backdrop-blur motion-safe:animate-rise-in"
-                style={{ animationDelay: '0.15s' }}
-              >
-                <p className="text-[11px] uppercase tracking-[0.2em] text-gray-400">Última emissão</p>
-                <p className="text-sm font-semibold text-[#123b63]">{lastIssuedLabel}</p>
+              <div className="px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-center min-w-[76px]">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Emitidos</span>
+                <span className="text-base font-extrabold text-slate-800">{records.length}</span>
               </div>
+              {lastIssuedLabel !== 'Nenhuma emissão' && (
+                <div className="hidden lg:block px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Última Emissão</span>
+                  <span className="text-xs font-bold text-slate-700">{lastIssuedLabel}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Barra de Navegação Visualmente Destacada */}
+          <div className="mt-5 pt-4 border-t border-slate-100">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {/* Opção 1: Emitir Documento */}
+              <button
+                type="button"
+                onClick={() => setActiveTab('emitir')}
+                className={`flex items-center justify-between p-3.5 rounded-xl border font-bold text-xs transition-all ${
+                  activeTab === 'emitir'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/20 ring-2 ring-blue-600/20'
+                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className={`p-2 rounded-lg ${
+                      activeTab === 'emitir' ? 'bg-white/20 text-white' : 'bg-white text-blue-600 shadow-xs'
+                    }`}
+                  >
+                    <FileSignature className="w-4 h-4" />
+                  </div>
+                  <div className="text-left">
+                    <span className="block font-black text-xs">Emitir Documento</span>
+                    <span className={`text-[10px] font-normal ${activeTab === 'emitir' ? 'text-blue-100' : 'text-slate-400'}`}>
+                      Novo preenchimento e impressão
+                    </span>
+                  </div>
+                </div>
+                {activeTab === 'emitir' && <span className="text-xs">●</span>}
+              </button>
+
+              {/* Opção 2: Pedidos Recebidos */}
+              <button
+                type="button"
+                onClick={() => setActiveTab('pedidos')}
+                className={`flex items-center justify-between p-3.5 rounded-xl border font-bold text-xs transition-all ${
+                  activeTab === 'pedidos'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/20 ring-2 ring-blue-600/20'
+                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className={`p-2 rounded-lg relative ${
+                      activeTab === 'pedidos' ? 'bg-white/20 text-white' : 'bg-white text-blue-600 shadow-xs'
+                    }`}
+                  >
+                    <Inbox className="w-4 h-4" />
+                  </div>
+                  <div className="text-left">
+                    <span className="block font-black text-xs">Pedidos de Cartas</span>
+                    <span className={`text-[10px] font-normal ${activeTab === 'pedidos' ? 'text-blue-100' : 'text-slate-400'}`}>
+                      Solicitações das congregações
+                    </span>
+                  </div>
+                </div>
+                {pedidosPendentesCount > 0 ? (
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                      activeTab === 'pedidos'
+                        ? 'bg-amber-400 text-slate-900 shadow-xs'
+                        : 'bg-amber-500 text-white'
+                    }`}
+                  >
+                    {pedidosPendentesCount} pendente{pedidosPendentesCount > 1 ? 's' : ''}
+                  </span>
+                ) : (
+                  activeTab === 'pedidos' && <span className="text-xs">●</span>
+                )}
+              </button>
+
+              {/* Opção 3: Histórico */}
+              <button
+                type="button"
+                onClick={() => setActiveTab('historico')}
+                className={`flex items-center justify-between p-3.5 rounded-xl border font-bold text-xs transition-all ${
+                  activeTab === 'historico'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/20 ring-2 ring-blue-600/20'
+                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className={`p-2 rounded-lg ${
+                      activeTab === 'historico' ? 'bg-white/20 text-white' : 'bg-white text-blue-600 shadow-xs'
+                    }`}
+                  >
+                    <History className="w-4 h-4" />
+                  </div>
+                  <div className="text-left">
+                    <span className="block font-black text-xs">Histórico Oficial</span>
+                    <span className={`text-[10px] font-normal ${activeTab === 'historico' ? 'text-blue-100' : 'text-slate-400'}`}>
+                      {records.length} documento{records.length !== 1 ? 's' : ''} emitido{records.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                </div>
+                {activeTab === 'historico' && <span className="text-xs">●</span>}
+              </button>
             </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/70 bg-white/80 shadow-xl/10 backdrop-blur">
-          <div className="p-4 md:p-6">
-            <Tabs tabs={visibleTabs} activeTab={activeTab} onTabChange={setActiveTab}>
+        {/* Área de Conteúdo da Aba Ativa */}
+        <div>
         {activeTab === 'emitir' && (
-          <Section icon="📄" title="Emitir Documento">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              {/* Formulário Guiado em Passos (Coluna Esquerda) */}
-              <div className="lg:col-span-5 space-y-4">
-                <div className="rounded-2xl border border-white/80 bg-white/90 p-5 shadow-sm space-y-5 backdrop-blur">
+            <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6 items-start w-full">
+              {/* Formulário Guiado em Etapas Claras (Coluna Esquerda - 60% da largura) */}
+              <div className="w-full min-w-0 space-y-4">
+                <div ref={formCardRef} className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-7 shadow-sm space-y-5">
                   
-                  {/* Passo 1: Tipo de Documento */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-teal-100 text-[11px] font-bold text-teal-800">
+                  {/* Etapa 1: Tipo de Documento */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center gap-2 pb-1.5 border-b border-slate-100">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[11px] font-black text-blue-800">
                         1
                       </span>
-                      <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                      <label className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
                         Tipo de Documento
                       </label>
                     </div>
-                    <div className="grid grid-cols-3 gap-1.5 p-1 bg-gray-100 rounded-xl">
+
+                    <div className="grid grid-cols-3 gap-2 p-1.5 bg-slate-100 rounded-xl border border-slate-200">
                       <button
                         type="button"
                         onClick={() => setEmitirCategoria('todas')}
-                        className={`py-2 text-xs font-bold rounded-lg transition ${
+                        className={`py-2.5 text-xs font-bold rounded-lg transition-all ${
                           emitirCategoria === 'todas'
-                            ? 'bg-white text-teal-800 shadow-sm'
-                            : 'text-gray-600 hover:text-gray-900'
+                            ? 'bg-white text-slate-900 shadow-xs border border-slate-200 font-extrabold'
+                            : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        Todos
+                        Todos ({templatesFiltrados.length})
                       </button>
                       <button
                         type="button"
                         onClick={() => setEmitirCategoria('carta')}
-                        className={`py-2 text-xs font-bold rounded-lg transition flex items-center justify-center gap-1 ${
+                        className={`py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
                           emitirCategoria === 'carta'
-                            ? 'bg-white text-blue-800 shadow-sm'
-                            : 'text-gray-600 hover:text-blue-800'
+                            ? 'bg-blue-600 text-white shadow-xs font-extrabold'
+                            : 'text-blue-700 hover:bg-blue-50'
                         }`}
                       >
                         <span>📜</span>
@@ -1947,10 +2103,10 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                       <button
                         type="button"
                         onClick={() => setEmitirCategoria('declaracao')}
-                        className={`py-2 text-xs font-bold rounded-lg transition flex items-center justify-center gap-1 ${
+                        className={`py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
                           emitirCategoria === 'declaracao'
-                            ? 'bg-white text-emerald-800 shadow-sm'
-                            : 'text-gray-600 hover:text-emerald-800'
+                            ? 'bg-emerald-600 text-white shadow-xs font-extrabold'
+                            : 'text-emerald-700 hover:bg-emerald-50'
                         }`}
                       >
                         <span>📄</span>
@@ -1959,38 +2115,39 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                     </div>
                   </div>
 
-                  {/* Passo 2: Seleção do Modelo */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
+                  {/* Etapa 2: Seleção do Modelo */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
                       <div className="flex items-center gap-2">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-teal-100 text-[11px] font-bold text-teal-800">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[11px] font-black text-blue-800">
                           2
                         </span>
-                        <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                        <label className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
                           Modelo do Documento
                         </label>
                       </div>
                       {selectedTemplate && (
                         <span
-                          className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
                             selectedTemplate.categoria === 'declaracao'
                               ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                               : 'bg-blue-50 text-blue-800 border border-blue-200'
                           }`}
                         >
-                          {selectedTemplate.categoria === 'declaracao' ? '📄 Declaração' : '📜 Carta'}
+                          {selectedTemplate.categoria === 'declaracao' ? '📄 Declaração' : '📜 Carta Oficial'}
                         </span>
                       )}
                     </div>
+
                     <select
                       value={selectedTemplate?.id || ''}
                       onChange={(e) => {
                         const tpl = templatesFiltrados.find((t) => t.id === e.target.value);
                         if (tpl) handleSelectTemplate(tpl);
                       }}
-                      className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-gray-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 shadow-sm"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-xs"
                     >
-                      <option value="" disabled>Selecione o modelo desejado</option>
+                      <option value="" disabled>Selecione o modelo desejado...</option>
                       {templatesFiltrados
                         .filter((t) => emitirCategoria === 'todas' || (t.categoria || 'carta') === emitirCategoria)
                         .map((tpl) => (
@@ -1999,119 +2156,250 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                           </option>
                         ))}
                     </select>
-                  </div>
 
-                  {/* Aviso de Cartas com deliberação presidencial obrigatória */}
-                  {selectedTemplate && CartasService.exigeAutorizacaoPresidencial(selectedTemplate.tipo || selectedTemplate.template_key) && (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 space-y-2">
-                      <div className="flex items-center gap-2 text-amber-800">
-                        <span className="text-sm">⚠️</span>
-                        <p className="text-xs font-bold">Carta de Mudança ou Desligamento?</p>
-                      </div>
-                      <p className="text-xs text-amber-700 leading-relaxed">
-                        Essas cartas exigem autorização da Presidência. Preencha os dados abaixo e clique diretamente em <strong>“Registrar Pedido de Carta”</strong> para encaminhar à deliberação presidencial sem sair desta tela.
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Passo 3: Selecione o Membro */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-teal-100 text-[11px] font-bold text-teal-800">
-                        3
-                      </span>
-                      <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        Membro Destinatário
-                      </label>
-                    </div>
-                    <select
-                      value={selectedMemberId}
-                      onChange={(e) => setSelectedMemberId(e.target.value)}
-                      className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-xs font-medium text-gray-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 shadow-sm"
-                    >
-                      <option value="">Selecione o membro...</option>
-                      {members.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name} {m.cargo_ministerial ? `(${m.cargo_ministerial})` : ''}
-                        </option>
-                      ))}
-                    </select>
-
-                    {/* Resumo do Membro Selecionado */}
-                    {selectedMember && (
-                      <div className="rounded-xl border border-teal-100 bg-teal-50/50 p-2.5 text-xs text-teal-900 flex items-center justify-between">
-                        <div>
-                          <p className="font-bold">{selectedMember.name}</p>
-                          <p className="text-[11px] text-teal-700">
-                            {selectedMember.email || selectedMember.phone || 'Sem contato cadastrado'}
+                    {/* Aviso Objetivo de Governança para Cartas que Exigem Presidência */}
+                    {selectedTemplate && CartasService.exigeAutorizacaoPresidencial(selectedTemplate.tipo || selectedTemplate.template_key) && (
+                      <div className="rounded-xl border border-amber-300 bg-amber-50/90 p-3 text-xs text-amber-900 flex items-start gap-2.5">
+                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                        <div className="space-y-0.5">
+                          <p className="font-bold">Autorização Presidencial Obrigatória</p>
+                          <p className="text-[11px] text-amber-800 leading-relaxed font-normal">
+                            Cartas de Mudança ou Desligamento exigem aprovação da Presidência antes da emissão definitiva.
                           </p>
                         </div>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800">
-                          {selectedMember.status || 'Ativo'}
-                        </span>
                       </div>
                     )}
                   </div>
 
-                  {/* Passo 4: Informações Adicionais */}
+                  {/* Etapa 3: Destinatário (Membro) */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[11px] font-black text-blue-800">
+                          3
+                        </span>
+                        <label className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                          Destinatário (Membro)
+                        </label>
+                      </div>
+                      {selectedMember && (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                          <UserCheck className="w-3 h-3" />
+                          <span>Membro Selecionado</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Caso NÃO tenha membro selecionado: Exibir campo de busca e lista de resultados */}
+                    {!selectedMember ? (
+                      <div className="space-y-2 relative">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={memberSearchTerm}
+                            onChange={(e) => setMemberSearchTerm(e.target.value)}
+                            placeholder="Digite pelo menos 3 letras do nome do membro..."
+                            className="w-full rounded-xl border border-slate-300 bg-white pl-9 pr-9 py-2.5 text-xs font-medium text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-xs placeholder:text-slate-400"
+                          />
+                          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                          {isSearchingMembers && (
+                            <Loader2 className="w-4 h-4 text-blue-600 animate-spin absolute right-3 top-3" />
+                          )}
+                          {!isSearchingMembers && memberSearchTerm.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMemberSearchTerm('');
+                                setMemberSearchResults([]);
+                              }}
+                              className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 p-0.5"
+                              title="Limpar busca"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Orientações / feedback de busca */}
+                        {memberSearchTerm.trim().length > 0 && memberSearchTerm.trim().length < 3 && (
+                          <p className="text-[11px] text-slate-400 font-medium px-1">
+                            Digite mais {3 - memberSearchTerm.trim().length} letra{3 - memberSearchTerm.trim().length > 1 ? 's' : ''} para buscar...
+                          </p>
+                        )}
+
+                        {searchMemberError && (
+                          <p className="text-[11px] text-red-600 font-medium px-1">
+                            {searchMemberError}
+                          </p>
+                        )}
+
+                        {/* Lista de resultados dinâmica */}
+                        {memberSearchTerm.trim().length >= 3 && !isSearchingMembers && memberSearchResults.length === 0 && !searchMemberError && (
+                          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 p-3 text-center text-xs text-slate-500">
+                            Nenhum membro ativo encontrado com o termo &ldquo;{memberSearchTerm}&rdquo;.
+                          </div>
+                        )}
+
+                        {memberSearchResults.length > 0 && (
+                          <div className="rounded-xl border border-slate-200 bg-white shadow-lg max-h-56 overflow-y-auto divide-y divide-slate-100 z-10">
+                            {memberSearchResults.map((m) => {
+                              const cf = (m.custom_fields && typeof m.custom_fields === 'object') ? m.custom_fields : {};
+                              const cargo = String(m.cargo_ministerial || (cf as any).cargoMinisterial || (cf as any).cargo_ministerial || '');
+                              const congId = m.congregacao_id || (cf as any).congregacao_id;
+                              const congNome = congregacoes.find((c) => c.id === congId)?.nome || String((cf as any).supervisao || (cf as any).congregacao || (cf as any).congregacao_nome || '');
+
+                              return (
+                                <button
+                                  key={m.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedMemberId(m.id);
+                                    setSelectedMemberObject(m);
+                                    setMemberSearchTerm('');
+                                    setMemberSearchResults([]);
+                                  }}
+                                  className="w-full text-left p-3 hover:bg-blue-50/80 transition flex items-center justify-between gap-3 group"
+                                >
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-bold text-slate-800 group-hover:text-blue-700 truncate">
+                                      {m.name}
+                                    </p>
+                                    <p className="text-[11px] text-slate-500 truncate">
+                                      {[cargo, congNome, m.phone ? `Tel: ${m.phone}` : null]
+                                        .filter(Boolean)
+                                        .join(' • ') || 'Membro do Ministério'}
+                                    </p>
+                                  </div>
+                                  <span className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 group-hover:bg-blue-600 group-hover:text-white transition">
+                                    Selecionar
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      /* Card compacto com os dados do membro selecionado e botão vermelho X — Remover */
+                      <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3.5 text-xs text-blue-900 flex items-center justify-between gap-3 shadow-xs">
+                        <div className="min-w-0 space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <p className="font-extrabold text-slate-900 truncate text-xs sm:text-sm">
+                              {selectedMember.name}
+                            </p>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 uppercase shrink-0">
+                              {selectedMember.status || 'Ativo'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 truncate">
+                            {(() => {
+                              const cf = (selectedMember.custom_fields && typeof selectedMember.custom_fields === 'object') ? selectedMember.custom_fields : {};
+                              const cargo = String(selectedMember.cargo_ministerial || (cf as any).cargoMinisterial || (cf as any).cargo_ministerial || '');
+                              const congId = selectedMember.congregacao_id || (cf as any).congregacao_id;
+                              const congNome = congregacoes.find((c) => c.id === congId)?.nome || String((cf as any).supervisao || (cf as any).congregacao || (cf as any).congregacao_nome || '');
+                              return [
+                                cargo,
+                                congNome ? `Congregação: ${congNome}` : null,
+                                selectedMember.cpf ? `CPF: ${selectedMember.cpf}` : null,
+                              ]
+                                .filter(Boolean)
+                                .join(' • ') || 'Dados cadastrais validados';
+                            })()}
+                          </p>
+                        </div>
+
+                        {/* Botão vermelho X — Remover */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedMemberId('');
+                            setSelectedMemberObject(null);
+                            setMemberSearchTerm('');
+                            setMemberSearchResults([]);
+                          }}
+                          className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-xs transition active:scale-95"
+                          title="Remover seleção e buscar outro membro"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          <span>Remover</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Etapa 4: Informações do Documento */}
                   <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-teal-100 text-[11px] font-bold text-teal-800">
+                    <div className="flex items-center gap-2 pb-1.5 border-b border-slate-100">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[11px] font-black text-blue-800">
                         4
                       </span>
-                      <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                      <label className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
                         Informações do Documento
                       </label>
                     </div>
+
                     <div>
-                      <label className="text-[11px] font-semibold text-gray-500 block mb-1">
-                        Destino / Finalidade
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                        Destino ou Finalidade
                       </label>
                       <input
                         value={issueFields.destino}
                         onChange={(e) => setIssueFields((prev) => ({ ...prev, destino: e.target.value }))}
-                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 shadow-sm"
-                        placeholder="Ex: Igreja Evangélica Betel / Fins acadêmicos"
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-xs"
+                        placeholder="Ex: Igreja Evangélica Betel / Fins de comprovação eclesiástica"
                       />
                     </div>
-                    <div>
-                      <label className="text-[11px] font-semibold text-gray-500 block mb-1">
-                        Motivo
-                      </label>
-                      <textarea
-                        rows={2}
-                        value={issueFields.motivo}
-                        onChange={(e) => setIssueFields((prev) => ({ ...prev, motivo: e.target.value }))}
-                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 shadow-sm"
-                        placeholder="Descreva o motivo ou justificativa"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-semibold text-gray-500 block mb-1">
-                        Observações Complementares
-                      </label>
-                      <textarea
-                        rows={2}
-                        value={issueFields.observacoes}
-                        onChange={(e) => setIssueFields((prev) => ({ ...prev, observacoes: e.target.value }))}
-                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 shadow-sm"
-                        placeholder="Observações internas ou adicionais"
-                      />
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                          Motivo ou Justificativa
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={issueFields.motivo}
+                          onChange={(e) => setIssueFields((prev) => ({ ...prev, motivo: e.target.value }))}
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-xs"
+                          placeholder="Justificativa da emissão ou mudança de domicílio"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                          Observações Complementares (Opcional)
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={issueFields.observacoes}
+                          onChange={(e) => setIssueFields((prev) => ({ ...prev, observacoes: e.target.value }))}
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-xs"
+                          placeholder="Anotações internas da secretaria"
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  {/* Passo 5: Ação de Emissão */}
-                  <div className="pt-2 border-t border-gray-100 space-y-3">
+                  {/* Etapa 5: Emissão e Validação */}
+                  <div className="pt-3.5 border-t border-slate-200 space-y-3">
+                    <div className="flex items-center gap-2 pb-1">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[11px] font-black text-blue-800">
+                        5
+                      </span>
+                      <label className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                        Emissão Oficial
+                      </label>
+                    </div>
+
                     {/* Alertas e Status da Deliberação Presidencial */}
                     {autorizacaoStatus.exigeAutorizacao && selectedMemberId && (
-                      <div>
+                      <div className="space-y-2">
                         {autorizacaoStatus.status === 'pendente' && (
-                          <div className="rounded-xl border border-amber-300 bg-amber-50 p-3.5 space-y-2">
-                            <div className="flex items-center gap-1.5 text-amber-800 text-xs font-bold">
+                          <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 space-y-2 text-xs text-amber-900">
+                            <div className="flex items-center gap-1.5 font-bold">
                               <Clock className="h-4 w-4 shrink-0 text-amber-600" />
                               <span>Aguardando Deliberação da Presidência</span>
                             </div>
-                            <p className="text-[11px] text-amber-700 leading-relaxed">
+                            <p className="text-[11px] text-amber-800 leading-relaxed font-normal">
                               {autorizacaoStatus.mensagem}
                             </p>
                             <div className="flex items-center justify-between pt-1 text-[11px]">
@@ -2119,51 +2407,51 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                                 type="button"
                                 onClick={() => checkAuth()}
                                 disabled={verificandoAutorizacao}
-                                className="inline-flex items-center gap-1 font-semibold text-amber-800 hover:text-amber-950 underline disabled:opacity-50"
+                                className="inline-flex items-center gap-1 font-bold text-amber-800 hover:text-amber-950 underline disabled:opacity-50"
                               >
                                 <RotateCcw className={`h-3 w-3 ${verificandoAutorizacao ? 'animate-spin' : ''}`} />
-                                <span>{verificandoAutorizacao ? 'Verificando...' : 'Verificar deliberação'}</span>
+                                <span>{verificandoAutorizacao ? 'Verificando...' : 'Checar autorização'}</span>
                               </button>
                               <button
                                 type="button"
-                                onClick={() => router.push('/secretaria/cartas/pedidos')}
-                                className="inline-flex items-center gap-1 font-semibold text-amber-900 underline hover:text-amber-950"
+                                onClick={() => setActiveTab('pedidos')}
+                                className="inline-flex items-center gap-1 font-bold text-amber-900 underline hover:text-amber-950"
                               >
-                                Ver lista de pedidos &rarr;
+                                Ir para Pedidos &rarr;
                               </button>
                             </div>
                           </div>
                         )}
 
                         {autorizacaoStatus.status === 'rejeitado' && (
-                          <div className="rounded-xl border border-red-300 bg-red-50 p-3.5 space-y-2">
-                            <div className="flex items-center gap-1.5 text-red-800 text-xs font-bold">
+                          <div className="rounded-xl border border-red-300 bg-red-50 p-3 space-y-2 text-xs text-red-900">
+                            <div className="flex items-center gap-1.5 font-bold">
                               <XCircle className="h-4 w-4 shrink-0 text-red-600" />
                               <span>Pedido Indeferido pela Presidência</span>
                             </div>
-                            <p className="text-[11px] text-red-700 leading-relaxed">
+                            <p className="text-[11px] text-red-800 leading-relaxed font-normal">
                               {autorizacaoStatus.mensagem}
                             </p>
                             {autorizacaoStatus.motivoRejeicao && (
-                              <p className="text-[11px] text-red-800 font-medium bg-red-100/70 rounded px-2.5 py-1.5 border border-red-200">
-                                <strong>Justificativa registrada:</strong> {autorizacaoStatus.motivoRejeicao}
+                              <p className="text-[11px] text-red-900 font-medium bg-red-100 rounded px-2.5 py-1.5 border border-red-200">
+                                <strong>Justificativa:</strong> {autorizacaoStatus.motivoRejeicao}
                               </p>
                             )}
                             <button
                               type="button"
                               onClick={handleRegistrarPedidoDireto}
                               disabled={registrandoPedido || !selectedMemberId || !selectedTemplate}
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 transition shadow-sm mt-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 transition shadow-xs disabled:opacity-50"
                             >
                               {registrandoPedido ? (
                                 <>
                                   <span className="inline-block animate-spin mr-1">⏳</span>
-                                  <span>Encaminhando novo pedido...</span>
+                                  <span>Reenviando...</span>
                                 </>
                               ) : (
                                 <>
                                   <Send className="h-3 w-3" />
-                                  <span>Reenviar Pedido com Justificativa Ajustada</span>
+                                  <span>Reenviar Pedido de Carta</span>
                                 </>
                               )}
                             </button>
@@ -2171,19 +2459,19 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                         )}
 
                         {autorizacaoStatus.status === 'nao_solicitado' && (
-                          <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 space-y-2">
-                            <div className="flex items-center gap-1.5 text-amber-800 text-xs font-bold">
+                          <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 space-y-2 text-xs text-amber-900">
+                            <div className="flex items-center gap-1.5 font-bold">
                               <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
-                              <span>Autorização Presidencial Obrigatória</span>
+                              <span>Deliberação Prévia Necessária</span>
                             </div>
-                            <p className="text-[11px] text-amber-700 leading-relaxed">
+                            <p className="text-[11px] text-amber-800 leading-relaxed font-normal">
                               {autorizacaoStatus.mensagem}
                             </p>
                             <button
                               type="button"
                               onClick={handleRegistrarPedidoDireto}
                               disabled={registrandoPedido || !selectedMemberId || !selectedTemplate}
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-amber-700 transition shadow-sm mt-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-amber-700 transition shadow-xs disabled:opacity-50"
                             >
                               {registrandoPedido ? (
                                 <>
@@ -2201,12 +2489,12 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                         )}
 
                         {autorizacaoStatus.status === 'autorizado' && (
-                          <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3.5 space-y-1">
-                            <div className="flex items-center gap-1.5 text-emerald-800 text-xs font-bold">
+                          <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 space-y-1 text-xs text-emerald-900">
+                            <div className="flex items-center gap-1.5 font-bold">
                               <CheckCircle className="h-4 w-4 shrink-0 text-emerald-600" />
                               <span>Autorizado pela Presidência</span>
                             </div>
-                            <p className="text-[11px] text-emerald-700 leading-relaxed">
+                            <p className="text-[11px] text-emerald-800 leading-relaxed font-normal">
                               {autorizacaoStatus.mensagem}
                             </p>
                           </div>
@@ -2214,10 +2502,15 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                       </div>
                     )}
 
+                    {/* Botão de Emissão com Estados Claros */}
                     <button
                       type="button"
                       onClick={handleIssueLetter}
-                      className="w-full rounded-xl bg-teal-600 px-4 py-3 text-xs font-bold text-white hover:bg-teal-700 shadow-md transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className={`w-full rounded-xl px-4 py-3 text-xs font-bold text-white transition flex items-center justify-center gap-2 ${
+                        isIssuing || verificandoAutorizacao || !selectedTemplate || !selectedMemberId || (autorizacaoStatus.exigeAutorizacao && !autorizacaoStatus.autorizado)
+                          ? 'bg-slate-400 cursor-not-allowed opacity-60'
+                          : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 shadow-md shadow-blue-600/20'
+                      }`}
                       disabled={
                         isIssuing ||
                         verificandoAutorizacao ||
@@ -2231,7 +2524,7 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                         {isIssuing
                           ? 'Emitindo Documento...'
                           : verificandoAutorizacao
-                          ? 'Verificando autorização presidencial...'
+                          ? 'Verificando autorização...'
                           : autorizacaoStatus.exigeAutorizacao && !autorizacaoStatus.autorizado
                           ? 'Emissão Bloqueada (Aguardando Presidência)'
                           : selectedTemplate?.categoria === 'declaracao'
@@ -2239,25 +2532,34 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                           : 'Emitir Carta Ministerial'}
                       </span>
                     </button>
+
                     {!selectedMemberId && (
-                      <p className="text-[11px] text-center text-gray-400 mt-1.5">
-                        * Selecione um membro para habilitar a emissão.
+                      <p className="text-[11px] text-center text-slate-400 font-medium">
+                        * Selecione um membro no Passo 3 para habilitar a emissão.
                       </p>
                     )}
                   </div>
                 </div>
               </div>
 
-              {/* Pré-visualização do Documento em A4 (Coluna Direita) */}
-              <div className="lg:col-span-7">
-                <div className="rounded-2xl border border-white/80 bg-white/90 p-5 shadow-sm backdrop-blur space-y-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">👁️</span>
-                      <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        Pré-visualização em Tempo Real (A4)
-                      </h3>
+              {/* Pré-visualização do Documento em A4 (Coluna Direita - 40% da largura) */}
+              <div className="w-full min-w-0">
+                <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm space-y-3 sticky top-4 flex flex-col">
+                  <div ref={previewHeaderRef} className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="p-1.5 rounded-lg bg-blue-50 text-blue-700 shrink-0">
+                        <FileText className="w-4 h-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider truncate">
+                          Pré-visualização (A4)
+                        </h3>
+                        <p className="text-[11px] text-slate-400 font-medium truncate">
+                          Miniatura integral proporcional
+                        </p>
+                      </div>
                     </div>
+
                     <button
                       type="button"
                       onClick={() => handlePrintHtml(previewHtml)}
@@ -2267,25 +2569,25 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                           ? 'Impressão bloqueada até deliberação da Presidência'
                           : 'Imprimir ou salvar em PDF'
                       }
-                      className="rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-1.5 text-xs font-bold text-gray-700 hover:bg-teal-50 hover:text-teal-800 transition flex items-center gap-1.5 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:text-blue-700 transition flex items-center gap-1.5 shadow-xs disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                     >
-                      <Printer className="h-3.5 w-3.5 text-gray-600" />
-                      <span>Imprimir / PDF</span>
+                      <Printer className="h-3.5 w-3.5 text-slate-600" />
+                      <span>Imprimir</span>
                     </button>
                   </div>
 
                   {autorizacaoStatus.exigeAutorizacao && !autorizacaoStatus.autorizado && (
-                    <div className="bg-amber-100 border border-amber-300 text-amber-900 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2">
+                    <div className="bg-amber-50 border border-amber-200 text-amber-900 px-3 py-2 rounded-xl text-[11px] font-semibold flex items-center gap-2 shrink-0">
                       <Clock className="h-4 w-4 text-amber-700 shrink-0" />
                       <span>
-                        Documento Não Autorizado — Impressão oficial bloqueada até deliberação prévia da Presidência na Central de Decisões.
+                        Aguardando autorização da Presidência.
                       </span>
                     </div>
                   )}
 
                   <div
                     ref={previewContainerRef}
-                    className="relative min-h-[500px] max-h-[820px] rounded-xl border border-gray-200 bg-gray-100 p-4 shadow-inner overflow-auto flex justify-center py-2"
+                    className="relative w-full rounded-xl border border-slate-200/80 bg-slate-100/90 p-3 shadow-inner overflow-hidden flex justify-center items-center"
                   >
                     <div
                       style={{
@@ -2311,7 +2613,6 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
                 </div>
               </div>
             </div>
-          </Section>
         )}
 
         {activeTab === 'pedidos' && (
@@ -2649,7 +2950,6 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
             </div>
           </Section>
         )}
-            </Tabs>
         </div>
       </div>
 
@@ -2712,7 +3012,6 @@ const DEFAULT_SYSTEM_TEMPLATES: CartaTemplate[] = [
           </div>
         </div>
       )}
-      </div>
     </PageLayout>
   );
 }

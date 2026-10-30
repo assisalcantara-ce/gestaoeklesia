@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Search, UserCheck, CheckCircle2, AlertCircle, Loader2, X, UserPlus } from 'lucide-react';
 import { createClient } from '@/lib/supabase-client';
+import { buildAccentInsensitiveRegex } from '@/lib/search-normalizer';
 
 interface MemberSearchItem {
   id: string;
@@ -60,12 +61,19 @@ export default function AdicionarDizimistaModal({
     const timer = setTimeout(async () => {
       try {
         setSearching(true);
-        const { data, error } = await supabase
+        const regex = buildAccentInsensitiveRegex(term);
+        let query = supabase
           .from('members')
           .select('id, name, tipo_cadastro, is_dizimista, congregacao_id, congregacoes(nome)')
-          .eq('ministry_id', ministryId)
-          .ilike('name', `%${term}%`)
-          .limit(10);
+          .eq('ministry_id', ministryId);
+
+        if (regex) {
+          query = query.filter('name', 'imatch', regex);
+        } else {
+          query = query.ilike('name', `%${term}%`);
+        }
+
+        const { data, error } = await query.limit(10);
 
         if (error) {
           console.error('Erro ao pesquisar membros:', error);

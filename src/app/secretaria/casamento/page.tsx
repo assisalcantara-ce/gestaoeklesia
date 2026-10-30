@@ -13,6 +13,7 @@ import { fetchConfiguracaoIgrejaFromSupabase, type ConfiguracaoIgreja } from '@/
 import { substituirPlaceholdersCertificado } from '@/lib/certificados-utils';
 import { getFontesCertificadosHeadHtml, getFontesReadyPrintScript, buildTextoEstiloRenderizacao } from '@/lib/certificados-fontes';
 import { Pencil, Printer, Trash2 } from 'lucide-react';
+import { buildAccentInsensitiveRegex } from '@/lib/search-normalizer';
 
 type CertificadoTemplate = {
   id: string;
@@ -299,12 +300,19 @@ export default function CasamentoPage() {
     async (termo: string, setSugestoes: (s: PessoaSugestao[]) => void, setShow: (v: boolean) => void, setLoad: (v: boolean) => void) => {
       if (!ministryId || termo.length < 3) { setSugestoes([]); setShow(false); return; }
       setLoad(true);
-      const { data } = await supabase
+      const regex = buildAccentInsensitiveRegex(termo);
+      let query = supabase
         .from('members')
         .select('id, name, data_nascimento, sexo, celular, congregacao_id, congregacao:congregacoes(id, nome)')
-        .eq('ministry_id', ministryId)
-        .ilike('name', `%${termo}%`)
-        .limit(10);
+        .eq('ministry_id', ministryId);
+
+      if (regex) {
+        query = query.filter('name', 'imatch', regex);
+      } else {
+        query = query.ilike('name', `%${termo}%`);
+      }
+
+      const { data } = await query.limit(10);
       const mapped: PessoaSugestao[] = (data || []).map((m: any) => ({
         id: m.id,
         nome: m.name || '',

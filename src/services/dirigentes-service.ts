@@ -7,6 +7,7 @@ import type {
   MinistroElegivelBusca,
 } from '@/types/dirigentes';
 import type { NivelAcesso } from '@/lib/access-control';
+import { buildMemberSearchOrFilter } from '@/lib/search-normalizer';
 
 export interface UserContextAuth {
   userId: string;
@@ -463,13 +464,15 @@ export class DirigentesService {
     const sanitized = termo.replace(/[,()]/g, '');
     if (!sanitized) return [];
 
+    const orFilter = buildMemberSearchOrFilter(sanitized);
+
     const { data, error } = await supabase
       .from('members')
       .select('id, name, matricula, cpf, cargo_ministerial, congregacao_id, role, tipo_cadastro, status, foto_url, congregacoes(nome)')
       .eq('ministry_id', ministryId)
       .or('status.eq.active,status.eq.ativo')
       .or('role.eq.ministro,tipo_cadastro.eq.ministro')
-      .or(`name.ilike.%${sanitized}%,matricula.ilike.%${sanitized}%,cpf.ilike.%${sanitized}%`)
+      .or(orFilter || `name.ilike.%${sanitized}%,matricula.ilike.%${sanitized}%,cpf.ilike.%${sanitized}%`)
       .order('name', { ascending: true })
       .limit(limite);
 
