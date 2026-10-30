@@ -231,6 +231,7 @@ export class EscalaPregadoresService {
         ...evt,
         congregacoes: cong,
         escala: escalaAtiva,
+        escala_ativa: escalaAtiva,
         possui_pregador: !!escalaAtiva,
       };
     });
@@ -269,13 +270,55 @@ export class EscalaPregadoresService {
   }
 
   /**
-   * 2. Buscar dinamicamente ministros ativos com estatísticas de rodízio
+   * 2. Buscar dinamicamente ministros ativos com estatísticas de rodízio e filtro de conflitos de horário
    */
   public static async listarMinistrosComRodizio(
     client: SupabaseClient,
     ministryId: string,
-    termoBusca?: string
+    termoOuOpcoes?: string | {
+      busca?: string;
+      dataInicioIso?: string;
+      dataFimIso?: string;
+      ignorarEscalaId?: string;
+      agendaEventoId?: string;
+    }
   ): Promise<MinistroElegivel[]> {
+    let termoBusca: string | undefined;
+    let dataInicioIso: string | undefined;
+    let dataFimIso: string | undefined;
+    let ignorarEscalaId: string | undefined;
+    let agendaEventoId: string | undefined;
+
+    if (typeof termoOuOpcoes === 'string') {
+      termoBusca = termoOuOpcoes;
+    } else if (termoOuOpcoes && typeof termoOuOpcoes === 'object') {
+      termoBusca = termoOuOpcoes.busca;
+      dataInicioIso = termoOuOpcoes.dataInicioIso;
+      dataFimIso = termoOuOpcoes.dataFimIso;
+      ignorarEscalaId = termoOuOpcoes.ignorarEscalaId;
+      agendaEventoId = termoOuOpcoes.agendaEventoId;
+    }
+
+    // Se temos um agendaEventoId e faltam as datas, busca na agenda_eventos
+    if (agendaEventoId && (!dataInicioIso || !dataFimIso)) {
+      const { data: evtRef } = await client
+        .from('agenda_eventos')
+        .select('data_inicio, data_fim')
+        .eq('id', agendaEventoId)
+        .eq('ministry_id', ministryId)
+        .single();
+
+      if (evtRef) {
+        dataInicioIso = dataInicioIso || evtRef.data_inicio;
+        dataFimIso = dataFimIso || evtRef.data_fim || (new Date(new Date(evtRef.data_inicio).getTime() + 2 * 3600 * 1000).toISOString());
+      }
+    }
+
+    // Se temos dataInicioIso sem dataFimIso, calcula padrão de 2 horas
+    if (dataInicioIso && !dataFimIso) {
+      dataFimIso = new Date(new Date(dataInicioIso).getTime() + 2 * 3600 * 1000).toISOString();
+    }
+
     // Busca ministros ativos
     let queryMembros = client
       .from('members')
@@ -305,7 +348,71 @@ export class EscalaPregadoresService {
     if (errMembros) throw errMembros;
     if (!ministros || ministros.length === 0) return [];
 
-    const ministroIds = ministros.map((m) => m.id);
+    let ministroIds = ministros.map((m) => m.id);
+
+    // FILTRO DE CONFLITO DE HORÁRIO: se informado o intervalo do culto/evento
+    if (dataInicioIso && dataFimIso) {
+      // Busca todas as escalas ativas que possam colidir com este horário
+      // Considera escalas ativas ('escalado', 'confirmado') em que o evento não esteja cancelado
+      let queryConflitos = client
+        .from('agenda_escala_pregadores')
+        .select(`
+          id,
+          member_id,
+          agenda_evento_id,
+          evento_data_inicio_snapshot,
+          evento_data_fim_snapshot,
+          status,
+          agenda_eventos ( id, data_inicio, data_fim, status )
+        `)
+        .eq('ministry_id', ministryId)
+        .in('member_id', ministroIds)
+        .in('status', ['escalado', 'confirmado']);
+
+      if (ignorarEscalaId) {
+        queryConflitos = queryConflitos.neq('id', ignorarEscalaId);
+      }
+
+      const { data: escalasConflitantes, error: errConflitos } = await queryConflitos;
+      if (!errConflitos && escalasConflitantes) {
+        const ministrosComConflito = new Set<string>();
+        const targetInicioMs = new Date(dataInicioIso).getTime();
+        const targetFimMs = new Date(dataFimIso).getTime();
+
+        escalasConflitantes.forEach((esc: any) => {
+          // Se pertencer ao próprio evento que estamos editando/atribuindo, não bloqueia o próprio
+          if (agendaEventoId && esc.agenda_evento_id === agendaEventoId) {
+            return;
+          }
+
+          // Se o evento da agenda foi cancelado, ignora
+          if (esc.agenda_eventos && esc.agenda_eventos.status === 'cancelado') {
+            return;
+          }
+
+          // Horários atuais da Agenda Oficial ou fallback para snapshot
+          const evInicio = esc.agenda_eventos?.data_inicio || esc.evento_data_inicio_snapshot;
+          if (!evInicio) return;
+          const evInicioMs = new Date(evInicio).getTime();
+          const evFim = esc.agenda_eventos?.data_fim || esc.evento_data_fim_snapshot || new Date(evInicioMs + 2 * 3600 * 1000).toISOString();
+          const evFimMs = new Date(evFim).getTime();
+
+          // Verificação de sobreposição de intervalos: (InicioA < FimB) E (FimA > InicioB)
+          if (evInicioMs < targetFimMs && evFimMs > targetInicioMs) {
+            ministrosComConflito.add(esc.member_id);
+          }
+        });
+
+        if (ministrosComConflito.size > 0) {
+          // Filtra a lista de ministros removendo os indisponíveis por conflito
+          const ministrosDisponiveis = ministros.filter((m) => !ministrosComConflito.has(m.id));
+          if (ministrosDisponiveis.length === 0) return [];
+          ministros.length = 0;
+          ministros.push(...ministrosDisponiveis);
+          ministroIds = ministros.map((m) => m.id);
+        }
+      }
+    }
 
     // Estatísticas de rodízio: escalas ativas ou confirmadas
     const agora = new Date();
@@ -372,7 +479,9 @@ export class EscalaPregadoresService {
     });
 
     // Calcula os "menos escalados" (critério: totalMes === 0 ou no quartil inferior do ano)
-    const minEscalasMes = Math.min(...listaComEstatisticas.map((m) => m.total_escalas_mes));
+    const minEscalasMes = listaComEstatisticas.length > 0
+      ? Math.min(...listaComEstatisticas.map((m) => m.total_escalas_mes))
+      : 0;
 
     listaComEstatisticas.forEach((m) => {
       m.is_menos_escalado = m.total_escalas_mes === minEscalasMes;

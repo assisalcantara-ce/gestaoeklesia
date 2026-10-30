@@ -203,7 +203,11 @@ export default function EscalaPregadoresPage() {
         evento={eventoSelecionado}
         ministros={ministros}
         loadingMinistros={loadingMinistros}
-        onBuscarMinistros={carregarMinistros}
+        onBuscarMinistros={(termo) => carregarMinistros(termo, {
+          agendaEventoId: eventoSelecionado?.id,
+          dataInicio: eventoSelecionado?.data_inicio,
+          dataFim: eventoSelecionado?.data_fim,
+        })}
         onConfirmar={atribuirPregador}
         onFechar={() => setModalAtribuirAberto(false)}
       />
@@ -214,7 +218,12 @@ export default function EscalaPregadoresPage() {
         evento={eventoSelecionado}
         ministros={ministros}
         loadingMinistros={loadingMinistros}
-        onBuscarMinistros={carregarMinistros}
+        onBuscarMinistros={(termo) => carregarMinistros(termo, {
+          agendaEventoId: eventoSelecionado?.id,
+          dataInicio: eventoSelecionado?.data_inicio,
+          dataFim: eventoSelecionado?.data_fim,
+          ignorarEscalaId: eventoSelecionado?.escala_ativa?.id,
+        })}
         onConfirmar={substituirPregador}
         onFechar={() => setModalSubstituirAberto(false)}
       />

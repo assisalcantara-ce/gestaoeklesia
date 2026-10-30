@@ -107,8 +107,14 @@ describe('Serviço Backend: EscalaPregadoresService (Etapa 2)', () => {
 
         if (table === 'agenda_escala_pregadores') {
           return {
-            select(_cols: string) {
-              let res = [...escalas];
+            select(cols: string) {
+              let res = escalas.map(esc => {
+                const item = { ...esc };
+                if (cols.includes('member:') || cols.includes('member_id')) {
+                  item.member = item.member || membros.find(m => m.id === item.member_id) || null;
+                }
+                return item;
+              });
               const queryObj: any = {
                 eq(col: string, val: any) {
                   res = res.filter(item => item[col] === val);
@@ -310,5 +316,116 @@ describe('Serviço Backend: EscalaPregadoresService (Etapa 2)', () => {
     assert.equal(remanejada.member_id, 'min-1');
     assert.equal(remanejada.status, 'escalado');
     assert.equal(remanejada.tema_mensagem, 'Fé');
+  });
+
+  it('7. Problema 2: Garantir que evento com pregador retorne escala_ativa preenchida para a UI', async () => {
+    const mockSupabase = createMockSupabase({
+      eventos: [
+        {
+          id: 'evt-mcm',
+          ministry_id: tenantId,
+          titulo: 'ENSAIO MCM',
+          data_inicio: '2026-10-01T09:00:00Z',
+          data_fim: '2026-10-01T11:00:00Z',
+          status: 'agendado',
+        },
+      ],
+      escalas: [
+        {
+          id: 'esc-alcides',
+          ministry_id: tenantId,
+          agenda_evento_id: 'evt-mcm',
+          member_id: 'min-alcides',
+          status: 'escalado',
+          tema_mensagem: 'Edificação Familiar',
+        },
+      ],
+      membros: [
+        {
+          id: 'min-alcides',
+          name: 'ALCIDES FRANCISCO DE OLIVEIRA JUNIOR',
+          cargo_ministerial: 'Pastor',
+          status: 'active',
+          role: 'ministro',
+        },
+      ],
+    });
+
+    const eventos = await EscalaPregadoresService.listarEventosComEscala(mockSupabase, {
+      ministryId: tenantId,
+    });
+
+    assert.equal(eventos.length, 1);
+    const eventoMcm = eventos[0];
+    assert.equal(eventoMcm.possui_pregador, true);
+    assert.ok(eventoMcm.escala, 'Deve possuir propriedade escala');
+    assert.ok(eventoMcm.escala_ativa, 'Deve possuir escala_ativa esperada pelo EscalaEventosTable');
+    assert.equal(eventoMcm.escala_ativa.id, 'esc-alcides');
+    assert.equal(eventoMcm.escala_ativa.member?.name, 'ALCIDES FRANCISCO DE OLIVEIRA JUNIOR');
+  });
+
+  it('8. Problema 1: Ocultar ministros com escala ativa em horário conflitante na busca dinâmica', async () => {
+    const mockSupabase = createMockSupabase({
+      membros: [
+        { id: 'min-ocupado', ministry_id: tenantId, name: 'Pr. Ocupado', status: 'active', role: 'ministro' },
+        { id: 'min-livre', ministry_id: tenantId, name: 'Pr. Livre', status: 'active', role: 'ministro' },
+        { id: 'min-cancelado', ministry_id: tenantId, name: 'Pr. Com Escala Cancelada', status: 'active', role: 'ministro' },
+      ],
+      eventos: [
+        {
+          id: 'evt-existente',
+          ministry_id: tenantId,
+          titulo: 'Culto Matutino',
+          data_inicio: '2026-10-01T09:00:00Z',
+          data_fim: '2026-10-01T11:00:00Z',
+          status: 'agendado',
+        },
+        {
+          id: 'evt-cancelado',
+          ministry_id: tenantId,
+          titulo: 'Culto Cancelado',
+          data_inicio: '2026-10-01T09:00:00Z',
+          data_fim: '2026-10-01T11:00:00Z',
+          status: 'cancelado',
+        },
+      ],
+      escalas: [
+        // Ministro ocupado tem escala ativa em evento agendado colidindo
+        {
+          id: 'esc-1',
+          ministry_id: tenantId,
+          agenda_evento_id: 'evt-existente',
+          member_id: 'min-ocupado',
+          status: 'escalado',
+          evento_data_inicio_snapshot: '2026-10-01T09:00:00Z',
+          evento_data_fim_snapshot: '2026-10-01T11:00:00Z',
+        },
+        // Outro ministro tem escala mas foi cancelada em evento agendado
+        {
+          id: 'esc-2',
+          ministry_id: tenantId,
+          agenda_evento_id: 'evt-existente',
+          member_id: 'min-cancelado',
+          status: 'cancelado',
+          evento_data_inicio_snapshot: '2026-10-01T09:00:00Z',
+          evento_data_fim_snapshot: '2026-10-01T11:00:00Z',
+        },
+      ],
+    });
+
+    // Buscar ministros para um evento no mesmo intervalo: 01/10/2026 das 09:30 às 10:30
+    const ministrosDisponiveis = await EscalaPregadoresService.listarMinistrosComRodizio(
+      mockSupabase,
+      tenantId,
+      {
+        dataInicioIso: '2026-10-01T09:30:00Z',
+        dataFimIso: '2026-10-01T10:30:00Z',
+      }
+    );
+
+    const idsDisponiveis = ministrosDisponiveis.map(m => m.id);
+    assert.ok(!idsDisponiveis.includes('min-ocupado'), 'Ministro com escala ativa em horário conflitante deve ser ocultado');
+    assert.ok(idsDisponiveis.includes('min-livre'), 'Ministro sem escala deve constar');
+    assert.ok(idsDisponiveis.includes('min-cancelado'), 'Ministro com apenas escala cancelada deve estar disponível');
   });
 });

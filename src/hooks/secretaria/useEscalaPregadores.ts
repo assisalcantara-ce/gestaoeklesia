@@ -213,13 +213,25 @@ export function useEscalaPregadores() {
     carregarEventos();
   }, [carregarEventos]);
 
-  // Carregar ministros com rodízio
-  const carregarMinistros = useCallback(async (termo = '') => {
+  // Carregar ministros com rodízio e filtro de disponibilidade de horário
+  const carregarMinistros = useCallback(async (
+    termo = '',
+    opcoes?: {
+      dataInicio?: string;
+      dataFim?: string;
+      ignorarEscalaId?: string;
+      agendaEventoId?: string;
+    }
+  ) => {
     setLoadingMinistros(true);
     try {
       const params = new URLSearchParams();
       params.set('acao', 'ministros');
       if (termo) params.set('busca', termo);
+      if (opcoes?.dataInicio) params.set('data_inicio', opcoes.dataInicio);
+      if (opcoes?.dataFim) params.set('data_fim', opcoes.dataFim);
+      if (opcoes?.ignorarEscalaId) params.set('ignorar_escala_id', opcoes.ignorarEscalaId);
+      if (opcoes?.agendaEventoId) params.set('agenda_evento_id', opcoes.agendaEventoId);
 
       const res = await fetch(`/api/v1/secretaria/escala-pregadores?${params.toString()}`);
       const json = await res.json();

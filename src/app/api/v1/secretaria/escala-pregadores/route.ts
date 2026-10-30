@@ -83,13 +83,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data: resultado });
     }
 
-    // 2. Busca Dinâmica de Ministros Ativos com Rodízio
+    // 2. Busca Dinâmica de Ministros Ativos com Rodízio e Disponibilidade de Horário
     if (acao === 'ministros') {
       const termo = searchParams.get('busca') || undefined;
+      const dataInicioIso = searchParams.get('data_inicio') || undefined;
+      const dataFimIso = searchParams.get('data_fim') || undefined;
+      const ignorarEscalaId = searchParams.get('ignorar_escala_id') || undefined;
+      const agendaEventoId = searchParams.get('agenda_evento_id') || undefined;
+
       const ministros = await EscalaPregadoresService.listarMinistrosComRodizio(
         ctx.supabase,
         ctx.ministryId,
-        termo
+        {
+          busca: termo,
+          dataInicioIso,
+          dataFimIso,
+          ignorarEscalaId,
+          agendaEventoId,
+        }
       );
 
       return NextResponse.json({ data: ministros });
@@ -192,7 +203,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ data: novaEscala }, { status: 201 });
   } catch (err: any) {
     console.error('Erro em POST /api/v1/secretaria/escala-pregadores:', err);
-    return NextResponse.json({ error: err?.message || 'Erro ao atribuir pregador.' }, { status: 500 });
+    const msg = err?.message || 'Erro ao atribuir pregador.';
+    const isConflict = msg.includes('Choque de horário') || msg.includes('já está escalado') || msg.includes('uq_escala_evento_ativa') || err?.code === '23P01';
+    const status = isConflict ? 409 : (err?.code === '23514' || msg.includes('obrigatório') ? 400 : 500);
+    return NextResponse.json({ error: msg, code: isConflict ? 'SCHEDULE_CONFLICT' : 'INTERNAL_ERROR' }, { status });
   }
 }
 
@@ -269,7 +283,10 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ data: atualizada });
   } catch (err: any) {
     console.error('Erro em PUT /api/v1/secretaria/escala-pregadores:', err);
-    return NextResponse.json({ error: err?.message || 'Erro ao atualizar escala.' }, { status: 500 });
+    const msg = err?.message || 'Erro ao atualizar escala.';
+    const isConflict = msg.includes('Choque de horário') || msg.includes('já está escalado') || msg.includes('uq_escala_evento_ativa') || err?.code === '23P01';
+    const status = isConflict ? 409 : (err?.code === '23514' || msg.includes('obrigatório') ? 400 : 500);
+    return NextResponse.json({ error: msg, code: isConflict ? 'SCHEDULE_CONFLICT' : 'INTERNAL_ERROR' }, { status });
   }
 }
 
