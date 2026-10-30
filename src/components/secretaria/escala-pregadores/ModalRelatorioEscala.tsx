@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   X,
   FileText,
@@ -26,7 +26,7 @@ interface ModalRelatorioEscalaProps {
 
 export function ModalRelatorioEscala({
   aberto,
-  eventos,
+  eventos: _eventosPagina,
   congregacoes,
   anoMesAtual,
   churchIdAtual,
@@ -42,10 +42,59 @@ export function ModalRelatorioEscala({
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const [erroPdf, setErroPdf] = useState<string | null>(null);
 
+  // Armazena todos os eventos do período para o relatório (independente da paginação de 10 da tela)
+  const [todosEventos, setTodosEventos] = useState<AgendaEventoComEscala[]>([]);
+  const [carregandoEventosRelatorio, setCarregandoEventosRelatorio] = useState(false);
+
+  useEffect(() => {
+    if (!aberto) return;
+
+    let ativo = true;
+    async function carregarTodosEventosPeriodo() {
+      setCarregandoEventosRelatorio(true);
+      try {
+        const params = new URLSearchParams();
+        params.set('acao', 'eventos');
+        // Não envia 'pagina' para obter todos os eventos completos do período selecionado
+        if (tipoPeriodo === 'mes' && anoMes) {
+          params.set('ano_mes', anoMes);
+        } else if (tipoPeriodo === 'semana') {
+          if (semanaInicio) params.set('data_inicio', semanaInicio);
+          if (semanaFim) params.set('data_fim', semanaFim);
+        }
+        if (churchId) {
+          params.set('church_id', churchId);
+        }
+
+        const res = await fetch(`/api/v1/secretaria/escala-pregadores?${params.toString()}`);
+        if (res.ok && ativo) {
+          const json = await res.json();
+          // Mapeia caso venha direto no data
+          const lista = Array.isArray(json.data) ? json.data : [];
+          setTodosEventos(
+            lista.map((ev: any) => ({
+              ...ev,
+              escala_ativa: ev.escala || ev.escala_ativa || null,
+            }))
+          );
+        }
+      } catch (err) {
+        console.error('Falha ao carregar eventos para relatório:', err);
+      } finally {
+        if (ativo) setCarregandoEventosRelatorio(false);
+      }
+    }
+
+    carregarTodosEventosPeriodo();
+    return () => {
+      ativo = false;
+    };
+  }, [aberto, tipoPeriodo, anoMes, semanaInicio, semanaFim, churchId]);
+
   if (!aberto) return null;
 
   // Filtragem local para pré-visualização e impressão direta na página
-  const eventosFiltrados = eventos.filter((ev) => {
+  const eventosFiltrados = todosEventos.filter((ev) => {
     // Filtro congregação
     if (churchId && ev.church_id !== churchId) return false;
 
@@ -221,7 +270,10 @@ export function ModalRelatorioEscala({
           {/* Botões de Ação na Toolbar */}
           <div className="mt-4 pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
             <span className="text-xs text-slate-500">
-              Total de cultos listados: <strong>{eventosFiltrados.length}</strong>
+              Total de cultos no período: <strong>{eventosFiltrados.length}</strong>
+              {carregandoEventosRelatorio && (
+                <span className="ml-2 text-blue-600 font-medium animate-pulse">(Carregando agenda completa...)</span>
+              )}
             </span>
 
             <div className="flex items-center gap-2">

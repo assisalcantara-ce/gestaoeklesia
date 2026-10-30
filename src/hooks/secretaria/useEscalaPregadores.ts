@@ -95,6 +95,13 @@ export interface FiltrosEscalaState {
   semanaFim?: string;
 }
 
+export interface PaginacaoEscala {
+  pagina: number;
+  itensPorPagina: number;
+  total: number;
+  totalPaginas: number;
+}
+
 export function useEscalaPregadores() {
   const { nivel, congregacaoId, isAdmin, isMaster } = useUserContext();
 
@@ -113,6 +120,14 @@ export function useEscalaPregadores() {
     churchId: '',
     filtroTitulo: '',
     apenasSemPregador: false,
+  });
+
+  const [pagina, setPagina] = useState(1);
+  const [paginacao, setPaginacao] = useState<PaginacaoEscala>({
+    pagina: 1,
+    itensPorPagina: 10,
+    total: 0,
+    totalPaginas: 1,
   });
 
   const [eventos, setEventos] = useState<AgendaEventoComEscala[]>([]);
@@ -152,13 +167,15 @@ export function useEscalaPregadores() {
     carregarCongregacoes();
   }, []);
 
-  // Carregar eventos com escalas
+  // Carregar eventos com escalas (paginado no backend com 10 itens por página)
   const carregarEventos = useCallback(async () => {
     setLoadingEventos(true);
     setErroEventos(null);
     try {
       const params = new URLSearchParams();
       params.set('acao', 'eventos');
+      params.set('pagina', String(pagina));
+      params.set('itens_por_pagina', '10');
       if (filtros.anoMes) params.set('ano_mes', filtros.anoMes);
       if (filtros.semanaInicio) params.set('data_inicio', filtros.semanaInicio);
       if (filtros.semanaFim) params.set('data_fim', filtros.semanaFim);
@@ -174,12 +191,23 @@ export function useEscalaPregadores() {
       }
 
       setEventos(json.data || []);
+      if (json.paginacao) {
+        setPaginacao(json.paginacao);
+      } else {
+        const totalRegistros = (json.data || []).length;
+        setPaginacao({
+          pagina,
+          itensPorPagina: 10,
+          total: totalRegistros,
+          totalPaginas: Math.max(1, Math.ceil(totalRegistros / 10)),
+        });
+      }
     } catch (err: any) {
       setErroEventos(err?.message || 'Falha na comunicação com o servidor.');
     } finally {
       setLoadingEventos(false);
     }
-  }, [filtros]);
+  }, [filtros, pagina]);
 
   useEffect(() => {
     carregarEventos();
@@ -343,6 +371,9 @@ export function useEscalaPregadores() {
     // Filtros e Dados
     filtros,
     setFiltros,
+    pagina,
+    setPagina,
+    paginacao,
     congregacoes,
     eventos,
     loadingEventos,

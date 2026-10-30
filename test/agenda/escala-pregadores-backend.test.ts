@@ -45,7 +45,14 @@ describe('Serviço Backend: EscalaPregadoresService (Etapa 2)', () => {
                   return this;
                 },
                 order() {
-                  return Promise.resolve({ data: res, error: null });
+                  return this;
+                },
+                range(from: number, to: number) {
+                  res = res.slice(from, to + 1);
+                  return this;
+                },
+                then(resolve: any) {
+                  return Promise.resolve({ data: res, count: res.length, error: null }).then(resolve);
                 }
               };
             }
@@ -84,7 +91,14 @@ describe('Serviço Backend: EscalaPregadoresService (Etapa 2)', () => {
                   return this;
                 },
                 order() {
-                  return Promise.resolve({ data: res, error: null });
+                  return this;
+                },
+                range(from: number, to: number) {
+                  res = res.slice(from, to + 1);
+                  return this;
+                },
+                then(resolve: any) {
+                  return Promise.resolve({ data: res, count: res.length, error: null }).then(resolve);
                 }
               };
             }

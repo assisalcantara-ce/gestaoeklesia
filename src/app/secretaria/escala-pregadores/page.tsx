@@ -6,6 +6,7 @@ import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { useEscalaPregadores, AgendaEventoComEscala } from '@/hooks/secretaria/useEscalaPregadores';
 import { EscalaFiltrosBar } from '@/components/secretaria/escala-pregadores/EscalaFiltrosBar';
 import { EscalaEventosTable } from '@/components/secretaria/escala-pregadores/EscalaEventosTable';
+import { EscalaPaginacao } from '@/components/secretaria/escala-pregadores/EscalaPaginacao';
 import { ModalAtribuirPregador } from '@/components/secretaria/escala-pregadores/ModalAtribuirPregador';
 import { ModalSubstituirPregador } from '@/components/secretaria/escala-pregadores/ModalSubstituirPregador';
 import { ModalRemanejarPregador } from '@/components/secretaria/escala-pregadores/ModalRemanejarPregador';
@@ -19,6 +20,8 @@ export default function EscalaPregadoresPage() {
     isGlobalUser,
     filtros,
     setFiltros,
+    setPagina,
+    paginacao,
     congregacoes,
     eventos,
     loadingEventos,
@@ -158,6 +161,7 @@ export default function EscalaPregadoresPage() {
       <EscalaFiltrosBar
         filtros={filtros}
         setFiltros={setFiltros}
+        onResetPagina={() => setPagina(1)}
         congregacoes={congregacoes}
         isGlobalUser={isGlobalUser}
         loading={loadingEventos}
@@ -173,6 +177,13 @@ export default function EscalaPregadoresPage() {
         onRemanejar={handleAbrirRemanejar}
         onDesfazer={handleAbrirDesfazer}
         onVerHistorico={handleAbrirHistorico}
+      />
+
+      {/* Paginação da Listagem */}
+      <EscalaPaginacao
+        paginacao={paginacao}
+        onChangePagina={(p) => setPagina(p)}
+        loading={loadingEventos}
       />
 
       {/* Modal: Relatório e Impressão A4 / PDF */}

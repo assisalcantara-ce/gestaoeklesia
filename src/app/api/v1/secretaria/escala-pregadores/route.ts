@@ -50,7 +50,12 @@ export async function GET(request: NextRequest) {
         churchId = ctx.congregacaoId;
       }
 
-      const eventos = await EscalaPregadoresService.listarEventosComEscala(ctx.supabase, {
+      const paginaParam = searchParams.get('pagina');
+      const itensPorPaginaParam = searchParams.get('itens_por_pagina') || searchParams.get('limit');
+      const pagina = paginaParam ? Math.max(1, parseInt(paginaParam, 10)) : undefined;
+      const itensPorPagina = itensPorPaginaParam ? Math.max(1, parseInt(itensPorPaginaParam, 10)) : 10;
+
+      const resultado = await EscalaPregadoresService.listarEventosComEscala(ctx.supabase, {
         ministryId: ctx.ministryId,
         anoMes: searchParams.get('ano_mes') || undefined,
         dataInicioIso: searchParams.get('data_inicio') || undefined,
@@ -58,9 +63,24 @@ export async function GET(request: NextRequest) {
         churchId,
         filtroTitulo: searchParams.get('filtro_titulo') || undefined,
         apenasSemPregador: searchParams.get('apenas_sem_pregador') === 'true',
+        pagina,
+        itensPorPagina,
       });
 
-      return NextResponse.json({ data: eventos });
+      // Se foi solicitado paginado, resultado tem { eventos, total, pagina, itensPorPagina, totalPaginas }
+      if (pagina) {
+        return NextResponse.json({
+          data: resultado.eventos,
+          paginacao: {
+            total: resultado.total,
+            pagina: resultado.pagina,
+            itensPorPagina: resultado.itensPorPagina,
+            totalPaginas: resultado.totalPaginas,
+          },
+        });
+      }
+
+      return NextResponse.json({ data: resultado });
     }
 
     // 2. Busca Dinâmica de Ministros Ativos com Rodízio

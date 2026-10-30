@@ -7,42 +7,114 @@ import { FiltrosEscalaState } from '@/hooks/secretaria/useEscalaPregadores';
 interface EscalaFiltrosBarProps {
   filtros: FiltrosEscalaState;
   setFiltros: React.Dispatch<React.SetStateAction<FiltrosEscalaState>>;
+  onResetPagina?: () => void;
   congregacoes: { id: string; nome: string; is_sede?: boolean }[];
   isGlobalUser: boolean;
   loading: boolean;
   onRefresh: () => void;
 }
 
+const MESES_NOMES = [
+  { valor: '01', nome: 'Janeiro' },
+  { valor: '02', nome: 'Fevereiro' },
+  { valor: '03', nome: 'Março' },
+  { valor: '04', nome: 'Abril' },
+  { valor: '05', nome: 'Maio' },
+  { valor: '06', nome: 'Junho' },
+  { valor: '07', nome: 'Julho' },
+  { valor: '08', nome: 'Agosto' },
+  { valor: '09', nome: 'Setembro' },
+  { valor: '10', nome: 'Outubro' },
+  { valor: '11', nome: 'Novembro' },
+  { valor: '12', nome: 'Dezembro' },
+];
+
 export function EscalaFiltrosBar({
   filtros,
   setFiltros,
+  onResetPagina,
   congregacoes,
   isGlobalUser,
   loading,
   onRefresh,
 }: EscalaFiltrosBarProps) {
+  // Parse do ano e mês de filtros.anoMes (ex: "2026-10")
+  const [anoAtualStr, mesAtualStr] = (filtros.anoMes || '').split('-');
+  const anoAtual = parseInt(anoAtualStr, 10) || new Date().getFullYear();
+  const mesAtual = mesAtualStr || String(new Date().getMonth() + 1).padStart(2, '0');
+
+  // Gerar lista de anos disponíveis (2 anos anteriores até 2 anos posteriores)
+  const baseYear = new Date().getFullYear();
+  const listaAnos = [baseYear - 2, baseYear - 1, baseYear, baseYear + 1, baseYear + 2];
+
+  const handleMudarMes = (novoMes: string) => {
+    onResetPagina?.();
+    setFiltros((prev) => ({
+      ...prev,
+      anoMes: `${anoAtual}-${novoMes}`,
+      semanaInicio: undefined,
+      semanaFim: undefined,
+    }));
+  };
+
+  const handleMudarAno = (novoAno: number) => {
+    onResetPagina?.();
+    setFiltros((prev) => ({
+      ...prev,
+      anoMes: `${novoAno}-${mesAtual}`,
+      semanaInicio: undefined,
+      semanaFim: undefined,
+    }));
+  };
+
+  const handleMudarCongregacao = (novaCongregacao: string) => {
+    onResetPagina?.();
+    setFiltros((prev) => ({ ...prev, churchId: novaCongregacao }));
+  };
+
+  const handleMudarTitulo = (novoTitulo: string) => {
+    onResetPagina?.();
+    setFiltros((prev) => ({ ...prev, filtroTitulo: novoTitulo }));
+  };
+
+  const handleMudarApenasSemPregador = (checked: boolean) => {
+    onResetPagina?.();
+    setFiltros((prev) => ({ ...prev, apenasSemPregador: checked }));
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6 transition-all">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
-        {/* Mês de Referência */}
+        {/* Mês de Referência (Select por extenso + Ano) */}
         <div className="lg:col-span-3">
           <label className="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1.5">
             <Calendar className="w-3.5 h-3.5 text-blue-600" />
             Mês de Referência
           </label>
-          <input
-            type="month"
-            value={filtros.anoMes}
-            onChange={(e) =>
-              setFiltros((prev) => ({
-                ...prev,
-                anoMes: e.target.value,
-                semanaInicio: undefined,
-                semanaFim: undefined,
-              }))
-            }
-            className="w-full text-sm rounded-lg border border-slate-300 px-3 py-2 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-          />
+          <div className="grid grid-cols-12 gap-1.5">
+            <select
+              value={mesAtual}
+              onChange={(e) => handleMudarMes(e.target.value)}
+              className="col-span-7 text-sm rounded-lg border border-slate-300 px-2.5 py-2 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors font-medium text-slate-800"
+            >
+              {MESES_NOMES.map((m) => (
+                <option key={m.valor} value={m.valor}>
+                  {m.nome}
+                </option>
+              ))}
+            </select>
+            <select
+              value={anoAtual}
+              onChange={(e) => handleMudarAno(parseInt(e.target.value, 10))}
+              className="col-span-5 text-sm rounded-lg border border-slate-300 px-2 py-2 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors font-medium text-slate-800"
+            >
+              {listaAnos.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Congregação (Desabilitada/Oculta se não for global) */}
@@ -54,8 +126,8 @@ export function EscalaFiltrosBar({
           <select
             value={filtros.churchId}
             disabled={!isGlobalUser}
-            onChange={(e) => setFiltros((prev) => ({ ...prev, churchId: e.target.value }))}
-            className="w-full text-sm rounded-lg border border-slate-300 px-3 py-2 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            onChange={(e) => handleMudarCongregacao(e.target.value)}
+            className="w-full text-sm rounded-lg border border-slate-300 px-3 py-2 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-60 disabled:cursor-not-allowed transition-colors font-medium text-slate-800"
           >
             {isGlobalUser && <option value="">Todas as Congregações (Campo Geral)</option>}
             {congregacoes.map((c) => (
@@ -77,7 +149,7 @@ export function EscalaFiltrosBar({
               type="text"
               placeholder="Ex: Culto da Família, Santa Ceia..."
               value={filtros.filtroTitulo}
-              onChange={(e) => setFiltros((prev) => ({ ...prev, filtroTitulo: e.target.value }))}
+              onChange={(e) => handleMudarTitulo(e.target.value)}
               className="w-full text-sm rounded-lg border border-slate-300 pl-8 pr-3 py-2 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
             />
             <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" />
@@ -105,8 +177,8 @@ export function EscalaFiltrosBar({
           <input
             type="checkbox"
             checked={filtros.apenasSemPregador}
-            onChange={(e) => setFiltros((prev) => ({ ...prev, apenasSemPregador: e.target.checked }))}
-            className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 rounded"
+            onChange={(e) => handleMudarApenasSemPregador(e.target.checked)}
+            className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500"
           />
           <span className="font-medium text-slate-700 group-hover:text-blue-600 transition-colors">
             Mostrar apenas cultos sem pregador escalado

@@ -77,17 +77,39 @@ export interface ListarEventosComEscalaParams {
   churchId?: string | null; // null = todo o campo / todas
   filtroTitulo?: string;
   apenasSemPregador?: boolean;
+  pagina?: number;
+  itensPorPagina?: number;
+}
+
+export interface ListarEventosComEscalaResultado {
+  eventos: any[];
+  total: number;
+  pagina: number;
+  itensPorPagina: number;
+  totalPaginas: number;
 }
 
 export class EscalaPregadoresService {
   /**
    * 1. Listar eventos da Agenda Oficial com indicação do pregador escalado
+   * Suporta paginação (retorna ListarEventosComEscalaResultado com eventos e contagem total)
+   * ou listagem completa quando pagina não é informada (para relatórios e retrocompatibilidade).
    */
   public static async listarEventosComEscala(
     client: SupabaseClient,
     params: ListarEventosComEscalaParams
-  ) {
-    const { ministryId, anoMes, dataInicioIso, dataFimIso, churchId, filtroTitulo, apenasSemPregador } = params;
+  ): Promise<any> {
+    const {
+      ministryId,
+      anoMes,
+      dataInicioIso,
+      dataFimIso,
+      churchId,
+      filtroTitulo,
+      apenasSemPregador,
+      pagina,
+      itensPorPagina = 10,
+    } = params;
 
     let rangeInicio = dataInicioIso;
     let rangeFim = dataFimIso;
@@ -103,9 +125,13 @@ export class EscalaPregadoresService {
     }
 
     // Busca eventos na agenda_eventos (sem embutir congregacoes diretamente para evitar falha no schema cache do PostgREST)
+    // Se paginação for solicitada e NÃO houver filtro apenasSemPregador, podemos contar e paginar direto via range do PostgREST
+    const paginacaoDiretaNoBanco = Boolean(pagina && pagina > 0 && !apenasSemPregador);
+
     let queryEventos = client
       .from('agenda_eventos')
-      .select(`
+      .select(
+        `
         id,
         ministry_id,
         church_id,
@@ -118,10 +144,13 @@ export class EscalaPregadoresService {
         status,
         visibilidade,
         agenda_tipos ( id, nome, categoria, cor )
-      `)
+      `,
+        { count: 'exact' }
+      )
       .eq('ministry_id', ministryId)
       .neq('status', 'cancelado')
-      .order('data_inicio', { ascending: true });
+      .order('data_inicio', { ascending: true })
+      .order('id', { ascending: true }); // Ordenação determinística e estável
 
     if (rangeInicio) {
       queryEventos = queryEventos.gte('data_inicio', rangeInicio);
@@ -136,10 +165,25 @@ export class EscalaPregadoresService {
       queryEventos = queryEventos.ilike('titulo', `%${filtroTitulo.trim()}%`);
     }
 
-    const { data: eventos, error: errEventos } = await queryEventos;
+    if (paginacaoDiretaNoBanco) {
+      const from = (pagina! - 1) * itensPorPagina;
+      const to = from + itensPorPagina - 1;
+      queryEventos = queryEventos.range(from, to);
+    }
+
+    const { data: eventos, count, error: errEventos } = await queryEventos;
     if (errEventos) throw errEventos;
 
     if (!eventos || eventos.length === 0) {
+      if (pagina && pagina > 0) {
+        return {
+          eventos: [],
+          total: 0,
+          pagina,
+          itensPorPagina,
+          totalPaginas: 0,
+        };
+      }
       return [];
     }
 
@@ -180,7 +224,7 @@ export class EscalaPregadoresService {
       }
     });
 
-    const resultado = eventos.map((evt) => {
+    let resultado = eventos.map((evt) => {
       const escalaAtiva = mapaEscalaPorEvento.get(evt.id) || null;
       const cong = evt.church_id ? mapaCongregacoes.get(evt.church_id) || null : null;
       return {
@@ -192,7 +236,33 @@ export class EscalaPregadoresService {
     });
 
     if (apenasSemPregador) {
-      return resultado.filter((item) => !item.possui_pregador);
+      resultado = resultado.filter((item) => !item.possui_pregador);
+    }
+
+    // Se a paginação foi direta no banco (sem filtro apenasSemPregador)
+    if (paginacaoDiretaNoBanco) {
+      const totalRegistros = typeof count === 'number' ? count : resultado.length;
+      return {
+        eventos: resultado,
+        total: totalRegistros,
+        pagina: pagina!,
+        itensPorPagina,
+        totalPaginas: Math.ceil(totalRegistros / itensPorPagina),
+      };
+    }
+
+    // Se paginação foi solicitada com filtro apenasSemPregador
+    if (pagina && pagina > 0) {
+      const totalRegistros = resultado.length;
+      const from = (pagina - 1) * itensPorPagina;
+      const eventosPaginados = resultado.slice(from, from + itensPorPagina);
+      return {
+        eventos: eventosPaginados,
+        total: totalRegistros,
+        pagina,
+        itensPorPagina,
+        totalPaginas: Math.ceil(totalRegistros / itensPorPagina),
+      };
     }
 
     return resultado;

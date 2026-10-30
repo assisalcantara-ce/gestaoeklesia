@@ -116,30 +116,43 @@ describe('Homologação Funcional: Escala de Pregadores (Etapa 5)', () => {
           return {
             select(_cols: string) {
               let res = [...eventos];
+              let totalFiltrado = res.length;
               return {
                 eq(c: string, v: any) {
                   res = res.filter((item) => (item as any)[c] === v);
+                  totalFiltrado = res.length;
                   return this;
                 },
                 neq(c: string, v: any) {
                   res = res.filter((item) => (item as any)[c] !== v);
+                  totalFiltrado = res.length;
                   return this;
                 },
                 gte(c: string, v: any) {
                   res = res.filter((item) => (item as any)[c] >= v);
+                  totalFiltrado = res.length;
                   return this;
                 },
                 lte(c: string, v: any) {
                   res = res.filter((item) => (item as any)[c] <= v);
+                  totalFiltrado = res.length;
                   return this;
                 },
                 ilike(c: string, p: string) {
                   const pat = p.replace(/%/g, '').toLowerCase();
                   res = res.filter((item) => ((item as any)[c] || '').toLowerCase().includes(pat));
+                  totalFiltrado = res.length;
                   return this;
                 },
                 order() {
-                  return Promise.resolve({ data: res, error: null });
+                  return this;
+                },
+                range(from: number, to: number) {
+                  res = res.slice(from, to + 1);
+                  return this;
+                },
+                then(resolve: any) {
+                  return Promise.resolve({ data: res, count: totalFiltrado, error: null }).then(resolve);
                 },
                 single() {
                   return Promise.resolve({ data: res[0] || null, error: res[0] ? null : { message: 'Not found' } });
@@ -179,7 +192,14 @@ describe('Homologação Funcional: Escala de Pregadores (Etapa 5)', () => {
                   return this;
                 },
                 order() {
-                  return Promise.resolve({ data: res, error: null });
+                  return this;
+                },
+                range(from: number, to: number) {
+                  res = res.slice(from, to + 1);
+                  return this;
+                },
+                then(resolve: any) {
+                  return Promise.resolve({ data: res, count: res.length, error: null }).then(resolve);
                 },
                 single() {
                   return Promise.resolve({ data: res[0] || null, error: null });
@@ -484,7 +504,7 @@ describe('Homologação Funcional: Escala de Pregadores (Etapa 5)', () => {
     });
 
     assert.equal(lista.length, 3, 'Deve listar apenas os 3 eventos agendados, ignorando o cancelado');
-    const ids = lista.map((e) => e.id);
+    const ids = (lista as any[]).map((e: any) => e.id);
     assert.ok(!ids.includes('evt-cancelado'), 'Evento cancelado não deve ser listado para escala');
   });
 
@@ -512,5 +532,23 @@ describe('Homologação Funcional: Escala de Pregadores (Etapa 5)', () => {
     assert.equal(m1?.total_escalas_ano, 1);
     assert.equal(m2?.total_escalas_ano, 0);
     assert.equal(m2?.is_menos_escalado, true, 'min-02 com 0 escalas deve receber o indicador is_menos_escalado');
+  });
+
+  // ─── Teste 9: Paginação Real no Backend com Contagem Total ─────────────────
+  it('9. Homologação: deve suportar paginação real com limite, página e total de registros', async () => {
+    const { mockClient } = setupMockHomologacao();
+
+    const resultadoPaginado = await EscalaPregadoresService.listarEventosComEscala(mockClient, {
+      ministryId,
+      pagina: 1,
+      itensPorPagina: 2,
+    });
+
+    assert.ok(resultadoPaginado.eventos, 'Deve retornar objeto com campo eventos');
+    assert.equal(resultadoPaginado.pagina, 1);
+    assert.equal(resultadoPaginado.itensPorPagina, 2);
+    assert.equal(resultadoPaginado.eventos.length, 2, 'Página 1 com limit 2 deve retornar 2 itens');
+    assert.equal(resultadoPaginado.total, 3, 'Total geral deve contemplar os 3 eventos agendados');
+    assert.equal(resultadoPaginado.totalPaginas, 2);
   });
 });
