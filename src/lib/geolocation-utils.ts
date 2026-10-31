@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase-client'
+import { buildAccentInsensitiveRegex } from '@/lib/search-normalizer'
 
 /** Normaliza status do banco ('active'/'inactive') para o formato da interface ('ativo'/'inativo') */
 function normalizeStatus(status: string | null | undefined): 'ativo' | 'inativo' {
@@ -95,7 +96,12 @@ export async function buscarMembrosFiltrados(filtros: {
       .not('longitude', 'is', null)
 
     if (filtros.nome) {
-      query = query.ilike('name', `%${filtros.nome}%`)
+      const regex = buildAccentInsensitiveRegex(filtros.nome)
+      if (regex) {
+        query = query.imatch('name', regex)
+      } else {
+        query = query.ilike('name', `%${filtros.nome}%`)
+      }
     }
     if (filtros.cidade) {
       query = query.ilike('cidade', `%${filtros.cidade}%`)

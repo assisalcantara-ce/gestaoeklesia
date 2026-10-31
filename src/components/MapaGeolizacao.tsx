@@ -86,6 +86,12 @@ export default function MapaGeolizacao({ marcadores, selectedMarker, onMarkerCli
       }
     };
 
+    // O Google Maps dispara window.gm_authFailure quando há erro de chave, referenciador HTTP, faturamento ou API desabilitada
+    (window as any).gm_authFailure = () => {
+      console.error('Google Maps gm_authFailure disparado.');
+      setLoadError('Erro de autenticação no Google Maps: Verifique se a "Maps JavaScript API" está habilitada no projeto Google Cloud e se as restrições de referenciador HTTP ou faturamento permitem este domínio.');
+    };
+
     initMap();
 
     return () => {
@@ -226,6 +232,9 @@ export default function MapaGeolizacao({ marcadores, selectedMarker, onMarkerCli
     });
 
     infoWindowRef.current = infoWindow;
+
+    // Suavemente centralizar o mapa no ponto selecionado
+    mapInstanceRef.current.panTo({ lat, lng });
   }, [selectedMarker, isLoaded]);
 
   if (loadError) {
