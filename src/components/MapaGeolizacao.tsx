@@ -131,10 +131,16 @@ export default function MapaGeolizacao({ marcadores, selectedMarker, onMarkerCli
         ? parseFloat(marcador.longitude) 
         : marcador.longitude;
 
-      // Determinar cor do marcador
-      let markerColor = '#3366ff'; // azul padrão
+      const isSelected = selectedMarker?.id === marcador.id;
+
+      // Determinar cor e tamanho do marcador
+      let markerColor = '#2563eb'; // azul padrão (membro)
       if (marcador.tipo === 'CONGREGACAO') {
-        markerColor = '#ff8800'; // laranja para congregações
+        markerColor = '#d97706'; // âmbar para congregações
+      }
+
+      if (isSelected) {
+        markerColor = '#dc2626'; // vermelho de destaque para o selecionado
       }
 
       // Criar marcador
@@ -142,13 +148,14 @@ export default function MapaGeolizacao({ marcadores, selectedMarker, onMarkerCli
         position: { lat, lng },
         map: mapInstanceRef.current,
         title: marcador.nome,
+        zIndex: isSelected ? 999 : 1,
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
-          scale: 8,
+          scale: isSelected ? 11 : 7.5,
           fillColor: markerColor,
-          fillOpacity: 0.8,
+          fillOpacity: isSelected ? 1 : 0.85,
           strokeColor: '#ffffff',
-          strokeWeight: 2
+          strokeWeight: isSelected ? 3 : 2,
         }
       });
 
@@ -161,11 +168,11 @@ export default function MapaGeolizacao({ marcadores, selectedMarker, onMarkerCli
       bounds.extend({ lat, lng });
     });
 
-    // Ajustar zoom para mostrar todos os marcadores
-    if (markersRef.current.length > 0) {
+    // Ajustar zoom para mostrar todos os marcadores se não houver um selecionado
+    if (markersRef.current.length > 0 && !selectedMarker) {
       mapInstanceRef.current?.fitBounds(bounds);
     }
-  }, [marcadores, isLoaded, onMarkerClick]);
+  }, [marcadores, isLoaded, onMarkerClick, selectedMarker]);
 
   // Mostrar InfoWindow quando selecionar marcador
   useEffect(() => {
@@ -187,39 +194,56 @@ export default function MapaGeolizacao({ marcadores, selectedMarker, onMarkerCli
       infoWindowRef.current.close();
     }
 
-    // Criar conteúdo HTML
+    const congregacaoExibicao = selectedMarker.congregacaoNome || selectedMarker.congregacaoId || '';
+
+    // Criar conteúdo HTML moderno e institucional
     const content = `
-      <div class="p-3 max-w-xs bg-white rounded-lg">
-        <h3 class="font-bold text-gray-900 mb-2">${selectedMarker.nome}</h3>
-        <div class="space-y-2 text-sm">
-          <div class="flex items-center gap-2">
-            <span class="inline-block px-2 py-1 rounded text-xs font-semibold ${
-              selectedMarker.tipo === 'CONGREGACAO' 
-                ? 'bg-orange-100 text-orange-800' 
-                : 'bg-blue-100 text-blue-800'
-            }">
-              ${selectedMarker.tipo === 'CONGREGACAO' ? 'Congregação' : 'Membro'}
-            </span>
-          </div>
-          ${selectedMarker.logradouro ? `<p class="text-gray-600"><strong>Endereço:</strong> ${selectedMarker.logradouro}${selectedMarker.numero ? ', ' + selectedMarker.numero : ''}</p>` : ''}
-          ${selectedMarker.bairro ? `<p class="text-gray-600"><strong>Bairro:</strong> ${selectedMarker.bairro}</p>` : ''}
-          ${selectedMarker.cidade ? `<p class="text-gray-600"><strong>Cidade:</strong> ${selectedMarker.cidade}</p>` : ''}
-          ${selectedMarker.congregacao ? `<p class="text-gray-600"><strong>Congregação:</strong> ${selectedMarker.congregacao}</p>` : ''}
-          <p class="text-gray-600"><strong>Status:</strong> <span class="px-2 py-1 rounded text-xs font-semibold ${
+      <div style="font-family: system-ui, -apple-system, sans-serif; padding: 12px 14px; min-width: 220px; max-width: 280px; color: #1e293b;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; gap: 8px;">
+          <span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; ${
+            selectedMarker.tipo === 'CONGREGACAO' 
+              ? 'background-color: #fef3c7; color: #92400e;' 
+              : 'background-color: #dbeafe; color: #1e40af;'
+          }">
+            ${selectedMarker.tipo === 'CONGREGACAO' ? 'Congregação' : 'Membro'}
+          </span>
+          <span style="display: inline-block; padding: 2px 7px; border-radius: 9999px; font-size: 10px; font-weight: 600; ${
             selectedMarker.status === 'ativo' 
-              ? 'bg-green-100 text-green-800' 
-              : 'bg-gray-100 text-gray-800'
-          }">${selectedMarker.status === 'ativo' ? 'Ativo' : 'Inativo'}</span></p>
-          ${selectedMarker.celular ? `<p class="text-gray-700 flex items-center gap-2"><span class="text-teal-600">📱</span> ${selectedMarker.celular}</p>` : ''}
-          ${selectedMarker.email ? `<p class="text-gray-700 flex items-center gap-2"><span class="text-teal-600">✉️</span> ${selectedMarker.email}</p>` : ''}
+              ? 'background-color: #dcfce7; color: #166534;' 
+              : 'background-color: #f1f5f9; color: #475569;'
+          }">
+            ${selectedMarker.status === 'ativo' ? 'Ativo' : 'Inativo'}
+          </span>
         </div>
+
+        <h4 style="font-size: 14px; font-weight: 700; color: #0f172a; margin: 0 0 6px 0; line-height: 1.3;">
+          ${selectedMarker.nome}
+        </h4>
+
+        ${congregacaoExibicao ? `
+          <div style="font-size: 12px; color: #475569; margin-bottom: 4px; display: flex; align-items: center; gap: 5px;">
+            <span>⛪</span> <strong>${congregacaoExibicao}</strong>
+          </div>
+        ` : ''}
+
+        ${selectedMarker.cidade ? `
+          <div style="font-size: 11px; color: #64748b; margin-bottom: 4px; display: flex; align-items: center; gap: 5px;">
+            <span>📍</span> ${selectedMarker.bairro ? `${selectedMarker.bairro}, ` : ''}${selectedMarker.cidade}
+          </div>
+        ` : ''}
+
+        ${selectedMarker.celular ? `
+          <div style="font-size: 11px; color: #0284c7; margin-top: 6px; display: flex; align-items: center; gap: 5px;">
+            <span>📱</span> ${selectedMarker.celular}
+          </div>
+        ` : ''}
       </div>
     `;
 
     // Criar InfoWindow
     const infoWindow = new google.maps.InfoWindow({
       content: content,
-      maxWidth: 300
+      maxWidth: 320
     });
 
     infoWindow.open({
@@ -239,21 +263,20 @@ export default function MapaGeolizacao({ marcadores, selectedMarker, onMarkerCli
 
   if (loadError) {
     return (
-      <div
-        className="w-full flex items-center justify-center bg-gray-50 border border-gray-200 rounded-xl p-8"
-        style={{ minHeight: '600px' }}
-      >
+      <div className="w-full h-full min-h-[460px] flex items-center justify-center bg-slate-50 border border-slate-200 rounded-2xl p-8">
         <div className="text-center max-w-md">
-          <div className="text-4xl mb-3">⚠️</div>
-          <h3 className="text-base font-bold text-gray-800 mb-1">Não foi possível exibir o mapa</h3>
-          <p className="text-xs text-gray-600 mb-4">{loadError}</p>
+          <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center text-2xl mx-auto mb-3 shadow-xs">
+            ⚠️
+          </div>
+          <h3 className="text-base font-bold text-slate-800 mb-1.5">Não foi possível exibir o mapa</h3>
+          <p className="text-xs text-slate-600 mb-4 leading-relaxed">{loadError}</p>
           <button
             onClick={() => {
               setLoadError(null);
               setIsLoaded(false);
               isGoogleMapsOptionsConfigured = false;
             }}
-            className="px-4 py-2 bg-[#123b63] hover:bg-[#0e2f50] text-white text-xs font-semibold rounded-lg transition shadow-sm"
+            className="px-4 py-2 bg-[#123b63] hover:bg-[#0e2f50] text-white text-xs font-semibold rounded-xl transition shadow-xs"
           >
             Tentar Novamente
           </button>
@@ -263,19 +286,18 @@ export default function MapaGeolizacao({ marcadores, selectedMarker, onMarkerCli
   }
 
   return (
-    <div className="relative w-full" style={{ minHeight: '600px' }}>
+    <div className="relative w-full h-full min-h-[460px] flex flex-col">
       {!isLoaded && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-gray-50/80 backdrop-blur-sm rounded-xl">
-          <div className="text-center text-gray-500">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#123b63] mx-auto mb-2" />
-            <p className="text-xs font-medium">Inicializando visualização geográfica...</p>
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-50/80 backdrop-blur-xs rounded-2xl">
+          <div className="text-center text-slate-500">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#123b63] border-t-transparent mx-auto mb-2" />
+            <p className="text-xs font-medium text-slate-600">Inicializando visualização geográfica...</p>
           </div>
         </div>
       )}
       <div 
         ref={mapRef} 
-        className="w-full h-full rounded-xl overflow-hidden shadow-inner"
-        style={{ minHeight: '600px' }}
+        className="w-full flex-1 rounded-2xl overflow-hidden shadow-xs"
       />
     </div>
   );

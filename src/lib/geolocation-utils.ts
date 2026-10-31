@@ -27,7 +27,8 @@ export interface Membro {
   longitude?: string | number;
   status: 'ativo' | 'inativo';
   tipoCadastro: 'membro' | 'congregado' | 'ministro' | 'crianca';
-  congregacao?: string;
+  congregacaoId?: string;
+  congregacaoNome?: string;
   supervisao?: string;
   fotoUrl?: string;
 }
@@ -45,7 +46,7 @@ export async function buscarMembrosComGeolocalizacao(): Promise<Membro[]> {
   try {
     const { data, error } = await supabase
       .from('members')
-      .select('id, name, email, phone, celular, latitude, longitude, cidade, logradouro, bairro, numero, status, tipo_cadastro, congregacao_id')
+      .select('id, name, email, phone, celular, latitude, longitude, cidade, logradouro, bairro, numero, status, tipo_cadastro, congregacao_id, congregacoes:congregacao_id(id, nome)')
       .not('latitude', 'is', null)
       .not('longitude', 'is', null)
       .order('name', { ascending: true })
@@ -55,21 +56,25 @@ export async function buscarMembrosComGeolocalizacao(): Promise<Membro[]> {
       return []
     }
 
-    return (data || []).map((row: any): Membro => ({
-      id: row.id,
-      nome: row.name ?? '',
-      email: row.email ?? undefined,
-      celular: row.celular || row.phone || undefined,
-      logradouro: row.logradouro ?? undefined,
-      numero: row.numero ?? undefined,
-      bairro: row.bairro ?? undefined,
-      cidade: row.cidade ?? undefined,
-      latitude: row.latitude ?? undefined,
-      longitude: row.longitude ?? undefined,
-      status: normalizeStatus(row.status),
-      tipoCadastro: normalizeTipoCadastro(row.tipo_cadastro),
-      congregacao: row.congregacao_id ?? undefined,
-    }))
+    return (data || []).map((row: any): Membro => {
+      const congObj = Array.isArray(row.congregacoes) ? row.congregacoes[0] : row.congregacoes
+      return {
+        id: row.id,
+        nome: row.name ?? '',
+        email: row.email ?? undefined,
+        celular: row.celular || row.phone || undefined,
+        logradouro: row.logradouro ?? undefined,
+        numero: row.numero ?? undefined,
+        bairro: row.bairro ?? undefined,
+        cidade: row.cidade ?? undefined,
+        latitude: row.latitude ?? undefined,
+        longitude: row.longitude ?? undefined,
+        status: normalizeStatus(row.status),
+        tipoCadastro: normalizeTipoCadastro(row.tipo_cadastro),
+        congregacaoId: row.congregacao_id ?? undefined,
+        congregacaoNome: congObj?.nome ?? undefined,
+      }
+    })
   } catch (error) {
     console.error('Erro ao buscar membros com geolocalização:', error)
     return []
@@ -91,7 +96,7 @@ export async function buscarMembrosFiltrados(filtros: {
   try {
     let query = supabase
       .from('members')
-      .select('id, name, email, phone, celular, latitude, longitude, cidade, logradouro, bairro, numero, status, tipo_cadastro, congregacao_id')
+      .select('id, name, email, phone, celular, latitude, longitude, cidade, logradouro, bairro, numero, status, tipo_cadastro, congregacao_id, congregacoes:congregacao_id(id, nome)')
       .not('latitude', 'is', null)
       .not('longitude', 'is', null)
 
@@ -127,23 +132,54 @@ export async function buscarMembrosFiltrados(filtros: {
       return []
     }
 
-    return (data || []).map((row: any): Membro => ({
-      id: row.id,
-      nome: row.name ?? '',
-      email: row.email ?? undefined,
-      celular: row.celular || row.phone || undefined,
-      logradouro: row.logradouro ?? undefined,
-      numero: row.numero ?? undefined,
-      bairro: row.bairro ?? undefined,
-      cidade: row.cidade ?? undefined,
-      latitude: row.latitude ?? undefined,
-      longitude: row.longitude ?? undefined,
-      status: normalizeStatus(row.status),
-      tipoCadastro: normalizeTipoCadastro(row.tipo_cadastro),
-      congregacao: row.congregacao_id ?? undefined,
-    }))
+    return (data || []).map((row: any): Membro => {
+      const congObj = Array.isArray(row.congregacoes) ? row.congregacoes[0] : row.congregacoes
+      return {
+        id: row.id,
+        nome: row.name ?? '',
+        email: row.email ?? undefined,
+        celular: row.celular || row.phone || undefined,
+        logradouro: row.logradouro ?? undefined,
+        numero: row.numero ?? undefined,
+        bairro: row.bairro ?? undefined,
+        cidade: row.cidade ?? undefined,
+        latitude: row.latitude ?? undefined,
+        longitude: row.longitude ?? undefined,
+        status: normalizeStatus(row.status),
+        tipoCadastro: normalizeTipoCadastro(row.tipo_cadastro),
+        congregacaoId: row.congregacao_id ?? undefined,
+        congregacaoNome: congObj?.nome ?? undefined,
+      }
+    })
   } catch (error) {
     console.error('Erro ao buscar membros filtrados:', error)
+    return []
+  }
+}
+
+/**
+ * Buscar congregações para filtros (id e nome)
+ * Respeita RLS e ministry_id automaticamente via createClient
+ */
+export async function listarCongregacoesFiltro(): Promise<{ id: string; nome: string }[]> {
+  const supabase = createClient()
+  try {
+    const { data, error } = await supabase
+      .from('congregacoes')
+      .select('id, nome')
+      .order('nome', { ascending: true })
+
+    if (error) {
+      console.error('Erro ao listar congregações para filtro:', error)
+      return []
+    }
+
+    return (data || []).map((c: any) => ({
+      id: c.id,
+      nome: c.nome || 'Sem Nome'
+    }))
+  } catch (error) {
+    console.error('Erro ao listar congregações para filtro:', error)
     return []
   }
 }
@@ -282,7 +318,7 @@ export function gerarKML(marcadores: Marcador[]): string {
           <b>Status:</b> ${marcador.status}<br/>
           ${marcador.celular ? `<b>Celular:</b> ${marcador.celular}<br/>` : ''}
           ${marcador.email ? `<b>Email:</b> ${marcador.email}<br/>` : ''}
-          ${marcador.congregacao ? `<b>Congregação:</b> ${marcador.congregacao}<br/>` : ''}
+          ${(marcador.congregacaoNome || marcador.congregacaoId) ? `<b>Congregação:</b> ${marcador.congregacaoNome || marcador.congregacaoId}<br/>` : ''}
         ]]></description>
         <styleUrl>#${marcador.tipo === 'CONGREGACAO' ? 'congregacao' : 'membro'}</styleUrl>
         <Point>
