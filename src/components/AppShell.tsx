@@ -32,6 +32,7 @@ const SIDEBAR_PREFIXES = [
 ];
 
 const STANDALONE_PUBLIC_PREFIXES = [
+  '/pastor',
   '/reunioes/painel',
   '/eventos/check-in',
   '/eventos/e',

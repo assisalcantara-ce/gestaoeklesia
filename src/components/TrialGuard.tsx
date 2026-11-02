@@ -31,6 +31,7 @@ const BYPASS_PATHS = [
   '/revista',
   '/igreja',
   '/app',
+  '/pastor',
 ]
 
 /** Intervalo de polling para re-verificar o status do trial (5 minutos). */
@@ -120,3 +121,4 @@ export function TrialGuard({ children }: { children: React.ReactNode }) {
   // Renderização transparente — TrialGuard não adiciona markup
   return <>{children}</>
 }
+

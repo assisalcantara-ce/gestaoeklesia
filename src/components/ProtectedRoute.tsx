@@ -32,6 +32,7 @@ const PUBLIC_PREFIXES = [
   // Apenas as rotas mobile públicas explícitas estão liberadas do ProtectedRoute global
   '/app/login',
   '/app/vincular',
+  '/pastor',
 ]
 
 function isPublicPath(pathname: string): boolean {

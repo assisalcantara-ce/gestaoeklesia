@@ -20,7 +20,7 @@ import {
   Building2, Users, Award, CalendarDays,
   Cake, MessageCircle, FileText, Key,
   Clock, ClipboardList, LogOut,
-  ChevronRight, Sparkles,
+  ChevronRight, Sparkles, Smartphone, ShieldCheck,
 } from 'lucide-react';
 
 // helpers
@@ -943,6 +943,83 @@ export default function DashboardPage() {
               </div>
             </div>
 
+          </div>
+
+          {/* ── APLICATIVOS GESTÃO EKLÉSIA ──────────────────────────────────── */}
+          <div className="bg-white rounded-2xl shadow-2xs border border-slate-200/80 p-5">
+            <div className="pb-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-base font-bold text-[#1E3A5F]">Aplicativos Gestão Eklésia</h3>
+                <p className="text-xs text-slate-400">Acesse as interfaces mobile dedicadas para membros e liderança</p>
+              </div>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 self-start sm:self-auto">
+                <Smartphone size={13} /> Mobile & PWA
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              {/* Card 1: Aplicativo do Membro */}
+              <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-br from-slate-900 via-slate-900 to-blue-950 p-5 text-white flex flex-col justify-between shadow-xs hover:border-blue-500/40 transition">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-blue-500/20 border border-blue-400/30 text-blue-400 flex items-center justify-center shrink-0">
+                      <Smartphone size={22} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400">Portal do Membro</span>
+                      <h4 className="text-base font-bold text-white leading-tight">Aplicativo do Membro</h4>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 shrink-0">
+                    /app
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 my-4 leading-relaxed">
+                  Carteirinha digital, contribuições via PIX, escala, pedidos de oração, avisos, eventos e acompanhamento da EBD na palma da mão.
+                </p>
+                <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-3">
+                  <span className="text-[11px] text-slate-400">Todos os membros vinculados</span>
+                  <button
+                    onClick={() => router.push('/app')}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white rounded-xl text-xs font-bold transition shadow-md shadow-blue-900/40 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>Abrir aplicativo</span>
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Card 2: Aplicativo do Pastor */}
+              <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-br from-[#0a1628] via-[#0d1f3c] to-[#12284b] p-5 text-white flex flex-col justify-between shadow-xs hover:border-amber-500/40 transition">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-amber-500/20 border border-amber-400/30 text-amber-400 flex items-center justify-center shrink-0">
+                      <ShieldCheck size={22} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">Presidência & Gestão</span>
+                      <h4 className="text-base font-bold text-white leading-tight">Aplicativo do Pastor</h4>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+                    /pastor
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 my-4 leading-relaxed">
+                  Deliberações ministeriais, resumo financeiro consolidado, indicadores de almas, crescimento e visão executiva para pastores e administradores.
+                </p>
+                <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-3">
+                  <span className="text-[11px] text-slate-400">Acesso restrito à liderança</span>
+                  <button
+                    onClick={() => router.push('/pastor')}
+                    className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-95 text-[#0a1628] rounded-xl text-xs font-bold transition shadow-md shadow-amber-950/40 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>Abrir aplicativo</span>
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* ── RESUMO INSTITUCIONAL ──────────────────────────────────────── */}
