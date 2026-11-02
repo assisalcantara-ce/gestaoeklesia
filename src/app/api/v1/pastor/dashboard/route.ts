@@ -167,17 +167,18 @@ export async function GET(request: NextRequest) {
       console.error('[pastor/dashboard] Erro ao carregar indicadores espirituais:', err);
     }
 
-    // 5. Dados do ministério (nome, cidade)
-    let ministerio = { nome: '', cidade: '' };
+    // 5. Dados do ministério (nome, cidade, logo_url)
+    let ministerio = { nome: '', cidade: '', logoUrl: null as string | null };
     try {
       const { data: min } = await admin
         .from('ministries')
-        .select('name, city')
+        .select('name, city, logo_url')
         .eq('id', ministryId)
         .maybeSingle();
       ministerio = {
         nome: min?.name || '',
         cidade: min?.city || '',
+        logoUrl: min?.logo_url || null,
       };
     } catch (err) {
       console.error('[pastor/dashboard] Erro ao carregar dados do ministério:', err);

@@ -42,8 +42,11 @@ export default function PastorBottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-[#0d1a2e]/95 backdrop-blur-md border-t border-slate-800/60 z-50 flex items-center justify-around px-2"
-      style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)' }}
+      className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-[#0c182d]/98 backdrop-blur-md border-t border-[#1e2f4d]/80 z-50 flex items-stretch justify-around px-1"
+      style={{
+        height: 'calc(68px + env(safe-area-inset-bottom, 0px))',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }}
     >
       {TABS.map((tab) => {
         const Icon = tab.icon;
@@ -52,27 +55,27 @@ export default function PastorBottomNav() {
           <button
             key={tab.href}
             onClick={() => router.push(tab.href)}
-            className="relative flex flex-col items-center justify-center gap-1 flex-1 py-2 px-0.5 min-w-0 cursor-pointer transition-all active:scale-95 select-none"
+            className="relative flex flex-col items-center justify-center gap-1 flex-1 py-1 px-0.5 min-w-0 min-h-[44px] cursor-pointer transition-all active:scale-95 select-none"
             aria-label={tab.label}
           >
             <Icon
-              size={20}
+              size={22}
               className={
                 active
-                  ? 'text-amber-400'
+                  ? 'text-[#f59e0b]'
                   : 'text-slate-400'
               }
-              strokeWidth={active ? 2.2 : 1.7}
+              strokeWidth={active ? 2.3 : 1.8}
             />
             <span
-              className={`text-[10px] font-semibold tracking-tight truncate max-w-full transition-colors ${
-                active ? 'text-amber-400' : 'text-slate-400'
+              className={`text-[11px] font-semibold tracking-tight truncate max-w-full transition-colors ${
+                active ? 'text-[#f59e0b]' : 'text-slate-400'
               }`}
             >
               {tab.label}
             </span>
             {active && (
-              <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-amber-400" />
+              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-[3px] rounded-full bg-[#f59e0b]" />
             )}
           </button>
         );
