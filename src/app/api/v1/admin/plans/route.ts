@@ -67,9 +67,6 @@ export async function POST(request: NextRequest) {
     const priceMonthly = Number(body?.price_monthly)
     const priceAnnually = Number(body?.price_annually || 0)
     const setupFee = Number(body?.setup_fee || 0)
-    const maxUsers = Number(body?.max_users)
-    const maxMembers = Number(body?.max_members ?? 0)
-    const maxMinisterios = Number(body?.max_ministerios)
     const additionalChurchMonthlyFee = Number(body?.additional_church_monthly_fee ?? 50)
     const additionalAdminsPerChurch = Number(body?.additional_admin_users_per_church ?? 2)
 
