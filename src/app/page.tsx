@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { BRAND } from '@/config/brand';
 import NotificationModal from '@/components/NotificationModal';
 import { formatPhone } from '@/lib/mascaras';
 import { createClient } from '@/lib/supabase-client';
 import { formatarPreco } from '@/config/plans';
-import { Users, CircleDollarSign, Calendar, BarChart3, ArrowRight, Play, CheckCircle2, ShieldCheck, Target, ChevronDown, Sparkles, UserPlus, Coins, FileText, TrendingUp, BookOpen, Smartphone, Heart, Rocket } from 'lucide-react';
+import { Users, CircleDollarSign, Calendar, BarChart3, ArrowRight, Play, CheckCircle2, ShieldCheck, Target, ChevronDown, ChevronLeft, ChevronRight, Sparkles, UserPlus, Coins, FileText, TrendingUp, BookOpen, Smartphone, Heart, Rocket } from 'lucide-react';
 
 const pillars = [
   {
@@ -220,7 +220,6 @@ export default function LandingPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [planosLanding, setPlanosLanding] = useState<PlanoDB[]>([]);
-  const [showAllPlanos] = useState(false);
   const [successModal, setSuccessModal] = useState({
     isOpen: false,
     email: ''
@@ -264,20 +263,66 @@ export default function LandingPage() {
       .toLowerCase()
       .trim();
 
-  const planosDestaque = ['basic', 'basico', 'starter', 'intermediario', 'profissional']
-    .reduce((acc, key) => {
-      const plan = planosLanding.find((item) =>
-        normalizePlanKey(item.slug || item.name) === key || normalizePlanKey(item.name) === key
-      );
-      if (plan && !acc.some((existing) => existing.id === plan.id)) {
-        acc.push(plan);
-      }
-      return acc;
-    }, [] as PlanoDB[]);
+  // Ordem comercial padrão solicitada: Júnior -> Basic -> Starter -> Intermediário -> Profissional
+  const ordemComercialPadrao = ['junior', 'basic', 'starter', 'intermediario', 'profissional'];
 
-  const planosVisiveis = showAllPlanos
-    ? planosLanding
-    : (planosDestaque.length > 0 ? planosDestaque : planosLanding.slice(0, 4));
+  // Ordenação dinâmica: se o administrador configurar display_order diferentes no banco/painel, respeita estritamente o display_order.
+  // Caso os planos tenham display_order idêntico (ex: default 0), aplica a esteira comercial oficial (Júnior, Basic, Starter, Intermediário, Profissional).
+  const planosOrdenados = [...planosLanding].sort((a, b) => {
+    const orderA = a.display_order ?? 0;
+    const orderB = b.display_order ?? 0;
+
+    if (orderA !== orderB) {
+      return orderA - orderB;
+    }
+
+    const keyA = normalizePlanKey(a.slug || a.name);
+    const keyB = normalizePlanKey(b.slug || b.name);
+    const idxA = ordemComercialPadrao.indexOf(keyA);
+    const idxB = ordemComercialPadrao.indexOf(keyB);
+
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+
+    return (a.price_monthly ?? 0) - (b.price_monthly ?? 0);
+  });
+
+  // Referência e controles de rolagem do carrossel horizontal
+  const carouselRef = useRef<HTMLDivElement | null>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const [needsCarousel, setNeedsCarousel] = useState(false);
+
+  const checkCarouselScroll = useCallback(() => {
+    const el = carouselRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    const maxScroll = scrollWidth - clientWidth;
+    const hasOverflow = maxScroll > 4; // tolerância para subpixels
+    setNeedsCarousel(hasOverflow);
+    setCanScrollLeft(scrollLeft > 4);
+    setCanScrollRight(scrollLeft < maxScroll - 4);
+  }, []);
+
+  useEffect(() => {
+    checkCarouselScroll();
+    const handleResize = () => checkCarouselScroll();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [planosOrdenados, checkCarouselScroll]);
+
+  const scrollCarousel = (direction: 'left' | 'right') => {
+    const el = carouselRef.current;
+    if (!el) return;
+    // Rola a largura de um card + gap
+    const firstCard = el.querySelector<HTMLElement>('[data-plan-card="true"]');
+    const scrollAmount = firstCard ? firstCard.offsetWidth + 24 : 320;
+    el.scrollBy({
+      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      behavior: 'smooth',
+    });
+  };
 
   const handleContactChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -981,112 +1026,162 @@ export default function LandingPage() {
             <p className="text-center text-slate-400 text-sm py-8">Carregando planos disponíveis...</p>
           )}
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 items-start">
-            {planosVisiveis.map((plan, idx) => {
-              const featured = idx === 1;
-              const highlights = buildHighlights(plan);
-              const modulePack = buildModuleHighlights(plan);
-              const modules = modulePack.modules;
-              const isExpanded = expandedPlanId === plan.id;
-              return (
-                <div
-                  key={plan.id}
-                  className={`rounded-2xl p-6 border transition-all duration-300 self-start ${
-                    featured
-                      ? 'bg-gradient-to-b from-blue-900 to-slate-900 text-white border-2 border-blue-500 shadow-xl lg:-translate-y-2 relative'
-                      : 'bg-white text-slate-900 border-slate-200 hover:border-blue-300 shadow-sm hover:shadow-md'
+          <div className="relative">
+            {/* Setas de navegação desktop/tablet (aparecem quando houver overflow/mais de 4 planos no viewport) */}
+            {needsCarousel && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => scrollCarousel('left')}
+                  disabled={!canScrollLeft}
+                  aria-label="Plano anterior"
+                  className={`hidden sm:flex absolute -left-4 lg:-left-6 top-1/2 -translate-y-1/2 z-20 w-11 h-11 items-center justify-center rounded-full bg-white/95 backdrop-blur-xs border border-slate-200/90 shadow-lg text-slate-700 transition-all duration-200 ${
+                    canScrollLeft
+                      ? 'hover:bg-blue-600 hover:text-white hover:border-blue-600 hover:scale-105 cursor-pointer shadow-blue-900/10'
+                      : 'opacity-30 cursor-not-allowed hover:bg-white text-slate-400 border-slate-200'
                   }`}
                 >
-                  {featured && (
-                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                      <span className="inline-flex text-[11px] font-bold uppercase tracking-wider bg-amber-400 text-slate-950 px-3 py-1 rounded-full shadow-md">
-                        Mais popular
-                      </span>
-                    </div>
-                  )}
-                  <h3 className={`text-xl font-bold mt-2 ${featured ? 'text-white' : 'text-slate-900'}`}>{plan.name}</h3>
-                  <p className={`text-xs mt-2 min-h-[36px] ${featured ? 'text-blue-200/80' : 'text-slate-500'}`}>
-                    {plan.description || ''}
-                  </p>
-                  <div className={`mt-4 pt-3 border-t ${featured ? 'border-blue-800' : 'border-slate-100'}`}>
-                    {plan.is_price_on_request ? (
-                      <p className="text-2xl font-bold">Consulte-nos</p>
-                    ) : (
-                      <>
-                        <p className={`text-3xl font-extrabold tracking-tight ${featured ? 'text-white' : 'text-slate-900'}`}>
-                          {formatarPreco(plan.price_monthly)}
-                        </p>
-                        {Number(plan.price_annually) > 0 && (
-                          <p className={`text-xs mt-1 ${featured ? 'text-blue-300' : 'text-slate-500'}`}>
-                            {formatarPreco(plan.price_annually ?? 0)}/ano
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </div>
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
 
-                  <ul className="mt-6 space-y-2.5 text-xs">
-                    {highlights.map((item) => (
-                      <li key={item} className="flex items-center gap-2">
-                        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${featured ? 'bg-amber-400' : 'bg-blue-600'}`} />
-                        <span className={featured ? 'text-blue-100' : 'text-slate-700'}>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
+                <button
+                  type="button"
+                  onClick={() => scrollCarousel('right')}
+                  disabled={!canScrollRight}
+                  aria-label="Próximo plano"
+                  className={`hidden sm:flex absolute -right-4 lg:-right-6 top-1/2 -translate-y-1/2 z-20 w-11 h-11 items-center justify-center rounded-full bg-white/95 backdrop-blur-xs border border-slate-200/90 shadow-lg text-slate-700 transition-all duration-200 ${
+                    canScrollRight
+                      ? 'hover:bg-blue-600 hover:text-white hover:border-blue-600 hover:scale-105 cursor-pointer shadow-blue-900/10'
+                      : 'opacity-30 cursor-not-allowed hover:bg-white text-slate-400 border-slate-200'
+                  }`}
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </>
+            )}
 
-                  <a
-                    href={plan.is_price_on_request ? '#contato' : `/pre-cadastro?plan=${plan.slug}`}
-                    className={`mt-6 inline-flex w-full justify-center px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer shadow-sm ${
+            {/* Container do Carrossel Horizontal */}
+            <div
+              ref={carouselRef}
+              onScroll={checkCarouselScroll}
+              className={`flex items-start gap-6 overflow-x-auto scroll-smooth py-5 px-1 sm:px-2 no-scrollbar ${
+                needsCarousel ? 'snap-x snap-mandatory' : 'justify-center'
+              }`}
+              style={{
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none',
+                WebkitOverflowScrolling: 'touch',
+              }}
+            >
+              {planosOrdenados.map((plan) => {
+                const planKey = normalizePlanKey(plan.slug || plan.name);
+                // Destaque visual oficial "Mais Popular" no Starter
+                const featured = planKey === 'starter';
+                const highlights = buildHighlights(plan);
+                const modulePack = buildModuleHighlights(plan);
+                const modules = modulePack.modules;
+                const isExpanded = expandedPlanId === plan.id;
+                return (
+                  <div
+                    key={plan.id}
+                    data-plan-card="true"
+                    className={`rounded-2xl p-6 border transition-all duration-300 self-start shrink-0 snap-start w-[85vw] max-w-[320px] sm:w-[calc(50%-12px)] sm:max-w-none lg:w-[calc(25%-18px)] ${
                       featured
-                        ? 'bg-amber-400 text-slate-950 hover:bg-amber-300 shadow-amber-950/20'
-                        : plan.is_price_on_request
-                          ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300'
-                          : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20'
+                        ? 'bg-gradient-to-b from-blue-900 to-slate-900 text-white border-2 border-blue-500 shadow-xl lg:-translate-y-2 relative'
+                        : 'bg-white text-slate-900 border-slate-200 hover:border-blue-300 shadow-sm hover:shadow-md'
                     }`}
                   >
-                    {plan.is_price_on_request ? 'Falar com consultor' : 'Teste grátis por 7 dias'}
-                  </a>
+                    {featured && (
+                      <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+                        <span className="inline-flex text-[11px] font-bold uppercase tracking-wider bg-amber-400 text-slate-950 px-3 py-1 rounded-full shadow-md">
+                          Mais popular
+                        </span>
+                      </div>
+                    )}
+                    <h3 className={`text-xl font-bold mt-2 ${featured ? 'text-white' : 'text-slate-900'}`}>{plan.name}</h3>
+                    <p className={`text-xs mt-2 min-h-[36px] ${featured ? 'text-blue-200/80' : 'text-slate-500'}`}>
+                      {plan.description || ''}
+                    </p>
+                    <div className={`mt-4 pt-3 border-t ${featured ? 'border-blue-800' : 'border-slate-100'}`}>
+                      {plan.is_price_on_request ? (
+                        <p className="text-2xl font-bold">Consulte-nos</p>
+                      ) : (
+                        <>
+                          <p className={`text-3xl font-extrabold tracking-tight ${featured ? 'text-white' : 'text-slate-900'}`}>
+                            {formatarPreco(plan.price_monthly)}
+                          </p>
+                          {Number(plan.price_annually) > 0 && (
+                            <p className={`text-xs mt-1 ${featured ? 'text-blue-300' : 'text-slate-500'}`}>
+                              {formatarPreco(plan.price_annually ?? 0)}/ano
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setExpandedPlanId(isExpanded ? null : plan.id)}
-                    className={`mt-3.5 flex w-fit items-center justify-center gap-1.5 text-xs mx-auto transition cursor-pointer ${
-                      featured ? 'text-blue-200 hover:text-white' : 'text-slate-500 hover:text-blue-600'
-                    }`}
-                    aria-expanded={isExpanded}
-                  >
-                    <span>Módulos inclusos</span>
-                    <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
-                  </button>
+                    <ul className="mt-6 space-y-2.5 text-xs">
+                      {highlights.map((item) => (
+                        <li key={item} className="flex items-center gap-2">
+                          <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${featured ? 'bg-amber-400' : 'bg-blue-600'}`} />
+                          <span className={featured ? 'text-blue-100' : 'text-slate-700'}>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
 
-                  <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-[360px] opacity-100 mt-3' : 'max-h-0 opacity-0'}`}>
-                    <div className={`rounded-xl border p-3.5 space-y-3 ${
-                      featured ? 'bg-blue-950/80 border-blue-800 text-blue-100' : 'bg-slate-50 border-slate-200 text-slate-700'
-                    }`}>
-                      <div>
-                        <p className={`text-[10px] font-bold uppercase tracking-[0.2em] ${featured ? 'text-blue-300' : 'text-blue-700'}`}>
-                          {modulePack.label}
-                        </p>
-                        {modules.length > 0 ? (
-                          <ul className="mt-2 space-y-1.5 text-xs">
-                            {modules.map((item) => (
-                              <li key={item} className="flex items-center gap-2">
-                                <span className={`h-1 w-1 rounded-full ${featured ? 'bg-blue-400' : 'bg-blue-600'}`} />
-                                <span className={item.startsWith('Todos do ') ? 'font-bold' : ''}>
-                                  {item}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="mt-2 text-xs opacity-60">Sem módulos adicionais incluídos.</p>
-                        )}
+                    <a
+                      href={plan.is_price_on_request ? '#contato' : `/pre-cadastro?plan=${plan.slug}`}
+                      className={`mt-6 inline-flex w-full justify-center px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer shadow-sm ${
+                        featured
+                          ? 'bg-amber-400 text-slate-950 hover:bg-amber-300 shadow-amber-950/20'
+                          : plan.is_price_on_request
+                            ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300'
+                            : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20'
+                      }`}
+                    >
+                      {plan.is_price_on_request ? 'Falar com consultor' : 'Teste grátis por 7 dias'}
+                    </a>
+
+                    <button
+                      type="button"
+                      onClick={() => setExpandedPlanId(isExpanded ? null : plan.id)}
+                      className={`mt-3.5 flex w-fit items-center justify-center gap-1.5 text-xs mx-auto transition cursor-pointer ${
+                        featured ? 'text-blue-200 hover:text-white' : 'text-slate-500 hover:text-blue-600'
+                      }`}
+                      aria-expanded={isExpanded}
+                    >
+                      <span>Módulos inclusos</span>
+                      <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-[360px] opacity-100 mt-3' : 'max-h-0 opacity-0'}`}>
+                      <div className={`rounded-xl border p-3.5 space-y-3 ${
+                        featured ? 'bg-blue-950/80 border-blue-800 text-blue-100' : 'bg-slate-50 border-slate-200 text-slate-700'
+                      }`}>
+                        <div>
+                          <p className={`text-[10px] font-bold uppercase tracking-[0.2em] ${featured ? 'text-blue-300' : 'text-blue-700'}`}>
+                            {modulePack.label}
+                          </p>
+                          {modules.length > 0 ? (
+                            <ul className="mt-2 space-y-1.5 text-xs">
+                              {modules.map((item) => (
+                                <li key={item} className="flex items-center gap-2">
+                                  <span className={`h-1 w-1 rounded-full ${featured ? 'bg-blue-400' : 'bg-blue-600'}`} />
+                                  <span className={item.startsWith('Todos do ') ? 'font-bold' : ''}>
+                                    {item}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="mt-2 text-xs opacity-60">Sem módulos adicionais incluídos.</p>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
       </section>
