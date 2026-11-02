@@ -90,7 +90,7 @@ async function checkMigrations() {
   }
 
   console.log('\n✅ Validação Enterprise Concluída: Todas as migrações registradas estão em conformidade com o banco remoto!');
-  process.exit(0);
 }
 
 checkMigrations();
+

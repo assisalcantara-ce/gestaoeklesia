@@ -49,8 +49,8 @@ const PATH_TO_MENU_ID: { path: string; id: string }[] = [
   { path: '/eventos',                          id: 'eventos'              },
   { path: '/patrimonio',                       id: 'patrimonio'           },
   { path: '/financeiro',                       id: 'financeiro'           },
-  { path: '/auditoria',                        id: 'auditoria'            },
   { path: '/geolocalizacao',                   id: 'geolocalizacao'       },
+  { path: '/auditoria',                        id: 'auditoria'            },
   { path: '/usuarios',                         id: 'usuarios'             },
   { path: '/suporte',                          id: 'suporte'              },
 ];

@@ -105,6 +105,7 @@ export const NAVIGATION_STRUCTURE: NavigationGroup[] = [
         ]
       },
       { id: 'financeiro', label: 'Financeiro', icon: '💳', path: '/financeiro', modulo: 'financeiro' },
+      { id: 'geolocalizacao', label: 'Geolocalização', icon: '📍', path: '/geolocalizacao', modulo: 'geolocalizacao' },
       { id: 'auditoria', label: 'Auditoria', icon: '✅', path: '/auditoria', modulo: 'auditoria' },
     ]
   },
@@ -144,7 +145,6 @@ export const NAVIGATION_STRUCTURE: NavigationGroup[] = [
       { id: 'reunioes', label: 'Reuniões', icon: '🤝', path: '/reunioes', modulo: 'reunioes', featureFlag: 'meetings_module', planFeature: 'has_modulo_reunioes' },
       { id: 'missoes', label: 'Missões', icon: '✈️', path: '/missoes', modulo: 'missoes', featureFlag: 'missions_module', planFeature: 'has_modulo_missoes' },
       { id: 'patrimonio', label: 'Patrimônio', icon: '🏢', path: '/patrimonio', modulo: 'patrimonio' },
-      { id: 'geolocalizacao', label: 'Geolocalização', icon: '📍', path: '/geolocalizacao', modulo: 'geolocalizacao' },
     ]
   }
 ];

@@ -119,9 +119,11 @@ export default function PlanosPage() {
           slug: slugValue,
           price_monthly: parseFloat(formData.price_monthly || '0'),
           price_annually: parseFloat(formData.price_annually || '0'),
-          max_users: parseInt(formData.max_users),
+          max_users: Number.isFinite(parseInt(formData.max_users)) && parseInt(formData.max_users) > 0
+            ? parseInt(formData.max_users)
+            : Math.max(2, (parseInt(formData.max_ministerios || '1') || 1) * 2),
           max_members: formData.members_unlimited ? 0 : parseInt(formData.max_members || '0'),
-          max_ministerios: parseInt(formData.max_ministerios),
+          max_ministerios: parseInt(formData.max_ministerios || '1') || 1,
           additional_church_monthly_fee: parseFloat(formData.additional_church_monthly_fee || '0'),
           additional_admin_users_per_church: parseInt(formData.additional_admin_users_per_church || '0'),
           setup_fee: parseFloat(formData.setup_fee || '0'),
@@ -309,10 +311,39 @@ export default function PlanosPage() {
                       type="number"
                       min="1"
                       value={formData.max_ministerios}
-                      onChange={(e) => setFormData({ ...formData, max_ministerios: e.target.value })}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        const num = parseInt(val)
+                        setFormData((prev) => ({
+                          ...prev,
+                          max_ministerios: val,
+                          // Se max_users estiver vazio ou padrão, sugere 2 por igreja
+                          max_users: !prev.max_users || prev.max_users === String((parseInt(prev.max_ministerios || '1') || 1) * 2)
+                            ? String(Math.max(2, (num || 1) * 2))
+                            : prev.max_users,
+                        }))
+                      }}
                       required
                       className="w-full px-4 py-2 border rounded-lg"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Usuários Administradores
+                      <span className="text-gray-400 font-normal text-xs ml-1">(acessos ao sistema)</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={formData.max_users}
+                      onChange={(e) => setFormData({ ...formData, max_users: e.target.value })}
+                      placeholder="Ex: 2 ou 10"
+                      className="w-full px-4 py-2 border rounded-lg"
+                    />
+                    <p className="mt-1 text-xs text-gray-400">
+                      Padrão sugerido: 2 por igreja inclusa
+                    </p>
                   </div>
 
                   <div className="md:col-span-3">
@@ -424,6 +455,10 @@ export default function PlanosPage() {
                         <li className="flex items-center text-sm">
                           <span className="font-semibold text-[#F8FAFC] mr-2">🏛️</span>
                           Até {(plan as any).max_ministerios || 0} Igrejas Inclusas
+                        </li>
+                        <li className="flex items-center text-sm">
+                          <span className="font-semibold text-[#F8FAFC] mr-2">🔑</span>
+                          Até {plan.max_users || 0} Usuários Administradores
                         </li>
                       </ul>
                     </div>

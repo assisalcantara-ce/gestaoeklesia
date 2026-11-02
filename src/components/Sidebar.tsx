@@ -85,8 +85,8 @@ const PATH_TO_MENU_ID: { path: string; id: string }[] = [
   { path: '/eventos',                          id: 'eventos'              },
   { path: '/patrimonio',                       id: 'patrimonio'           },
   { path: '/financeiro',                       id: 'financeiro'           },
-  { path: '/auditoria',                        id: 'auditoria'            },
   { path: '/geolocalizacao',                   id: 'geolocalizacao'       },
+  { path: '/auditoria',                        id: 'auditoria'            },
   { path: '/usuarios',                         id: 'usuarios'             },
   { path: '/suporte',                          id: 'suporte'              },
 ];
@@ -309,8 +309,8 @@ export default function Sidebar() {
     { id: 'achados-perdidos', label: 'Achados e Perdidos', icon: Search, path: '/secretaria/achados-perdidos', modulo: 'gestao' },
     { id: 'funcionarios', label: 'Funcionários', icon: UserCog, path: '/secretaria/funcionarios', modulo: 'funcionarios', featureFlag: 'employees_module', planFeature: 'has_modulo_funcionarios' },
     { id: 'financeiro', label: 'Financeiro', icon: CreditCard, path: '/financeiro', modulo: 'financeiro' },
-    { id: 'auditoria', label: 'Auditoria', icon: CheckCircle2, path: '/auditoria', modulo: 'auditoria' },
     { id: 'geolocalizacao', label: 'Geolocalização', icon: MapPin, path: '/geolocalizacao', modulo: 'geolocalizacao' },
+    { id: 'auditoria', label: 'Auditoria', icon: CheckCircle2, path: '/auditoria', modulo: 'auditoria' },
     { id: 'suporte', label: 'Suporte', icon: LifeBuoy, path: '/suporte', modulo: 'suporte' },
     {
       id: 'configuracoes',

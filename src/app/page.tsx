@@ -7,7 +7,7 @@ import NotificationModal from '@/components/NotificationModal';
 import { formatPhone } from '@/lib/mascaras';
 import { createClient } from '@/lib/supabase-client';
 import { formatarPreco } from '@/config/plans';
-import { Users, CircleDollarSign, Calendar, BarChart3, ArrowRight, Play, CheckCircle2, ShieldCheck, Target, ChevronDown, Sparkles, UserPlus, Coins, FileText, TrendingUp, BookOpen, Smartphone, Heart } from 'lucide-react';
+import { Users, CircleDollarSign, Calendar, BarChart3, ArrowRight, Play, CheckCircle2, ShieldCheck, Target, ChevronDown, Sparkles, UserPlus, Coins, FileText, TrendingUp, BookOpen, Smartphone, Heart, Rocket } from 'lucide-react';
 
 const pillars = [
   {
@@ -541,10 +541,20 @@ export default function LandingPage() {
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <a
                 href="/pre-cadastro?plan=starter&trial=true"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition shadow-lg shadow-blue-900/50 cursor-pointer group"
+                className="inline-flex items-center gap-3.5 px-6 py-3 rounded-2xl bg-gradient-to-b from-[#ff7e1d] to-[#f45300] hover:from-[#ff8b33] hover:to-[#ff5c0a] text-white shadow-lg shadow-orange-950/40 hover:shadow-orange-600/30 border border-orange-400/30 transition-all duration-200 cursor-pointer group active:scale-[0.98]"
               >
-                <span>Comece agora</span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                <div className="flex items-center justify-center">
+                  <Rocket className="w-6 h-6 text-white drop-shadow-sm group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-base sm:text-[17px] font-extrabold tracking-tight leading-snug drop-shadow-sm">
+                    Teste Grátis por 7 Dias
+                  </span>
+                  <span className="text-[12px] sm:text-[12.5px] font-medium text-orange-100/95 leading-none mt-0.5">
+                    Acesse todas as funcionalidades
+                  </span>
+                </div>
+                <ArrowRight className="w-5 h-5 ml-1 text-white/95 group-hover:translate-x-1 transition-transform" />
               </a>
 
               <a
