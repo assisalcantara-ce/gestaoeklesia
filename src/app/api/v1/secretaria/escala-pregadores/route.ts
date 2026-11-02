@@ -124,17 +124,92 @@ export async function GET(request: NextRequest) {
 
     // 4. Listagem de Congregações do Ministério (para filtros do módulo)
     if (acao === 'congregacoes') {
-      const { data: congregacoes, error: errCong } = await ctx.admin
+      const anoMes = searchParams.get('ano_mes');
+
+      // Se ano_mes for informado, restringe às congregações com eventos no período
+      let idsComEventos: string[] | null = null;
+      if (anoMes && anoMes.includes('-')) {
+        const [anoStr, mesStr] = anoMes.split('-');
+        const ano = parseInt(anoStr, 10);
+        const mes = parseInt(mesStr, 10);
+        const startOfMonth = new Date(Date.UTC(ano, mes - 1, 1, 0, 0, 0)).toISOString();
+        const endOfMonth = new Date(Date.UTC(ano, mes, 0, 23, 59, 59, 999)).toISOString();
+
+        let queryEventosPeriodo = ctx.admin
+          .from('agenda_eventos')
+          .select('church_id')
+          .eq('ministry_id', ctx.ministryId)
+          .neq('status', 'cancelado')
+          .not('church_id', 'is', null)
+          .gte('data_inicio', startOfMonth)
+          .lte('data_inicio', endOfMonth);
+
+        if (isLocalSecretary && ctx.congregacaoId) {
+          queryEventosPeriodo = queryEventosPeriodo.eq('church_id', ctx.congregacaoId);
+        }
+
+        const { data: evtsPeriodo, error: errEvts } = await queryEventosPeriodo;
+        if (errEvts) {
+          return NextResponse.json({ error: errEvts.message }, { status: 500 });
+        }
+
+        const idsSet = new Set((evtsPeriodo || []).map((e: any) => e.church_id).filter(Boolean));
+        idsComEventos = Array.from(idsSet);
+      }
+
+      // Se filtrou por período e não há nenhum evento específico de congregação
+      if (idsComEventos !== null && idsComEventos.length === 0) {
+        return NextResponse.json({ data: [] });
+      }
+
+      let queryCongs = ctx.admin
         .from('congregacoes')
-        .select('id, nome, is_sede')
+        .select('id, nome, campo_id, is_active')
         .eq('ministry_id', ctx.ministryId)
+        .or('is_active.eq.true,is_active.is.null')
         .order('nome');
+
+      if (isLocalSecretary && ctx.congregacaoId) {
+        queryCongs = queryCongs.eq('id', ctx.congregacaoId);
+      } else if (idsComEventos !== null) {
+        queryCongs = queryCongs.in('id', idsComEventos);
+      }
+
+      const { data: congs, error: errCong } = await queryCongs;
 
       if (errCong) {
         return NextResponse.json({ error: errCong.message }, { status: 500 });
       }
 
-      return NextResponse.json({ data: congregacoes || [] });
+      // Mapeia congregação Sede (seja por vínculo ao campo sede ou nomenclatura Templo Central / Sede)
+      const { data: camposSede } = await ctx.admin
+        .from('campos')
+        .select('id')
+        .eq('ministry_id', ctx.ministryId)
+        .eq('is_sede', true);
+      const sedeCamposSet = new Set((camposSede || []).map((c) => c.id));
+
+      const congregacoesFormatadas = (congs || []).map((c) => {
+        const isSede = Boolean(
+          (c.campo_id && sedeCamposSet.has(c.campo_id)) ||
+          c.nome?.toLowerCase().includes('templo central') ||
+          c.nome?.toLowerCase().includes('sede')
+        );
+        return {
+          id: c.id,
+          nome: c.nome,
+          is_sede: isSede,
+        };
+      });
+
+      // Ordenar: Sede primeiro, seguido de ordem alfabética das demais
+      congregacoesFormatadas.sort((a, b) => {
+        if (a.is_sede && !b.is_sede) return -1;
+        if (!a.is_sede && b.is_sede) return 1;
+        return a.nome.localeCompare(b.nome);
+      });
+
+      return NextResponse.json({ data: congregacoesFormatadas });
     }
 
     return NextResponse.json({ error: 'Ação não reconhecida.', code: 'INVALID_ACTION' }, { status: 400 });

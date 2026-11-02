@@ -526,3 +526,142 @@ export async function DELETE(
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
   }
 }
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+  try {
+    const context = await resolveTenantAuth(request)
+    const { supabase, ministryId } = context
+    const congregacaoIds = await getAccessibleCongregacaoIds(context)
+    const body = await request.json()
+
+    // 1. Localizar membro existente garantindo tenant e escopo de congregação
+    let existingQuery = supabase
+      .from('members')
+      .select('id, name, matricula, phone, celular, whatsapp, email, custom_fields')
+      .eq('id', id)
+      .eq('ministry_id', ministryId)
+
+    existingQuery = applyMemberCongregacaoScope(existingQuery, congregacaoIds)
+    const { data: existing } = await existingQuery.single()
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Membro não encontrado' }, { status: 404 })
+    }
+
+    const updates: Record<string, any> = {}
+    const existingCustomFields =
+      existing.custom_fields && typeof existing.custom_fields === 'object'
+        ? { ...existing.custom_fields }
+        : {}
+
+    // 2. Validação e sanitização de WhatsApp / Telefone
+    if ('whatsapp' in body || 'phone' in body || 'celular' in body) {
+      const rawWhatsapp = body.whatsapp !== undefined ? body.whatsapp : (body.celular !== undefined ? body.celular : body.phone)
+      if (rawWhatsapp === null || rawWhatsapp === '') {
+        updates.whatsapp = null
+        updates.phone = null
+        updates.celular = null
+        delete existingCustomFields.whatsapp
+        delete existingCustomFields.celular
+        delete existingCustomFields.phone
+      } else if (typeof rawWhatsapp === 'string') {
+        const digits = rawWhatsapp.replace(/\D/g, '')
+        if (digits.length > 0 && (digits.length < 10 || digits.length > 11)) {
+          return NextResponse.json(
+            { error: 'WhatsApp inválido. Informe um número com DDD (10 ou 11 dígitos).' },
+            { status: 400 }
+          )
+        }
+        updates.whatsapp = digits || null
+        updates.phone = digits || null
+        updates.celular = digits || null
+        if (digits) {
+          existingCustomFields.whatsapp = digits
+          existingCustomFields.celular = digits
+          existingCustomFields.phone = digits
+        } else {
+          delete existingCustomFields.whatsapp
+          delete existingCustomFields.celular
+          delete existingCustomFields.phone
+        }
+      }
+    }
+
+    // 3. Validação e sanitização de E-mail
+    if ('email' in body) {
+      const rawEmail = body.email
+      if (rawEmail === null || rawEmail === '') {
+        updates.email = null
+        delete existingCustomFields.email
+      } else if (typeof rawEmail === 'string') {
+        const cleanEmail = rawEmail.trim().toLowerCase()
+        if (cleanEmail.length > 0 && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(cleanEmail)) {
+          return NextResponse.json(
+            { error: 'E-mail inválido. Informe um endereço válido (exemplo@dominio.com).' },
+            { status: 400 }
+          )
+        }
+        updates.email = cleanEmail || null
+        if (cleanEmail) {
+          existingCustomFields.email = cleanEmail
+        } else {
+          delete existingCustomFields.email
+        }
+      }
+    }
+
+    updates.custom_fields = existingCustomFields
+    updates.updated_at = new Date().toISOString()
+
+    // 4. Executar atualização protegida
+    let updateQuery = supabase
+      .from('members')
+      .update(updates)
+      .eq('id', id)
+      .eq('ministry_id', ministryId)
+
+    updateQuery = applyMemberCongregacaoScope(updateQuery, congregacaoIds)
+    const { data: updatedData, error: updateError } = await updateQuery.select().single()
+
+    if (updateError || !updatedData) {
+      return NextResponse.json(
+        { error: updateError?.message || 'Falha ao atualizar contatos do membro.' },
+        { status: 400 }
+      )
+    }
+
+    // 5. Auditoria de servidor
+    await logServerAudit(context.admin, {
+      ministryId,
+      userId: context.userId,
+      acao: 'editar',
+      modulo: 'membros',
+      area: 'aniversariantes',
+      tabelaAfetada: 'members',
+      registroId: id,
+      descricao: `Contatos do aniversariante atualizados: ${existing.name || id} (WhatsApp: ${updates.whatsapp ?? 'não alterado'}, Email: ${updates.email ?? 'não alterado'})`,
+      dadosAnteriores: {
+        whatsapp: existing.whatsapp,
+        phone: existing.phone,
+        email: existing.email,
+      },
+      dadosNovos: {
+        whatsapp: updatedData.whatsapp,
+        phone: updatedData.phone,
+        email: updatedData.email,
+      },
+      status: 'sucesso',
+    })
+
+    return NextResponse.json(updatedData)
+  } catch (error) {
+    const authResponse = authTenantErrorResponse(error)
+    if (authResponse) return authResponse
+    console.error('PATCH /api/v1/members/:id:', error)
+    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
+  }
+}

@@ -45,6 +45,11 @@ import {
   ChevronRight,
   Coins,
   Scale,
+  Sparkles,
+  Heart,
+  TrendingUp,
+  TrendingDown,
+  ExternalLink,
 } from 'lucide-react';
 
 const INITIAL_RESUMO: PresidenciaResumo = {
@@ -54,6 +59,7 @@ const INITIAL_RESUMO: PresidenciaResumo = {
   cartasMudanca: 0,
   cartasDesligamento: 0,
   outrasCartas: 0,
+  agendaSolicitacoes: 0,
   totalLiderancasAtivas: 0,
 };
 
@@ -119,6 +125,7 @@ export default function PresidenciaPage() {
   const [modalDeliberarDirigente, setModalDeliberarDirigente] = useState<ProcessoDecisao | null>(null);
   const [modalEfetivarDirigente, setModalEfetivarDirigente] = useState<ProcessoDecisao | null>(null);
   const [modalDeliberarCarta, setModalDeliberarCarta] = useState<ProcessoDecisao | null>(null);
+  const [modalDeliberarAgenda, setModalDeliberarAgenda] = useState<ProcessoDecisao | null>(null);
   const [modalDetalhesProcesso, setModalDetalhesProcesso] = useState<ProcessoDecisao | null>(null);
 
   // Estados de formulário dos modais
@@ -127,6 +134,11 @@ export default function PresidenciaPage() {
   const [divergenciasPatrimonio, setDivergenciasPatrimonio] = useState('');
   const [observacoesEfetivacao, setObservacoesEfetivacao] = useState('');
   const [submittingAction, setSubmittingAction] = useState(false);
+  const [agendaTipoDecisao, setAgendaTipoDecisao] = useState<'aprovar' | 'rejeitar' | 'aprovar_com_restricao'>('aprovar');
+  const [agendaEfeito, setAgendaEfeito] = useState<'autorizar_evento' | 'permitir_coexistencia' | 'alterar_escopo' | 'alterar_data' | 'outro'>('autorizar_evento');
+  const [agendaVigenciaTipo, setAgendaVigenciaTipo] = useState<'unica' | 'temporaria' | 'permanente'>('unica');
+  const [agendaVigenciaInicio, setAgendaVigenciaInicio] = useState('');
+  const [agendaVigenciaFim, setAgendaVigenciaFim] = useState('');
 
   // Notificações
   const [notif, setNotif] = useState<{
@@ -244,6 +256,8 @@ export default function PresidenciaPage() {
         if (proc.tipoCategoria !== 'carta_mudanca') return false;
       } else if (filtroCategoria === 'carta_desligamento') {
         if (proc.tipoCategoria !== 'carta_desligamento') return false;
+      } else if (filtroCategoria === 'agenda_solicitacao') {
+        if (proc.tipoCategoria !== 'agenda_solicitacao') return false;
       } else if (filtroCategoria === 'outras_cartas') {
         if (
           proc.origem !== 'carta_pedido' ||
@@ -429,6 +443,65 @@ export default function PresidenciaPage() {
     }
   };
 
+
+  // 4. Deliberar Solicitação de Exceção da Agenda Oficial
+  const handleDeliberarAgenda = async (decisao: 'aprovar' | 'rejeitar') => {
+    if (!modalDeliberarAgenda) return;
+    if (decisao === 'rejeitar' && !justificativaDecisao.trim()) {
+      showNotif('warning', 'Parecer Obrigatório', 'Informe a justificativa/parecer do indeferimento da solicitação da Agenda.');
+      return;
+    }
+
+    setSubmittingAction(true);
+    try {
+      await PresidenciaService.deliberarAgendaSolicitacao(supabase, userAuth, {
+        solicitacao_id: modalDeliberarAgenda.id,
+        decisao,
+        tipo_decisao: decisao === 'rejeitar' ? 'rejeitar' : agendaTipoDecisao,
+        efeito: decisao === 'rejeitar' ? null : agendaEfeito,
+        vigencia_tipo: decisao === 'rejeitar' ? 'unica' : agendaVigenciaTipo,
+        vigencia_inicio: decisao === 'rejeitar' || !agendaVigenciaInicio ? null : agendaVigenciaInicio,
+        vigencia_fim: decisao === 'rejeitar' || !agendaVigenciaFim ? null : agendaVigenciaFim,
+        parecer: justificativaDecisao.trim() || undefined,
+      });
+
+      await registrarAcao({
+        acao: 'atualizar_status',
+        modulo: 'agenda',
+        area: 'central_decisoes',
+        tabela_afetada: 'agenda_solicitacoes',
+        registro_id: modalDeliberarAgenda.id,
+        descricao: `Presidência ${
+          decisao === 'aprovar' ? 'aprovou' : 'rejeitou'
+        } solicitação de exceção da Agenda "${modalDeliberarAgenda.pessoaNome}"`,
+        dados_novos: {
+          status: decisao === 'aprovar' ? 'aprovado' : 'rejeitado',
+          tipo_decisao: decisao === 'rejeitar' ? 'rejeitar' : agendaTipoDecisao,
+          parecer: justificativaDecisao.trim() || null,
+        },
+        status: decisao === 'aprovar' ? 'sucesso' : 'aviso',
+      });
+
+      showNotif(
+        'success',
+        decisao === 'aprovar' ? 'Solicitação Aprovada' : 'Solicitação Indeferida',
+        decisao === 'aprovar'
+          ? 'A solicitação foi deferida pela Presidência e seu efeito já está ativo no calendário da Agenda Oficial.'
+          : 'A solicitação de exceção da Agenda foi indeferida com justificativa registrada.'
+      );
+
+      setModalDeliberarAgenda(null);
+      setJustificativaDecisao('');
+      carregarCentral();
+      carregarHistorico();
+    } catch (err: any) {
+      console.error('Erro ao deliberar solicitação da agenda:', err);
+      showNotif('error', 'Falha na Decisão', err.message || 'Erro ao processar julgamento da solicitação.');
+    } finally {
+      setSubmittingAction(false);
+    }
+  };
+
   // ─── Telas de Bloqueio de Plano ou Permissão ───────────────────────
 
   if (ctx.loading || planFeatures.loading) {
@@ -561,33 +634,18 @@ export default function PresidenciaPage() {
               </span>
               <span className="text-xs font-medium text-slate-500">em análise</span>
             </div>
-            <p className="text-xs text-slate-500 mt-1">Mudanças aguardando deliberação</p>
+            <p className="text-xs text-slate-500 mt-1">
+              {resumo.dirigentesAprovadosAguardandoPosse > 0
+                ? `+${resumo.dirigentesAprovadosAguardandoPosse} aprovados aguardando posse`
+                : 'Mudanças aguardando deliberação'}
+            </p>
           </div>
           <div className="w-12 h-12 rounded-xl bg-blue-50 text-[#123b63] flex items-center justify-center">
             <Users className="w-6 h-6" />
           </div>
         </div>
 
-        {/* Card 3: Dirigentes Aguardando Posse */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between hover:border-slate-300 transition-all">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Aprovados Aguardando Posse
-            </p>
-            <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-3xl font-extrabold text-indigo-700">
-                {resumo.dirigentesAprovadosAguardandoPosse}
-              </span>
-              <span className="text-xs font-medium text-slate-500">efetivação</span>
-            </div>
-            <p className="text-xs text-slate-500 mt-1">Termo patrimonial e data de posse</p>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center">
-            <ShieldCheck className="w-6 h-6" />
-          </div>
-        </div>
-
-        {/* Card 4: Cartas Ministeriais Pendentes */}
+        {/* Card 3: Cartas Ministeriais Pendentes */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between hover:border-slate-300 transition-all">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -607,7 +665,206 @@ export default function PresidenciaPage() {
             <FileText className="w-6 h-6" />
           </div>
         </div>
+
+        {/* Card 4: Solicitações da Agenda */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between hover:border-slate-300 transition-all">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Solicitações da Agenda
+            </p>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="text-3xl font-extrabold text-indigo-700">
+                {resumo.agendaSolicitacoes || 0}
+              </span>
+              <span className="text-xs font-medium text-slate-500">pendências</span>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">Conflitos de datas e eventos extras</p>
+          </div>
+          <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center">
+            <Calendar className="w-6 h-6" />
+          </div>
+        </div>
       </div>
+
+      {/* ─── PAINEL EXECUTIVO: VIDA ESPIRITUAL & ACOLHIMENTO ─── */}
+      {(() => {
+        const ind = resumo.indicadoresEspirituais;
+        if (!ind) return null;
+
+        const isFechada = ind.statusFechamento === 'Fechada';
+        const isAberta = ind.statusFechamento === 'Aberta';
+        const semDados = !ind.temDados;
+
+        const renderVar = (varPct: number | null | undefined) => {
+          if (varPct === null || varPct === undefined) return null;
+          if (varPct > 0) {
+            return (
+              <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                <TrendingUp className="w-3 h-3" />+{varPct}%
+              </span>
+            );
+          }
+          if (varPct < 0) {
+            return (
+              <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                <TrendingDown className="w-3 h-3" />{varPct}%
+              </span>
+            );
+          }
+          return (
+            <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+              0%
+            </span>
+          );
+        };
+
+        return (
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 mb-6 transition-all">
+            {/* Cabeçalho do Painel Espiritual */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-50 to-blue-100 text-indigo-700 flex items-center justify-center border border-indigo-200/70">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-900 tracking-tight">
+                      Vida Espiritual & Acolhimento
+                    </h3>
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                      {ind.periodo.label}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Consolidação oficial do Livro Espiritual ({ind.congregaçõesParticipantesCount} congregações ativas • {ind.cultosRealizados} cultos consolidados)
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Badge de Status de Fechamento */}
+                {isFechada && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    Competência Fechada e Consolidada
+                  </span>
+                )}
+                {isAberta && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                    <Clock className="w-3.5 h-3.5 text-amber-600" />
+                    Competência Aberta (Dados Preliminares)
+                  </span>
+                )}
+                {!isFechada && !isAberta && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                    Sem Fechamento Registrado
+                  </span>
+                )}
+
+                {/* Links Oficiais para Detalhamento */}
+                <Link
+                  href="/secretaria/relatorio-espiritual"
+                  className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 hover:text-slate-900 rounded-lg transition"
+                >
+                  Livro Espiritual
+                  <ExternalLink className="w-3 h-3 text-slate-400" />
+                </Link>
+                <Link
+                  href="/acolhimento/relatorios"
+                  className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold text-[#123b63] bg-blue-50 hover:bg-blue-100 rounded-lg transition"
+                >
+                  Relatórios Acolhimento
+                  <ExternalLink className="w-3 h-3 text-[#123b63]" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Conteúdo das Métricas Espirituais */}
+            {semDados ? (
+              <div className="py-6 px-4 text-center bg-slate-50/70 rounded-xl border border-dashed border-slate-200">
+                <p className="text-sm font-semibold text-slate-700">Nenhum registro espiritual consolidado para {ind.periodo.label}</p>
+                <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                  Os indicadores serão exibidos automaticamente assim que as congregações consolidarem os cultos ou lançarem atividades no Livro Espiritual.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+                {/* 1. Almas Alcançadas / Decisões */}
+                <div className="p-3.5 rounded-xl bg-gradient-to-br from-indigo-50/60 to-white border border-indigo-100/90 shadow-2xs">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-900">
+                      Almas Alcançadas
+                    </span>
+                    <Heart className="w-4 h-4 text-indigo-600" />
+                  </div>
+                  <div className="flex items-baseline justify-between gap-1">
+                    <span className="text-2xl font-black text-indigo-950">
+                      {ind.almasAlcancadas}
+                    </span>
+                    {ind.comparativoMesAnterior?.temDadosAnterior &&
+                      renderVar(ind.comparativoMesAnterior.almasVarPct)}
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1">Decisões e conversões</p>
+                </div>
+
+                {/* 2. Reconciliações */}
+                <div className="p-3.5 rounded-xl bg-gradient-to-br from-emerald-50/60 to-white border border-emerald-100/90 shadow-2xs">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-900">
+                      Reconciliações
+                    </span>
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <div className="flex items-baseline justify-between gap-1">
+                    <span className="text-2xl font-black text-emerald-950">
+                      {ind.reconciliacoes}
+                    </span>
+                    {ind.comparativoMesAnterior?.temDadosAnterior &&
+                      renderVar(ind.comparativoMesAnterior.reconciliacoesVarPct)}
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1">Retornos à comunhão</p>
+                </div>
+
+                {/* 3. Batismos Espírito Santo */}
+                <div className="p-3.5 rounded-xl bg-gradient-to-br from-amber-50/60 to-white border border-amber-100/90 shadow-2xs">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-amber-900">
+                      Batismos no E.S.
+                    </span>
+                    <Sparkles className="w-4 h-4 text-amber-600" />
+                  </div>
+                  <div className="flex items-baseline justify-between gap-1">
+                    <span className="text-2xl font-black text-amber-950">
+                      {ind.batismosEspiritoSanto}
+                    </span>
+                    {ind.comparativoMesAnterior?.temDadosAnterior &&
+                      renderVar(ind.comparativoMesAnterior.batismosVarPct)}
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1">Avivamento espiritual</p>
+                </div>
+
+                {/* 4. Visitantes Presentes */}
+                <div className="p-3.5 rounded-xl bg-gradient-to-br from-blue-50/60 to-white border border-blue-100/90 shadow-2xs">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-blue-900">
+                      Visitantes Presentes
+                    </span>
+                    <Users className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div className="flex items-baseline justify-between gap-1">
+                    <span className="text-2xl font-black text-blue-950">
+                      {ind.visitantesPresentes}
+                    </span>
+                    {ind.comparativoMesAnterior?.temDadosAnterior &&
+                      renderVar(ind.comparativoMesAnterior.visitantesVarPct)}
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1">Acolhimento nos cultos</p>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ─── ABAS DA CENTRAL DE DECISÕES ─── */}
       <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab}>
@@ -627,6 +884,7 @@ export default function PresidenciaPage() {
                   { id: 'dirigente_aprovado', label: `Dirigentes: Posse (${resumo.dirigentesAprovadosAguardandoPosse})` },
                   { id: 'carta_mudanca', label: `Cartas de Mudança (${resumo.cartasMudanca})` },
                   { id: 'carta_desligamento', label: `Cartas de Desligamento (${resumo.cartasDesligamento})` },
+                  { id: 'agenda_solicitacao', label: `Agenda: Solicitações (${resumo.agendaSolicitacoes || 0})` },
                 ].map((f) => (
                   <button
                     key={f.id}
@@ -723,6 +981,8 @@ export default function PresidenciaPage() {
                                   ? 'bg-amber-100 text-amber-800'
                                   : item.tipoCategoria === 'carta_desligamento'
                                   ? 'bg-red-100 text-red-800'
+                                  : item.tipoCategoria === 'agenda_solicitacao'
+                                  ? 'bg-indigo-100 text-indigo-800'
                                   : 'bg-emerald-100 text-emerald-800'
                               }`}
                             >
@@ -732,6 +992,8 @@ export default function PresidenciaPage() {
                                 <ArrowRight className="w-4 h-4" />
                               ) : item.tipoCategoria === 'carta_desligamento' ? (
                                 <AlertTriangle className="w-4 h-4" />
+                              ) : item.tipoCategoria === 'agenda_solicitacao' ? (
+                                <Calendar className="w-4 h-4" />
                               ) : (
                                 <FileText className="w-4 h-4" />
                               )}
@@ -838,6 +1100,25 @@ export default function PresidenciaPage() {
                               >
                                 <Check className="w-3.5 h-3.5" />
                                 <span>Efetivar Posse</span>
+                              </button>
+                            )}
+
+                                                        {/* Se solicitação da agenda: Deliberar Solicitação */}
+                            {item.origem === 'agenda_solicitacao' && (
+                              <button
+                                onClick={() => {
+                                  setModalDeliberarAgenda(item);
+                                  setJustificativaDecisao('');
+                                  setAgendaTipoDecisao('aprovar');
+                                  setAgendaEfeito('autorizar_evento');
+                                  setAgendaVigenciaTipo('unica');
+                                  setAgendaVigenciaInicio('');
+                                  setAgendaVigenciaFim('');
+                                }}
+                                className="px-3 py-1.5 bg-indigo-700 text-white rounded-lg font-bold hover:bg-indigo-800 transition shadow-xs flex items-center gap-1.5 cursor-pointer text-xs"
+                              >
+                                <Calendar className="w-3.5 h-3.5" />
+                                <span>Julgar Solicitação</span>
                               </button>
                             )}
 
@@ -1103,6 +1384,32 @@ export default function PresidenciaPage() {
                 <h4 className="font-bold text-sm text-slate-900">Conselho Fiscal</h4>
                 <p className="text-xs text-slate-500 mt-1">
                   Pareceres fiscais, auditoria interna e homologação das contas ministeriais.
+                </p>
+              </Link>
+
+              <Link
+                href="/presidencia/auditoria"
+                className="p-5 rounded-2xl border border-slate-200 hover:border-[#123b63] transition shadow-xs hover:shadow-md bg-white group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-800 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <h4 className="font-bold text-sm text-slate-900">Auditoria Financeira</h4>
+                <p className="text-xs text-slate-500 mt-1">
+                  Painel de conformidade, alertas e conferência de conciliação de fechamentos.
+                </p>
+              </Link>
+
+              <Link
+                href="/presidencia/planejamento/solicitacoes"
+                className="p-5 rounded-2xl border border-slate-200 hover:border-[#123b63] transition shadow-xs hover:shadow-md bg-white group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-800 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <h4 className="font-bold text-sm text-slate-900">Solicitações da Agenda</h4>
+                <p className="text-xs text-slate-500 mt-1">
+                  Gestão e despacho de solicitações de exceção e conflitos de eventos da Agenda Oficial.
                 </p>
               </Link>
             </div>
@@ -1453,6 +1760,155 @@ export default function PresidenciaPage() {
               >
                 <FileCheck className="w-4 h-4" />
                 <span>Autorizar e Assinar Carta</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      
+      {/* ─── MODAL 3.5: DELIBERAÇÃO DE SOLICITAÇÃO DA AGENDA OFICIAL ─── */}
+      {modalDeliberarAgenda && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 space-y-5 animate-in fade-in zoom-in duration-150">
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="px-2.5 py-1 bg-indigo-100 text-indigo-800 font-bold text-xs rounded-full">
+                  Deliberação Presidencial — Agenda Oficial
+                </span>
+                <h3 className="text-lg font-bold text-slate-900 mt-2">
+                  {modalDeliberarAgenda.tipoLabel}
+                </h3>
+              </div>
+              <button
+                onClick={() => setModalDeliberarAgenda(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Informações da Solicitação */}
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <span className="text-slate-400 font-semibold block">Título do Evento / Solicitação:</span>
+                  <span className="font-bold text-slate-900 text-sm">
+                    {modalDeliberarAgenda.pessoaNome}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-semibold block">Data do Evento:</span>
+                  <span className="font-semibold text-slate-800">
+                    {formatDataPtBr(modalDeliberarAgenda.dataPrevista)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-200/80 pt-2 grid grid-cols-2 gap-3">
+                <div>
+                  <span className="text-slate-400 font-semibold block">Escopo Institucional:</span>
+                  <span className="font-semibold text-slate-700">
+                    {modalDeliberarAgenda.detalhesRaw?.escopo || 'Geral'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-semibold block">Enviado em:</span>
+                  <span className="font-semibold text-slate-700">
+                    {formatDataPtBr(modalDeliberarAgenda.dataSolicitacao)}
+                  </span>
+                </div>
+              </div>
+
+              {modalDeliberarAgenda.motivoOuDescricao && (
+                <div className="border-t border-slate-200/80 pt-2">
+                  <span className="text-slate-400 font-semibold block">Justificativa do Solicitante:</span>
+                  <p className="text-slate-700 font-medium italic mt-0.5">
+                    &ldquo;{modalDeliberarAgenda.motivoOuDescricao}&rdquo;
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Configurações da Decisão em caso de aprovação */}
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Tipo de Decisão:
+                  </label>
+                  <select
+                    value={agendaTipoDecisao}
+                    onChange={(e: any) => setAgendaTipoDecisao(e.target.value)}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl text-xs text-slate-800 bg-white"
+                  >
+                    <option value="aprovar">Aprovar Integralmente</option>
+                    <option value="aprovar_com_restricao">Aprovar com Restrições</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Efeito Jurídico/Estatutário:
+                  </label>
+                  <select
+                    value={agendaEfeito}
+                    onChange={(e: any) => setAgendaEfeito(e.target.value)}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl text-xs text-slate-800 bg-white"
+                  >
+                    <option value="autorizar_evento">Autorizar Evento</option>
+                    <option value="permitir_coexistencia">Permitir Coexistência</option>
+                    <option value="alterar_escopo">Alterar Escopo</option>
+                    <option value="alterar_data">Alterar Data</option>
+                    <option value="outro">Outro Efeito</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Parecer Presidencial */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Parecer / Despacho da Presidência:
+                </label>
+                <textarea
+                  value={justificativaDecisao}
+                  onChange={(e) => setJustificativaDecisao(e.target.value)}
+                  rows={3}
+                  placeholder="Parecer formal do Presidente para registro na ata da Agenda Oficial..."
+                  className="w-full p-3 border border-slate-300 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  * Obrigatório em caso de indeferimento/rejeição.
+                </span>
+              </div>
+            </div>
+
+            {/* Botões de Ação */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setModalDeliberarAgenda(null)}
+                disabled={submittingAction}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeliberarAgenda('rejeitar')}
+                disabled={submittingAction}
+                className="px-4 py-2 text-xs font-bold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl transition cursor-pointer flex items-center gap-1.5"
+              >
+                <XCircle className="w-4 h-4" />
+                <span>Rejeitar</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeliberarAgenda('aprovar')}
+                disabled={submittingAction}
+                className="px-5 py-2 text-xs font-bold text-white bg-indigo-700 hover:bg-indigo-800 rounded-xl transition shadow-md hover:shadow-lg cursor-pointer flex items-center gap-1.5"
+              >
+                <Check className="w-4 h-4" />
+                <span>Aprovar Solicitação</span>
               </button>
             </div>
           </div>

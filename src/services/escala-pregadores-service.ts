@@ -193,15 +193,28 @@ export class EscalaPregadoresService {
     // Busca congregações do ministério para mapear igreja/congregação aos eventos de forma desacoplada do PostgREST
     const { data: congregacoesData } = await client
       .from('congregacoes')
-      .select('id, nome, is_sede')
-      .eq('ministry_id', ministryId);
+      .select('id, nome, campo_id, is_active')
+      .eq('ministry_id', ministryId)
+      .or('is_active.eq.true,is_active.is.null');
+
+    const { data: camposSede } = await client
+      .from('campos')
+      .select('id')
+      .eq('ministry_id', ministryId)
+      .eq('is_sede', true);
+    const sedeCamposSet = new Set((camposSede || []).map((c: any) => c.id));
 
     const mapaCongregacoes = new Map<string, { id: string; nome: string; is_sede?: boolean }>();
     (congregacoesData || []).forEach((c: any) => {
+      const isSede = Boolean(
+        (c.campo_id && sedeCamposSet.has(c.campo_id)) ||
+        c.nome?.toLowerCase().includes('templo central') ||
+        c.nome?.toLowerCase().includes('sede')
+      );
       mapaCongregacoes.set(c.id, {
         id: c.id,
         nome: c.nome,
-        is_sede: c.is_sede,
+        is_sede: isSede,
       });
     });
 

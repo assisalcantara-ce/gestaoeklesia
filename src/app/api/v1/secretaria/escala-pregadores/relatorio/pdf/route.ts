@@ -146,15 +146,24 @@ export async function GET(request: NextRequest) {
     });
 
     // 5. Determinar nome da congregação no filtro
-    let congregacaoFiltroNome = 'Todas as Congregações (Campo Geral)';
+    let congregacaoFiltroNome = 'Todas as Congregações';
     if (churchId) {
       const { data: cong } = await ctx.admin
         .from('congregacoes')
-        .select('nome, is_sede')
+        .select('id, nome, campo_id')
         .eq('id', churchId)
         .maybeSingle();
       if (cong) {
-        congregacaoFiltroNome = `${cong.nome}${cong.is_sede ? ' (Sede)' : ''}`;
+        let isSede = cong.nome?.toLowerCase().includes('templo central') || cong.nome?.toLowerCase().includes('sede');
+        if (!isSede && cong.campo_id) {
+          const { data: campo } = await ctx.admin
+            .from('campos')
+            .select('is_sede')
+            .eq('id', cong.campo_id)
+            .maybeSingle();
+          if (campo?.is_sede) isSede = true;
+        }
+        congregacaoFiltroNome = `${cong.nome}${isSede ? ' (Sede)' : ''}`;
       }
     }
 

@@ -1563,6 +1563,9 @@ export function useMembros() {
     abrirConfirmacaoDeletar,
     cancelarDeletar,
     fecharFormulario,
+    recarregarMembros: async () => {
+      await Promise.all([carregarMembrosPagina(), carregarOverviewEContagem()]);
+    },
 
     // Ações PDF
     gerarPDFListagem,

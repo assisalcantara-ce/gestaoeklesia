@@ -107,8 +107,7 @@ export async function GET(
             name,
             slug,
             price_monthly,
-            max_members,
-            max_temples
+            max_members
           )
         `
         )
@@ -233,7 +232,7 @@ export async function GET(
           : null,
         limits: {
           max_members: m.subscription_plans?.max_members ?? null,
-          max_temples: m.subscription_plans?.max_temples ?? null,
+          max_temples: m.quantity_temples ?? null,
         },
       },
       subscription: {

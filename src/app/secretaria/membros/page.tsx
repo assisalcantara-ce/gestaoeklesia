@@ -143,6 +143,7 @@ export default function MembrosPage() {
     abrirDocumentosMembro,
     abrirConfirmacaoDeletar,
     fecharFormulario,
+    recarregarMembros,
 
     // Ações PDF
     gerarPDFListagem,
@@ -503,6 +504,9 @@ export default function MembrosPage() {
               <MembrosAniversariantesView
                 membros={membros}
                 setMembroImprimindo={setMembroImprimindo}
+                onMembroUpdated={() => {
+                  void recarregarMembros();
+                }}
               />
             </div>
           )}

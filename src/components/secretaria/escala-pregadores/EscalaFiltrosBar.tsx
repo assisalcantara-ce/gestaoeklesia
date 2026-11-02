@@ -129,7 +129,7 @@ export function EscalaFiltrosBar({
             onChange={(e) => handleMudarCongregacao(e.target.value)}
             className="w-full text-sm rounded-lg border border-slate-300 px-3 py-2 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-60 disabled:cursor-not-allowed transition-colors font-medium text-slate-800"
           >
-            {isGlobalUser && <option value="">Todas as Congregações (Campo Geral)</option>}
+            {isGlobalUser && <option value="">Todas as Congregações</option>}
             {congregacoes.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.nome} {c.is_sede ? '(Sede)' : ''}

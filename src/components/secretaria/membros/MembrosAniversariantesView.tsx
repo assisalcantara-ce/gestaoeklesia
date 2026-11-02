@@ -1,19 +1,23 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { Cake, Mail, Image as ImageIcon, CheckCircle, AlertCircle, Save, Trash2, Loader2, Sparkles, Filter } from 'lucide-react';
+import { Cake, Mail, Image as ImageIcon, CheckCircle, AlertCircle, Save, Trash2, Loader2, Sparkles, Filter, Pencil } from 'lucide-react';
 import { Membro } from '@/hooks/secretaria/useMembros';
 import { authenticatedFetch } from '@/lib/api-client';
 import { createClient } from '@/lib/supabase-client';
+import EditarContatoAniversarianteModal, { MembroContatoData } from './EditarContatoAniversarianteModal';
 import {
   FiltroFuncaoMinisterial,
   extrairMapaDirigentes,
   filtrarPorFuncaoMinisterial,
+  getHojeLocalBelem,
+  isAniversarianteHoje,
 } from '@/lib/aniversariantes-filtros-utils';
 
 interface MembrosAniversariantesViewProps {
   membros: Membro[];
   setMembroImprimindo?: (membro: Membro) => void;
+  onMembroUpdated?: (updated: { id: string; whatsapp?: string; email?: string }) => void;
 }
 
 const MESES = [
@@ -25,9 +29,32 @@ const DEFAULT_TEMPLATE = `Feliz Aniversário, {nome}! 🎉\n\nA equipe deseja qu
 
 export default function MembrosAniversariantesView({
   membros,
+  onMembroUpdated,
 }: MembrosAniversariantesViewProps) {
-  const [mesSelecionado, setMesSelecionado] = useState<number>(() => new Date().getMonth() + 1);
+  const [mesSelecionado, setMesSelecionado] = useState<number>(() => getHojeLocalBelem().mes);
   const [filtroFuncao, setFiltroFuncao] = useState<FiltroFuncaoMinisterial>('todos');
+
+  // Data atual no fuso do ministério (America/Belem) revalidada periodicamente
+  const [dataAtualBelem, setDataAtualBelem] = useState(() => getHojeLocalBelem());
+
+  useEffect(() => {
+    // Revalidação a cada 30 segundos para viradas de meia-noite sem recarregar a página
+    const interval = setInterval(() => {
+      const agora = getHojeLocalBelem();
+      setDataAtualBelem(prev => {
+        if (prev.dataStr !== agora.dataStr) {
+          return agora;
+        }
+        return prev;
+      });
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Overrides locais para atualização imediata dos contatos editados
+  const [contatosOverride, setContatosOverride] = useState<Record<string, { whatsapp: string; email: string }>>({});
+  const [membroParaEditar, setMembroParaEditar] = useState<MembroContatoData | null>(null);
 
   // Mapa de dirigentes resolvido a partir das designações e congregações oficiais
   const [dirigentesMap, setDirigentesMap] = useState<{
@@ -306,8 +333,13 @@ export default function MembrosAniversariantesView({
       .replace(/{supervisor}/gi, supervisao || 'Geral');
   };
 
-  // Enviar WhatsApp via web API nativa
+  // Enviar WhatsApp via web API nativa (com trava de dia de aniversário)
   const handleEnviarWhatsApp = (membro: Membro) => {
+    if (!isAniversarianteHoje(membro.dataNascimento, new Date(dataAtualBelem.dataStr + 'T12:00:00'))) {
+      alert(`O envio de felicitação para ${membro.nome} só estará disponível no dia do aniversário.`);
+      return;
+    }
+
     const celularOuZap = (membro.whatsapp || membro.celular || '').replace(/\D/g, '');
     if (!celularOuZap) {
       alert(`O membro ${membro.nome} não possui número de celular/WhatsApp cadastrado.`);
@@ -321,8 +353,13 @@ export default function MembrosAniversariantesView({
     window.open(`https://web.whatsapp.com/send?phone=${numeroCompleto}&text=${texto}`, '_blank');
   };
 
-  // Enviar E-mail nativo
+  // Enviar E-mail nativo (com trava de dia de aniversário)
   const handleEnviarEmail = (membro: Membro) => {
+    if (!isAniversarianteHoje(membro.dataNascimento, new Date(dataAtualBelem.dataStr + 'T12:00:00'))) {
+      alert(`O envio de felicitação para ${membro.nome} só estará disponível no dia do aniversário.`);
+      return;
+    }
+
     if (!membro.email) {
       alert(`O membro ${membro.nome} não possui e-mail cadastrado.`);
       return;
@@ -428,48 +465,111 @@ export default function MembrosAniversariantesView({
                 <tbody className="divide-y divide-gray-100">
                   {aniversariantesDoMes.map(membro => {
                     const dia = formatarDia(membro.dataNascimento);
-                    const temContato = !!(membro.whatsapp || membro.celular);
+                    const override = contatosOverride[membro.id];
+                    const whatsappEfetivo = override ? override.whatsapp : (membro.whatsapp || membro.celular || '');
+                    const emailEfetivo = override ? override.email : (membro.email || '');
+
+                    // Validação estrita de aniversário hoje no fuso local America/Belem
+                    const ehAniversarianteHoje = isAniversarianteHoje(
+                      membro.dataNascimento,
+                      new Date(dataAtualBelem.dataStr + 'T12:00:00')
+                    );
+
+                    // Botões só são habilitados no dia/mês do aniversário E se houver contato válido
+                    const canSendWhatsapp = ehAniversarianteHoje && !!whatsappEfetivo;
+                    const canSendEmail = ehAniversarianteHoje && !!emailEfetivo;
+
+                    // Tooltips informativos com indicação discreta quando fora da data
+                    const tooltipWhatsapp = !ehAniversarianteHoje
+                      ? 'Disponível no dia do aniversário'
+                      : (whatsappEfetivo ? 'Enviar WhatsApp conectado' : 'Sem WhatsApp cadastrado');
+
+                    const tooltipEmail = !ehAniversarianteHoje
+                      ? 'Disponível no dia do aniversário'
+                      : (emailEfetivo ? 'Enviar E-mail' : 'Sem e-mail cadastrado');
+
+                    const membroParaAcoes: Membro = {
+                      ...membro,
+                      whatsapp: whatsappEfetivo,
+                      celular: whatsappEfetivo,
+                      email: emailEfetivo,
+                    };
 
                     return (
                       <tr key={membro.id} className="hover:bg-gray-50/80 transition">
                         <td className="px-4 py-3 text-center">
-                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-teal-100 text-teal-800 font-bold text-xs">
+                          <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-xs ${
+                            ehAniversarianteHoje
+                              ? 'bg-amber-100 text-amber-900 ring-2 ring-amber-400'
+                              : 'bg-teal-100 text-teal-800'
+                          }`}>
                             {dia}
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="font-bold text-gray-800 uppercase text-xs">{membro.nome}</div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-gray-800 uppercase text-xs">{membro.nome}</span>
+                            {ehAniversarianteHoje && (
+                              <span className="px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-amber-400/20 text-amber-800 border border-amber-300">
+                                Hoje 🎉
+                              </span>
+                            )}
+                          </div>
                           <div className="text-[11px] text-gray-400 capitalize">{membro.tipoCadastro || 'membro'}</div>
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-600">
                           {membro.campo || membro.congregacao || '—'}
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-600">
-                          <div>{membro.whatsapp || membro.celular || '—'}</div>
-                          {membro.email && (
-                            <div className="text-[10px] text-gray-400 truncate max-w-[140px]">{membro.email}</div>
+                          <div>{whatsappEfetivo || '—'}</div>
+                          {emailEfetivo && (
+                            <div className="text-[10px] text-gray-400 truncate max-w-[140px]">{emailEfetivo}</div>
                           )}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center gap-1.5">
+                            {/* Botão de Edição Rápida de Contato (Lápis) - Sempre acessível */}
                             <button
-                              onClick={() => handleEnviarWhatsApp(membro)}
-                              title={temContato ? "Enviar WhatsApp conectado" : "Sem contato cadastrado"}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-bold text-white transition flex items-center gap-1 ${
-                                temContato
-                                  ? 'bg-emerald-500 hover:bg-emerald-600 shadow-sm'
-                                  : 'bg-gray-300 cursor-not-allowed'
+                              type="button"
+                              onClick={() => {
+                                setMembroParaEditar({
+                                  id: membro.id,
+                                  nome: membro.nome,
+                                  matricula: membro.matricula,
+                                  whatsapp: whatsappEfetivo,
+                                  celular: whatsappEfetivo,
+                                  email: emailEfetivo,
+                                });
+                              }}
+                              title="Editar WhatsApp e E-mail"
+                              aria-label={`Editar contato de ${membro.nome}`}
+                              className="w-8 h-8 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 flex items-center justify-center transition shadow-xs cursor-pointer"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleEnviarWhatsApp(membroParaAcoes)}
+                              disabled={!canSendWhatsapp}
+                              title={tooltipWhatsapp}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                                canSendWhatsapp
+                                  ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm cursor-pointer'
+                                  : 'bg-gray-200 text-gray-400 border border-gray-300/60 cursor-not-allowed opacity-75'
                               }`}
                             >
                               <span>WhatsApp</span>
                             </button>
                             <button
-                              onClick={() => handleEnviarEmail(membro)}
-                              title={membro.email ? "Enviar E-mail" : "Sem e-mail cadastrado"}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-bold text-white transition flex items-center gap-1 ${
-                                membro.email
-                                  ? 'bg-blue-600 hover:bg-blue-700 shadow-sm'
-                                  : 'bg-gray-300 cursor-not-allowed'
+                              type="button"
+                              onClick={() => handleEnviarEmail(membroParaAcoes)}
+                              disabled={!canSendEmail}
+                              title={tooltipEmail}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                                canSendEmail
+                                  ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm cursor-pointer'
+                                  : 'bg-gray-200 text-gray-400 border border-gray-300/60 cursor-not-allowed opacity-75'
                               }`}
                             >
                               <span>E-mail</span>
@@ -669,6 +769,23 @@ export default function MembrosAniversariantesView({
         </div>
 
       </div>
+
+      {/* Modal de Atualização Rápida de Contatos */}
+      <EditarContatoAniversarianteModal
+        isOpen={Boolean(membroParaEditar)}
+        membro={membroParaEditar}
+        onClose={() => setMembroParaEditar(null)}
+        onSuccess={(updated) => {
+          setContatosOverride((prev) => ({
+            ...prev,
+            [updated.id]: {
+              whatsapp: updated.whatsapp,
+              email: updated.email,
+            },
+          }));
+          onMembroUpdated?.(updated);
+        }}
+      />
     </div>
   );
 }

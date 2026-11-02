@@ -2,13 +2,14 @@ import { DirigentesService, type UserContextAuth } from './dirigentes-service';
 import { CartasService } from './cartas-service';
 import type { DirigenteMovimentacao } from '@/types/dirigentes';
 
-export type ProcessoOrigem = 'dirigente_movimentacao' | 'carta_pedido';
+export type ProcessoOrigem = 'dirigente_movimentacao' | 'carta_pedido' | 'agenda_solicitacao';
 export type ProcessoCategoria =
   | 'dirigente'
   | 'carta_mudanca'
   | 'carta_desligamento'
   | 'carta_transito'
-  | 'carta_recomendacao';
+  | 'carta_recomendacao'
+  | 'agenda_solicitacao';
 
 export interface ProcessoDecisao {
   id: string;
@@ -37,7 +38,9 @@ export interface ProcessoDecisao {
     | 'efetivada'
     | 'autorizado'
     | 'rejeitada'
-    | 'rejeitado';
+    | 'rejeitado'
+    | 'aprovado'
+    | 'cancelado';
   statusLabel: string;
   statusBadge: {
     bg: string;
@@ -56,6 +59,32 @@ export interface ProcessoDecisao {
   detalhesRaw: any;
 }
 
+export interface IndicadoresEspirituaisConsolidados {
+  periodo: {
+    mes: number;
+    ano: number;
+    mesNome: string;
+    label: string;
+  };
+  temDados: boolean;
+  statusFechamento: 'Fechada' | 'Aberta' | 'Sem Fechamento';
+  congregaçõesParticipantesCount: number;
+  totalAtividadesRegistradas: number;
+  almasAlcancadas: number;
+  reconciliacoes: number;
+  batismosEspiritoSanto: number;
+  visitantesPresentes: number;
+  membrosCearam: number;
+  cultosRealizados: number;
+  comparativoMesAnterior?: {
+    temDadosAnterior: boolean;
+    almasVarPct: number | null;
+    reconciliacoesVarPct: number | null;
+    batismosVarPct: number | null;
+    visitantesVarPct: number | null;
+  };
+}
+
 export interface PresidenciaResumo {
   totalPendencias: number;
   dirigentesPropostas: number;
@@ -63,7 +92,20 @@ export interface PresidenciaResumo {
   cartasMudanca: number;
   cartasDesligamento: number;
   outrasCartas: number;
+  agendaSolicitacoes: number;
   totalLiderancasAtivas: number;
+  indicadoresEspirituais?: IndicadoresEspirituaisConsolidados;
+}
+
+export interface DeliberarAgendaInput {
+  solicitacao_id: string;
+  decisao: 'aprovar' | 'rejeitar';
+  tipo_decisao?: 'aprovar' | 'rejeitar' | 'aprovar_com_restricao';
+  efeito?: 'autorizar_evento' | 'permitir_coexistencia' | 'alterar_escopo' | 'alterar_data' | 'outro' | null;
+  vigencia_tipo?: 'unica' | 'temporaria' | 'permanente';
+  vigencia_inicio?: string | null;
+  vigencia_fim?: string | null;
+  parecer?: string;
 }
 
 export interface DeliberarCartaInput {
@@ -95,6 +137,144 @@ export class PresidenciaService {
    * Carrega a Fila Unificada de Decisões e os Indicadores de Pendências da Presidência.
    * Consulta apenas o ministério autenticado (isolamento estrito multi-tenant).
    */
+
+  /**
+   * Consulta os dados oficiais consolidados de Acolhimento e Livro Espiritual.
+   * Não coleta, não edita e não cria consolidação paralela. Reutiliza estritamente relatorio_espiritual_registros e relatorio_espiritual_fechamentos.
+   */
+  public static async obterIndicadoresEspirituaisConsolidados(
+    supabase: any,
+    ministryId: string,
+    mesRef?: number,
+    anoRef?: number
+  ): Promise<IndicadoresEspirituaisConsolidados> {
+    const hoje = new Date();
+    const mes = mesRef || (hoje.getMonth() + 1);
+    const ano = anoRef || hoje.getFullYear();
+
+    const MESES = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    const mesNome = MESES[mes - 1] || 'Mês Atual';
+
+    if (!ministryId) {
+      return {
+        periodo: { mes, ano, mesNome, label: `${mesNome}/${ano}` },
+        temDados: false,
+        statusFechamento: 'Sem Fechamento',
+        congregaçõesParticipantesCount: 0,
+        totalAtividadesRegistradas: 0,
+        almasAlcancadas: 0,
+        reconciliacoes: 0,
+        batismosEspiritoSanto: 0,
+        visitantesPresentes: 0,
+        membrosCearam: 0,
+        cultosRealizados: 0,
+      };
+    }
+
+    const prevMes = mes === 1 ? 12 : mes - 1;
+    const prevAno = mes === 1 ? ano - 1 : ano;
+
+    // Consulta paralela aos registros e fechamentos oficiais de acolhimento
+    const [fechamentoRes, registrosMesRes] = await Promise.all([
+      supabase
+        .from('relatorio_espiritual_fechamentos')
+        .select('*')
+        .eq('ministry_id', ministryId)
+        .eq('mes', mes)
+        .eq('ano', ano),
+      supabase
+        .from('relatorio_espiritual_registros')
+        .select('*')
+        .eq('ministry_id', ministryId),
+    ]);
+
+    const fechamentos = fechamentoRes.data || [];
+    const todosRegistros = registrosMesRes.data || [];
+
+    // Filtra mês atual
+    const registrosMes = todosRegistros.filter((r: any) => {
+      const d = new Date(r.data_atividade);
+      return (d.getUTCMonth() + 1) === mes && d.getUTCFullYear() === ano;
+    });
+
+    // Filtra mês anterior para comparativo sustentado
+    const registrosPrev = todosRegistros.filter((r: any) => {
+      const d = new Date(r.data_atividade);
+      return (d.getUTCMonth() + 1) === prevMes && d.getUTCFullYear() === prevAno;
+    });
+
+    // Determina status de fechamento oficial
+    let statusFechamento: 'Fechada' | 'Aberta' | 'Sem Fechamento' = 'Sem Fechamento';
+    if (fechamentos.length > 0) {
+      const temAberta = fechamentos.some((f: any) => f.status === 'Aberta');
+      statusFechamento = temAberta ? 'Aberta' : 'Fechada';
+    } else if (registrosMes.length > 0) {
+      statusFechamento = 'Aberta';
+    }
+
+    const congsSet = new Set<string>();
+    let almas = 0;
+    let reconciliacoes = 0;
+    let batismos = 0;
+    let visitantes = 0;
+    let ceia = 0;
+    let cultos = 0;
+
+    registrosMes.forEach((r: any) => {
+      if (r.congregacao_id) congsSet.add(r.congregacao_id);
+      almas += Number(r.almas_alcancadas || 0);
+      reconciliacoes += Number(r.reconciliacoes || 0);
+      batismos += Number(r.batismos_espirito_santo || 0);
+      visitantes += Number(r.visitantes_presentes || 0);
+      ceia += Number(r.membros_cearam || 0);
+      cultos += Number(r.cultos_realizados || 0);
+    });
+
+    let prevAlmas = 0;
+    let prevReconciliacoes = 0;
+    let prevBatismos = 0;
+    let prevVisitantes = 0;
+
+    registrosPrev.forEach((r: any) => {
+      prevAlmas += Number(r.almas_alcancadas || 0);
+      prevReconciliacoes += Number(r.reconciliacoes || 0);
+      prevBatismos += Number(r.batismos_espirito_santo || 0);
+      prevVisitantes += Number(r.visitantes_presentes || 0);
+    });
+
+    const calcVar = (atual: number, anterior: number): number | null => {
+      if (anterior === 0) return atual > 0 ? 100 : null;
+      return Number((((atual - anterior) / anterior) * 100).toFixed(1));
+    };
+
+    const temDados = registrosMes.length > 0;
+    const temDadosAnterior = registrosPrev.length > 0;
+
+    return {
+      periodo: { mes, ano, mesNome, label: `${mesNome}/${ano}` },
+      temDados,
+      statusFechamento,
+      congregaçõesParticipantesCount: congsSet.size,
+      totalAtividadesRegistradas: registrosMes.length,
+      almasAlcancadas: almas,
+      reconciliacoes,
+      batismosEspiritoSanto: batismos,
+      visitantesPresentes: visitantes,
+      membrosCearam: ceia,
+      cultosRealizados: cultos,
+      comparativoMesAnterior: {
+        temDadosAnterior,
+        almasVarPct: temDadosAnterior ? calcVar(almas, prevAlmas) : null,
+        reconciliacoesVarPct: temDadosAnterior ? calcVar(reconciliacoes, prevReconciliacoes) : null,
+        batismosVarPct: temDadosAnterior ? calcVar(batismos, prevBatismos) : null,
+        visitantesVarPct: temDadosAnterior ? calcVar(visitantes, prevVisitantes) : null,
+      },
+    };
+  }
+
   public static async carregarCentralDecisoes(
     supabase: any,
     ministryId: string
@@ -112,6 +292,7 @@ export class PresidenciaService {
           cartasMudanca: 0,
           cartasDesligamento: 0,
           outrasCartas: 0,
+          agendaSolicitacoes: 0,
           totalLiderancasAtivas: 0,
         },
       };
@@ -152,6 +333,21 @@ export class PresidenciaService {
     if (cartasErr) {
       console.error('Erro ao carregar pedidos de cartas na Presidência:', cartasErr);
     }
+
+    // 3.1 Busca solicitações de exceção da Agenda Oficial pendentes de julgamento
+    const { data: agendaSols, error: agendaErr } = await supabase
+      .from('agenda_solicitacoes')
+      .select('*')
+      .eq('ministry_id', ministryId)
+      .eq('status', 'pendente')
+      .order('created_at', { ascending: false });
+
+    if (agendaErr) {
+      console.error('Erro ao carregar solicitações da agenda na Presidência:', agendaErr);
+    }
+
+    // 3.2 Busca indicadores espirituais consolidados do Acolhimento
+    const indicadoresEspirituais = await this.obterIndicadoresEspirituaisConsolidados(supabase, ministryId);
 
     // 4. Busca total de lideranças ativas no ministério
     const { count: totalAtivas } = await supabase
@@ -259,6 +455,45 @@ export class PresidenciaService {
       });
     });
 
+    (agendaSols || []).forEach((s: any) => {
+      const tipoLabels: Record<string, string> = {
+        conflito_data: 'Conflito de Data',
+        alteracao_data: 'Alteração de Data',
+        alteracao_escopo: 'Alteração de Escopo',
+        coexistencia: 'Coexistência de Eventos',
+        criacao_evento: 'Criação de Evento Extra',
+      };
+
+      const tipoLabel = `Agenda: ${tipoLabels[s.tipo_solicitacao] || 'Solicitação de Exceção'}`;
+
+      fila.push({
+        id: s.id,
+        origem: 'agenda_solicitacao',
+        tipoCategoria: 'agenda_solicitacao',
+        tipoLabel,
+        pessoaNome: s.titulo,
+        pessoaCargo: `Escopo: ${s.escopo || 'Geral'}`,
+        pessoaId: s.solicitante_id,
+        congregacaoId: null,
+        congregacaoNome: 'Agenda Oficial (Todo o Campo)',
+        solicitanteNome: 'Responsável do Evento',
+        solicitanteId: s.solicitante_id,
+        dataSolicitacao: s.created_at,
+        dataPrevista: s.data_inicio,
+        motivoOuDescricao: s.justificativa,
+        observacoes: s.justificativa,
+        status: 'pendente',
+        statusLabel: 'Aguardando Parecer Presidencial',
+        statusBadge: {
+          bg: 'bg-amber-50',
+          text: 'text-amber-800',
+          border: 'border-amber-300',
+        },
+        acaoRequerida: 'Deliberar Proposta',
+        detalhesRaw: s,
+      });
+    });
+
     // Ordena fila: propostas mais recentes primeiro
     fila.sort((a, b) => new Date(b.dataSolicitacao).getTime() - new Date(a.dataSolicitacao).getTime());
 
@@ -268,6 +503,7 @@ export class PresidenciaService {
     const cartasMudanca = (cartas || []).filter((c: any) => c.tipo_carta === 'mudanca').length;
     const cartasDesligamento = (cartas || []).filter((c: any) => c.tipo_carta === 'desligamento').length;
     const outrasCartas = 0;
+    const agendaSolicitacoes = (agendaSols || []).length;
 
     const resumo: PresidenciaResumo = {
       totalPendencias: fila.length,
@@ -276,7 +512,9 @@ export class PresidenciaService {
       cartasMudanca,
       cartasDesligamento,
       outrasCartas,
+      agendaSolicitacoes,
       totalLiderancasAtivas: Number(totalAtivas || 0),
+      indicadoresEspirituais,
     };
 
     return { fila, resumo };
@@ -302,7 +540,7 @@ export class PresidenciaService {
       mapCongs.set(c.id, c.nome);
     });
 
-    const [movsRes, cartasRes] = await Promise.all([
+    const [movsRes, cartasRes, agendaRes] = await Promise.all([
       supabase
         .from('dirigentes_movimentacoes')
         .select('*')
@@ -317,6 +555,13 @@ export class PresidenciaService {
         .in('status', ['autorizado', 'rejeitado'])
         .in('tipo_carta', ['mudanca', 'desligamento'])
         .order('updated_at', { ascending: false })
+        .limit(limite),
+      supabase
+        .from('agenda_solicitacoes')
+        .select('*')
+        .eq('ministry_id', ministryId)
+        .in('status', ['aprovado', 'rejeitado', 'cancelado'])
+        .order('analisado_em', { ascending: false })
         .limit(limite),
     ]);
 
@@ -398,6 +643,43 @@ export class PresidenciaService {
       });
     });
 
+    (agendaRes.data || []).forEach((s: any) => {
+      const isAprovado = s.status === 'aprovado';
+      const tipoLabels: Record<string, string> = {
+        conflito_data: 'Conflito de Data',
+        alteracao_data: 'Alteração de Data',
+        alteracao_escopo: 'Alteração de Escopo',
+        coexistencia: 'Coexistência de Eventos',
+        criacao_evento: 'Criação de Evento Extra',
+      };
+
+      const tipoLabel = `Agenda: ${tipoLabels[s.tipo_solicitacao] || 'Solicitação de Exceção'}`;
+
+      historico.push({
+        id: s.id,
+        origem: 'agenda_solicitacao',
+        tipoCategoria: 'agenda_solicitacao',
+        tipoLabel,
+        pessoaNome: s.titulo,
+        pessoaCargo: `Escopo: ${s.escopo || 'Geral'}`,
+        pessoaId: s.solicitante_id,
+        congregacaoId: null,
+        congregacaoNome: 'Agenda Oficial (Todo o Campo)',
+        solicitanteNome: 'Responsável do Evento',
+        dataSolicitacao: s.created_at,
+        dataPrevista: s.data_inicio,
+        motivoOuDescricao: s.justificativa,
+        observacoes: s.parecer || null,
+        status: s.status,
+        statusLabel: isAprovado ? 'Aprovada com Autorização' : 'Indeferida / Rejeitada',
+        statusBadge: isAprovado
+          ? { bg: 'bg-green-50', text: 'text-green-800', border: 'border-green-300' }
+          : { bg: 'bg-red-50', text: 'text-red-800', border: 'border-red-300' },
+        acaoRequerida: isAprovado ? 'Concluído' : 'Indeferido',
+        detalhesRaw: s,
+      });
+    });
+
     historico.sort(
       (a, b) =>
         new Date(b.detalhesRaw.updated_at || b.dataSolicitacao).getTime() -
@@ -469,6 +751,74 @@ export class PresidenciaService {
   /**
    * Delibera formalmente um pedido de carta ministerial (Autorização ou Rejeição).
    */
+
+  /**
+   * Delibera uma solicitação de exceção da Agenda Oficial pela Presidência.
+   * Reutiliza a mesma estrutura da tabela agenda_solicitacoes e reflete imediatamente na Agenda Oficial.
+   */
+  public static async deliberarAgendaSolicitacao(
+    supabase: any,
+    user: UserContextAuth,
+    input: DeliberarAgendaInput
+  ): Promise<any> {
+    if (!this.isPresidenciaOuAdmin(user)) {
+      throw new Error('Acesso negado: Somente a Presidência ou Administrador podem deliberar solicitações da Agenda Oficial.');
+    }
+
+    if (!input.solicitacao_id) {
+      throw new Error('O ID da solicitação é obrigatório.');
+    }
+
+    const { data: sol, error: solErr } = await supabase
+      .from('agenda_solicitacoes')
+      .select('*')
+      .eq('id', input.solicitacao_id)
+      .eq('ministry_id', user.ministryId)
+      .single();
+
+    if (solErr || !sol) {
+      throw new Error('Solicitação da Agenda Oficial não encontrada ou acesso negado pelo isolamento multi-tenant.');
+    }
+
+    if (sol.status !== 'pendente') {
+      throw new Error(`Esta solicitação já foi julgada anteriormente com status: ${sol.status}.`);
+    }
+
+    const parecer = (input.parecer || '').trim();
+    if (input.decisao === 'rejeitar' && !parecer) {
+      throw new Error('O parecer/motivo de indeferimento é obrigatório.');
+    }
+
+    const statusFinal = input.decisao === 'rejeitar' ? 'rejeitado' : 'aprovado';
+    const tipoDecisao = input.tipo_decisao || input.decisao;
+
+    const payload = {
+      status: statusFinal,
+      tipo_decisao: tipoDecisao,
+      efeito: statusFinal === 'rejeitado' ? null : (input.efeito || 'autorizar_evento'),
+      vigencia_tipo: statusFinal === 'rejeitado' ? 'unica' : (input.vigencia_tipo || 'unica'),
+      vigencia_inicio: statusFinal === 'rejeitado' || !input.vigencia_inicio ? null : new Date(input.vigencia_inicio).toISOString(),
+      vigencia_fim: statusFinal === 'rejeitado' || !input.vigencia_fim ? null : new Date(input.vigencia_fim).toISOString(),
+      parecer: parecer || 'Deliberação realizada pela Presidência Institucional.',
+      analisado_por: user.userId || null,
+      analisado_em: new Date().toISOString(),
+    };
+
+    const { data: updated, error: updateErr } = await supabase
+      .from('agenda_solicitacoes')
+      .update(payload)
+      .eq('id', input.solicitacao_id)
+      .eq('ministry_id', user.ministryId)
+      .select()
+      .single();
+
+    if (updateErr) {
+      throw new Error(`Falha ao salvar decisão da solicitação na Agenda: ${updateErr.message}`);
+    }
+
+    return updated;
+  }
+
   public static async deliberarCartaPedido(
     supabase: any,
     user: UserContextAuth,

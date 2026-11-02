@@ -227,3 +227,76 @@ export function filtrarPorFuncaoMinisterial<T extends FuncaoMinisterialPredicado
   }
   return true;
 }
+
+export const INSTITUTIONAL_TIMEZONE = 'America/Belem';
+
+/**
+ * Obtém a data corrente 'YYYY-MM-DD' no fuso horário do ministério (America/Belem).
+ */
+export function getHojeLocalBelem(refDate: Date = new Date()): {
+  dataStr: string;
+  dia: number;
+  mes: number;
+  ano: number;
+} {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: INSTITUTIONAL_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const dataStr = formatter.format(refDate); // YYYY-MM-DD
+  const [ano, mes, dia] = dataStr.split('-').map((v) => parseInt(v, 10));
+  return { dataStr, dia, mes, ano };
+}
+
+/**
+ * Extrai dia e mês de uma data de nascimento nos formatos aceitos (YYYY-MM-DD, DD/MM/YYYY, etc).
+ */
+export function extrairDiaMesNascimento(dataNascimento?: string | null): {
+  dia: number;
+  mes: number;
+} | null {
+  if (!dataNascimento || typeof dataNascimento !== 'string') return null;
+  const raw = dataNascimento.trim();
+  if (!raw) return null;
+
+  let dia = 0;
+  let mes = 0;
+
+  if (raw.includes('-')) {
+    const parts = raw.split('T')[0].split('-');
+    if (parts.length >= 3) {
+      mes = parseInt(parts[1], 10);
+      dia = parseInt(parts[2], 10);
+    }
+  } else if (raw.includes('/')) {
+    const parts = raw.split('/');
+    if (parts.length >= 2) {
+      dia = parseInt(parts[0], 10);
+      mes = parseInt(parts[1], 10);
+    }
+  }
+
+  if (isNaN(dia) || isNaN(mes) || dia < 1 || dia > 31 || mes < 1 || mes > 12) {
+    return null;
+  }
+
+  return { dia, mes };
+}
+
+/**
+ * Verifica se a data de nascimento do membro coincide estritamente com o dia e mês de hoje
+ * no fuso horário institucional (America/Belem).
+ */
+export function isAniversarianteHoje(
+  dataNascimento?: string | null,
+  refDate: Date = new Date()
+): boolean {
+  const bday = extrairDiaMesNascimento(dataNascimento);
+  if (!bday) return false;
+
+  const hoje = getHojeLocalBelem(refDate);
+  return bday.dia === hoje.dia && bday.mes === hoje.mes;
+}
+

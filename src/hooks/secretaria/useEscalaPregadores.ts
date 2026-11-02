@@ -150,22 +150,46 @@ export function useEscalaPregadores() {
   const [historicoEvento, setHistoricoEvento] = useState<HistoricoEscalaItem[]>([]);
   const [loadingHistorico, setLoadingHistorico] = useState(false);
 
-  // Carregar congregações para os filtros
+  // Carregar congregações para os filtros (filtrado dinamicamente pelo anoMes selecionado)
   useEffect(() => {
+    let ativo = true;
     async function carregarCongregacoes() {
       try {
-        const res = await fetch('/api/v1/secretaria/escala-pregadores?acao=congregacoes');
-        if (res.ok) {
+        const queryParams = new URLSearchParams();
+        queryParams.set('acao', 'congregacoes');
+        if (filtros.anoMes) {
+          queryParams.set('ano_mes', filtros.anoMes);
+        }
+
+        const res = await fetch(`/api/v1/secretaria/escala-pregadores?${queryParams.toString()}`);
+        if (res.ok && ativo) {
           const json = await res.json();
-          if (Array.isArray(json)) setCongregacoes(json);
-          else if (Array.isArray(json.data)) setCongregacoes(json.data);
+          const lista: { id: string; nome: string; is_sede?: boolean }[] = Array.isArray(json)
+            ? json
+            : Array.isArray(json.data)
+            ? json.data
+            : [];
+          setCongregacoes(lista);
+
+          // Regra 5: Se a congregação anteriormente selecionada não possuir eventos no novo período,
+          // retornar automaticamente ao filtro geral ("Todas as Congregações")
+          setFiltros((prev) => {
+            if (prev.churchId && !lista.some((c) => c.id === prev.churchId)) {
+              return { ...prev, churchId: '' };
+            }
+            return prev;
+          });
         }
       } catch (err) {
         console.error('Falha ao carregar congregações:', err);
       }
     }
     carregarCongregacoes();
-  }, []);
+
+    return () => {
+      ativo = false;
+    };
+  }, [filtros.anoMes]);
 
   // Carregar eventos com escalas (paginado no backend com 10 itens por página)
   const carregarEventos = useCallback(async () => {
