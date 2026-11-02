@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { CheckCircle2, Lock } from 'lucide-react';
+import { CheckCircle2, Lock, Sparkles } from 'lucide-react';
 import { createClient } from '@/lib/supabase-client';
 import { formatCpfOrCnpj, formatPhone, onlyDigits } from '@/lib/mascaras';
 import { formatarPreco } from '@/config/plans';
@@ -31,23 +31,62 @@ type PlanoDB = {
   modulos: string[] | null;
 };
 
-function buildHighlights(plan: PlanoDB): string[] {
-  const h: string[] = [];
-  if (plan.max_members > 0) h.push(`Até ${plan.max_members.toLocaleString('pt-BR')} Membros`);
-  else h.push('Membros ilimitados');
-  if (plan.max_ministerios > 0) h.push(`Até ${plan.max_ministerios} Igrejas inclusas`);
-  // Módulos registrados no banco (coluna modulos)
-  if (plan.modulos && plan.modulos.length > 0) {
-    plan.modulos.forEach(m => h.push(m));
-  } else {
-    // fallback por booleans
-    if (plan.has_modulo_financeiro) h.push('Módulo Financeiro');
-    if (plan.has_modulo_eventos) h.push('Módulo Eventos');
-    if (plan.has_modulo_reunioes) h.push('Módulo Reuniões');
-    if (plan.has_advanced_reports) h.push('Relatórios Avançados');
-    if (plan.has_priority_support) h.push('Suporte Prioritário');
+
+
+const INTERMEDIARIO_OFFICIAL_MODULES = [
+  'Secretaria IV',
+  'Tesouraria II',
+  'Área de Eventos I',
+  'Funcionários',
+  'Comissão/Consagração',
+  'Reuniões de Ministério',
+  'EBD',
+  'Missões',
+  'Agenda Ministerial',
+  'Achados e Perdidos',
+  'Patrimônio',
+  'Geolocalização',
+  'Auditoria',
+  'Suporte Incluso',
+];
+
+function buildPlanModuleList(plan: PlanoDB, allPlans: PlanoDB[]): string[] {
+  const slug = plan.slug?.toLowerCase();
+  if (slug === 'intermediario') {
+    return INTERMEDIARIO_OFFICIAL_MODULES;
   }
-  return h;
+
+  // Se for o Júnior, retorna exclusivamente seus módulos oficiais cadastrados
+  if (slug === 'junior') {
+    return [
+      'Secretaria I',
+      'Tesouraria I',
+      'Geolocalização',
+      'Auditoria',
+      'Suporte Incluso',
+    ];
+  }
+
+  // Para outros planos (Basic, Starter, Profissional), resolve a lista completa desmembrando "+ Todos do..."
+  const rawModulos = Array.isArray(plan.modulos) ? plan.modulos : [];
+  const result: string[] = [];
+
+  for (const m of rawModulos) {
+    if (m.startsWith('+ Todos do')) {
+      const baseName = m.replace('+ Todos do', '').trim().toLowerCase();
+      const basePlan = allPlans.find(
+        (p) => p.name.toLowerCase() === baseName || p.slug.toLowerCase() === baseName
+      );
+      if (basePlan) {
+        const inherited = buildPlanModuleList(basePlan, allPlans);
+        result.push(...inherited);
+      }
+    } else {
+      result.push(m);
+    }
+  }
+
+  return [...new Set(result)];
 }
 
 const formatCep = (value: string) => {
@@ -60,9 +99,14 @@ const formatCep = (value: string) => {
 export default function PreCadastroPage() {
   const searchParams = useSearchParams();
   const planParam  = useMemo(() => (searchParams.get('plan')  || '').toLowerCase().trim(), [searchParams]);
-  // isTrial: fluxo originado pelo botão "Teste grátis" da home.
-  // Quando true, o plano é fixado em Starter e não pode ser alterado pelo usuário.
-  const isTrial    = useMemo(() => searchParams.get('trial') === 'true', [searchParams]);
+  // isTrial: fluxo de teste grátis (iniciado via URL ou alternado pelo usuário na tela).
+  const initialTrial = useMemo(() => searchParams.get('trial') === 'true', [searchParams]);
+  const [isTrial, setIsTrial] = useState(initialTrial);
+
+  // Sincroniza caso searchParams mude externamente
+  useEffect(() => {
+    setIsTrial(initialTrial);
+  }, [initialTrial]);
   // lead_id + token: link vindo do e-mail de ativação do trial
   const leadId     = useMemo(() => searchParams.get('lead_id')?.trim() || '', [searchParams]);
   const leadToken  = useMemo(() => searchParams.get('token')?.trim()   || '', [searchParams]);
@@ -172,23 +216,30 @@ export default function PreCadastroPage() {
       .then(({ data }: { data: PlanoDB[] | null }) => {
         if (!data?.length) return;
         setPlanos(data);
-        // Fluxo de teste grátis: plano sempre Intermediário, independente do parâmetro da URL.
-        const targetSlug = isTrial ? 'intermediario' : planParam;
-        const matched =
-          data.find((p) => p.slug?.toLowerCase() === targetSlug) ||
-          data.find((p) => p.name?.toLowerCase() === targetSlug) ||
-          data[0];
-        setPlanoAtivo(matched);
-        setFormData((prev) => ({ ...prev, plan: matched?.slug || matched?.name || prev.plan }));
       });
-  }, [supabase, planParam, isTrial]);
+  }, [supabase]);
 
-  // Sincroniza planoAtivo ao mudar select
+  // Sincroniza planoAtivo e formData.plan quando isTrial é ativado ou planos carregam
   useEffect(() => {
     if (!planos.length) return;
+    if (isTrial) {
+      const intermediario = planos.find(p => p.slug?.toLowerCase() === 'intermediario' || p.name?.toLowerCase() === 'intermediário') || planos[0];
+      setPlanoAtivo(intermediario);
+      setFormData(prev => ({ ...prev, plan: intermediario.slug || 'intermediario' }));
+    } else {
+      const targetSlug = planParam || formData.plan;
+      const matched = planos.find(p => p.slug?.toLowerCase() === targetSlug || p.name?.toLowerCase() === targetSlug) || planos[0];
+      setPlanoAtivo(matched);
+      setFormData(prev => ({ ...prev, plan: matched.slug || matched.name.toLowerCase() }));
+    }
+  }, [isTrial, planos, planParam]);
+
+  // Sincroniza planoAtivo ao mudar select no fluxo comercial
+  useEffect(() => {
+    if (!planos.length || isTrial) return;
     const matched = planos.find((p) => p.slug === formData.plan || p.name?.toLowerCase() === formData.plan);
-    setPlanoAtivo(matched ?? null);
-  }, [formData.plan, planos]);
+    if (matched) setPlanoAtivo(matched);
+  }, [formData.plan, planos, isTrial]);
 
   useEffect(() => {
     const cepDigits = onlyDigits(formData.address_zip);
@@ -483,13 +534,13 @@ export default function PreCadastroPage() {
               Preencha os dados da igreja ou ministério e crie o acesso para iniciar o período de teste.
             </p>
 
-            <div className={`rounded-2xl border p-6 space-y-4 shadow-lg ${
+            <div className={`rounded-3xl border p-6 sm:p-7 space-y-5 shadow-xl ${
               isTrial
                 ? 'bg-gradient-to-b from-blue-900 via-blue-950 to-slate-900 border-blue-500 text-white relative overflow-hidden'
-                : 'bg-white/90 border-[#e7e0d6] text-slate-900'
+                : 'bg-white text-slate-900 border-slate-200'
             }`}>
               {isTrial && (
-                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl pointer-events-none" />
+                <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
               )}
               <div className="flex items-center justify-between">
                 <span className={`text-xs font-bold uppercase tracking-[0.25em] ${
@@ -497,69 +548,142 @@ export default function PreCadastroPage() {
                 }`}>
                   {isTrial ? 'Seu plano de teste — 7 dias grátis' : 'Plano comercial selecionado'}
                 </span>
-                <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
-                  isTrial ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30' : 'bg-slate-100 text-slate-600'
+                <span className={`text-xs font-bold px-3 py-1 rounded-full ${
+                  isTrial
+                    ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30 shadow-sm'
+                    : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                 }`}>
-                  {isTrial ? '100% Gratuito no período' : '07 dias grátis'}
+                  {isTrial ? '100% Gratuito no período' : 'Assinatura Comercial'}
                 </span>
               </div>
-              <div>
-                <p className={`text-3xl font-extrabold tracking-tight ${isTrial ? 'text-white' : 'text-slate-900'}`}>
-                  {planoAtivo?.name || (isTrial ? 'Intermediário' : 'Carregando...')}
-                </p>
-                {isTrial && (
-                  <p className="text-xs font-semibold text-blue-200 mt-1">
-                    Experimente todas as ferramentas avançadas do Gestão Eklésia sem nenhum compromisso ou cobrança agora.
-                  </p>
-                )}
-              </div>
-              <div className="space-y-3 pt-2">
-                <p className={`text-xs ${isTrial ? 'text-blue-100/90' : 'text-slate-600'}`}>
-                  {planoAtivo?.description || (isTrial ? 'Para igrejas em expansão que precisam de mais recursos, múltiplos templos e estrutura completa.' : '')}
-                </p>
-                {planoAtivo && (
-                  <ul className="space-y-2 text-xs">
-                    {buildHighlights(planoAtivo).map((item) => (
-                      <li key={item} className="flex items-center gap-2">
-                        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${isTrial ? 'bg-amber-400' : 'bg-emerald-600'}`} />
-                        <span className={isTrial ? 'text-blue-100 font-medium' : 'text-slate-600'}>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
 
-            <div className="rounded-2xl bg-white/80 border border-[#e7e0d6] p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm uppercase tracking-[0.3em] text-emerald-700">Valores após o período</span>
-              </div>
-              <p className="text-sm text-slate-600">
-                Após o período de testes, você poderá assinar um dos planos abaixo.
-              </p>
-              <div className="space-y-3">
-                {planos.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between text-slate-700 text-sm">
-                    <span className="font-semibold text-slate-900">{p.name}</span>
-                    <span>{formatarPreco(p.price_monthly)}/mês</span>
-                  </div>
-                ))}
-              </div>
-              {(() => {
-                const comAnual = planos.find((p) => p.price_annually && p.price_annually > 0);
-                return comAnual ? (
-                  <p className="text-xs text-slate-500">
-                    Valores anuais a partir de {formatarPreco(comAnual.price_annually!)}/ano.
+              <div>
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className={`text-3xl sm:text-4xl font-extrabold tracking-tight ${isTrial ? 'text-white' : 'text-slate-900'}`}>
+                    {isTrial ? 'Intermediário' : (planoAtivo?.name || 'Plano')}
                   </p>
-                ) : null;
-              })()}
+                  {!isTrial && planoAtivo && (
+                    <span className="text-xl sm:text-2xl font-black text-[#062E6F]">
+                      {formatarPreco(planoAtivo.price_monthly)}/mês
+                    </span>
+                  )}
+                </div>
+                <p className={`text-xs sm:text-sm font-semibold mt-1.5 ${isTrial ? 'text-blue-200' : 'text-slate-600'}`}>
+                  {isTrial
+                    ? 'Experimente todas as ferramentas avançadas do Gestão Eklésia sem nenhum compromisso ou cobrança agora.'
+                    : (planoAtivo?.description || 'Plano contratado para gestão completa do ministério.')}
+                </p>
+              </div>
+
+              {/* Limites Oficiais do Plano Selecionado */}
+              <div className={`rounded-xl p-3.5 border ${
+                isTrial
+                  ? 'bg-blue-950/60 border-blue-800/80 text-blue-100'
+                  : 'bg-slate-50 border-slate-200 text-slate-700'
+              }`}>
+                <p className={`text-[11px] font-bold uppercase tracking-wider mb-2 ${
+                  isTrial ? 'text-amber-400' : 'text-slate-700'
+                }`}>
+                  {isTrial ? 'Limites inclusos no teste' : 'Limites do plano contratado'}
+                </p>
+                <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span>
+                      {isTrial
+                        ? 'Membros ilimitados'
+                        : (planoAtivo?.max_members && planoAtivo.max_members > 0
+                            ? `Até ${planoAtivo.max_members.toLocaleString('pt-BR')} membros`
+                            : 'Membros ilimitados')}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span>
+                      {isTrial
+                        ? 'Até 51 congregações'
+                        : (planoAtivo?.max_ministerios && planoAtivo.max_ministerios > 0
+                            ? `Até ${planoAtivo.max_ministerios} congregações`
+                            : '1 congregação')}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span>
+                      {isTrial
+                        ? 'Até 200 usuários'
+                        : (planoAtivo?.max_users && planoAtivo.max_users > 0
+                            ? `Até ${planoAtivo.max_users} usuários`
+                            : 'Usuários inclusos')}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span>Gestão centralizada</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Módulos Oficiais do Plano em 2 Colunas */}
+              <div className="space-y-3 pt-1">
+                <p className={`text-xs font-bold uppercase tracking-[0.2em] ${
+                  isTrial ? 'text-blue-200' : 'text-slate-700'
+                }`}>
+                  {isTrial ? 'Módulos liberados para uso imediato:' : 'Módulos inclusos neste plano:'}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
+                  {(isTrial
+                    ? INTERMEDIARIO_OFFICIAL_MODULES
+                    : (planoAtivo ? buildPlanModuleList(planoAtivo, planos) : [])
+                  ).map((modulo) => (
+                    <div key={modulo} className="flex items-center gap-2">
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                        isTrial ? 'bg-amber-400' : 'bg-emerald-600'
+                      }`} />
+                      <span className={`font-medium ${isTrial ? 'text-blue-100' : 'text-slate-800'}`}>
+                        {modulo}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Aviso explícito de ativação financeira para o fluxo comercial */}
+              {!isTrial && (
+                <div className="space-y-4 pt-1">
+                  <div className="rounded-xl p-3 bg-amber-50/80 border border-amber-200/90 text-[11px] text-amber-900 font-medium leading-relaxed">
+                    <strong>Aviso de Ativação:</strong> O plano <strong>{planoAtivo?.name || 'selecionado'}</strong> e seus recursos completos serão ativados mediante a confirmação do pagamento.
+                  </div>
+
+                  {/* Chamada elegante para experimentar antes de assinar */}
+                  <div className="rounded-2xl p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 text-slate-800 space-y-2.5 shadow-sm">
+                    <div>
+                      <p className="text-xs font-bold text-blue-900">
+                        Quer experimentar antes de assinar?
+                      </p>
+                      <p className="text-xs text-blue-800 font-medium mt-0.5">
+                        Teste grátis por 7 dias com o plano Intermediário.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsTrial(true)}
+                      className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white text-xs font-bold shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                      Experimentar grátis por 7 dias
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <a
               href="https://wa.me/5591981755021"
               target="_blank"
               rel="noreferrer"
-              className="block rounded-2xl bg-white/80 border border-[#e7e0d6] p-4 hover:border-emerald-200 hover:bg-emerald-50/60 transition"
+              className="block rounded-2xl bg-white/90 border border-[#e7e0d6] p-4 hover:border-emerald-300 hover:bg-emerald-50/70 transition shadow-sm"
             >
               <p className="text-sm font-semibold flex items-center gap-2 text-slate-900">
                 <img
@@ -567,9 +691,11 @@ export default function PreCadastroPage() {
                   alt="WhatsApp"
                   className="h-4 w-4"
                 />
-                DÚVIDAS? Fale com nossa equipe comercial. Clique aqui...
+                DÚVIDAS? Fale com nossa equipe comercial
               </p>
-              <p className="text-xs text-slate-600 mt-2">Fale com nosso time: (91) 98175-5021</p>
+              <p className="text-xs text-slate-600 mt-1.5">
+                Atendimento personalizado via WhatsApp: (91) 98175-5021
+              </p>
             </a>
           </div>
 
@@ -733,9 +859,9 @@ export default function PreCadastroPage() {
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Plano</label>
                 {isTrial ? (
-                  <div className="w-full rounded-xl border border-blue-200 bg-blue-50/80 px-4 py-3 text-sm text-blue-900 flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-blue-600 shrink-0" />
-                    <span><strong>Intermediário</strong> — plano completo liberado no período de teste grátis (7 dias)</span>
+                  <div className="w-full rounded-xl border border-blue-200 bg-blue-50/80 px-3.5 py-2 text-blue-900 flex flex-col justify-center">
+                    <span className="text-sm font-bold leading-tight text-blue-950">Intermediário</span>
+                    <span className="text-xs text-blue-700 font-medium leading-tight mt-0.5">Teste grátis por 7 dias</span>
                   </div>
                 ) : (
                   <select
