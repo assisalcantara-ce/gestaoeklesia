@@ -28,12 +28,13 @@ export async function requireFlowAuth(request: NextRequest): Promise<FlowAuthCon
 async function ensureTrialAccess(userId: string) {
   const admin = createServerClient();
 
-  // Se for conta de suporte técnico, não bloqueia por trial expirado
+  // Se for conta de suporte técnico autorizada (app_metadata do servidor)
   const { data: userAuth } = await admin.auth.admin.getUserById(userId);
+  const emailConfirmed = Boolean(userAuth?.user?.email_confirmed_at);
   const isTechUser =
     userAuth?.user?.app_metadata?.is_technical_user === true ||
-    userAuth?.user?.user_metadata?.is_technical_user === true ||
-    (userAuth?.user?.email && userAuth.user.email.toLowerCase().startsWith('tech.suporte.'));
+    userAuth?.user?.app_metadata?.role === 'tech_support' ||
+    (emailConfirmed && userAuth?.user?.email && userAuth.user.email.toLowerCase().startsWith('tech.suporte.gestaoeklesia.com.br'));
 
   if (isTechUser) return;
 

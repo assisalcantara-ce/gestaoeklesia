@@ -15,6 +15,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveTenantAuth } from '@/lib/tenant-auth';
+import { authTenantErrorResponse } from '@/lib/api-errors';
 import { TesourariaService } from '@/services/TesourariaService';
 import { logServerAudit } from '@/lib/audit-logger';
 import { temAcesso } from '@/lib/access-control';
@@ -27,6 +28,8 @@ export async function GET(request: NextRequest) {
   try {
     context = await resolveTenantAuth(request);
   } catch (err: any) {
+    const authResponse = authTenantErrorResponse(err);
+    if (authResponse) return authResponse;
     const isUnauth = err?.message === 'UNAUTHORIZED';
     return NextResponse.json(
       { error: isUnauth ? 'Não autenticado.' : 'Acesso negado: sem ministério associado.' },
@@ -80,6 +83,8 @@ export async function POST(request: NextRequest) {
   try {
     context = await resolveTenantAuth(request);
   } catch (err: any) {
+    const authResponse = authTenantErrorResponse(err);
+    if (authResponse) return authResponse;
     const isUnauth = err?.message === 'UNAUTHORIZED';
     return NextResponse.json(
       { error: isUnauth ? 'Não autenticado.' : 'Acesso negado: sem ministério associado.' },
@@ -215,6 +220,8 @@ export async function PUT(request: NextRequest) {
   try {
     context = await resolveTenantAuth(request);
   } catch (err: any) {
+    const authResponse = authTenantErrorResponse(err);
+    if (authResponse) return authResponse;
     const isUnauth = err?.message === 'UNAUTHORIZED';
     return NextResponse.json(
       { error: isUnauth ? 'Não autenticado.' : 'Acesso negado: sem ministério associado.' },
@@ -379,6 +386,8 @@ export async function PATCH(request: NextRequest) {
   try {
     context = await resolveTenantAuth(request);
   } catch (err: any) {
+    const authResponse = authTenantErrorResponse(err);
+    if (authResponse) return authResponse;
     const isUnauth = err?.message === 'UNAUTHORIZED';
     return NextResponse.json(
       { error: isUnauth ? 'Não autenticado.' : 'Acesso negado: sem ministério associado.' },
@@ -454,6 +463,8 @@ export async function DELETE(request: NextRequest) {
   try {
     context = await resolveTenantAuth(request);
   } catch (err: any) {
+    const authResponse = authTenantErrorResponse(err);
+    if (authResponse) return authResponse;
     const isUnauth = err?.message === 'UNAUTHORIZED';
     return NextResponse.json(
       { error: isUnauth ? 'Não autenticado.' : 'Acesso negado: sem ministério associado.' },

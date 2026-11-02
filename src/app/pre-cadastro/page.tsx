@@ -172,8 +172,8 @@ export default function PreCadastroPage() {
       .then(({ data }: { data: PlanoDB[] | null }) => {
         if (!data?.length) return;
         setPlanos(data);
-        // Fluxo de teste grátis: plano sempre Starter, independente do parâmetro da URL.
-        const targetSlug = isTrial ? 'starter' : planParam;
+        // Fluxo de teste grátis: plano sempre Intermediário, independente do parâmetro da URL.
+        const targetSlug = isTrial ? 'intermediario' : planParam;
         const matched =
           data.find((p) => p.slug?.toLowerCase() === targetSlug) ||
           data.find((p) => p.name?.toLowerCase() === targetSlug) ||
@@ -345,7 +345,7 @@ export default function PreCadastroPage() {
           address_city: formData.address_city,
           address_state: formData.address_state,
           description: formData.description,
-          plan: isTrial ? 'starter' : formData.plan,
+          plan: isTrial ? 'intermediario' : formData.plan,
           trial: isTrial,
         })
       });
@@ -483,24 +483,46 @@ export default function PreCadastroPage() {
               Preencha os dados da igreja ou ministério e crie o acesso para iniciar o período de teste.
             </p>
 
-            <div className="rounded-2xl bg-white/90 border border-[#e7e0d6] p-6 space-y-4 shadow-lg">
+            <div className={`rounded-2xl border p-6 space-y-4 shadow-lg ${
+              isTrial
+                ? 'bg-gradient-to-b from-blue-900 via-blue-950 to-slate-900 border-blue-500 text-white relative overflow-hidden'
+                : 'bg-white/90 border-[#e7e0d6] text-slate-900'
+            }`}>
+              {isTrial && (
+                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl pointer-events-none" />
+              )}
               <div className="flex items-center justify-between">
-                <span className="text-sm uppercase tracking-[0.3em] text-emerald-700">Plano escolhido</span>
-                <span className="text-sm text-slate-500">{isTrial ? '🔒 Teste grátis — Starter' : '07 dias grátis'}</span>
+                <span className={`text-xs font-bold uppercase tracking-[0.25em] ${
+                  isTrial ? 'text-amber-400' : 'text-emerald-700'
+                }`}>
+                  {isTrial ? 'Seu plano de teste — 7 dias grátis' : 'Plano comercial selecionado'}
+                </span>
+                <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+                  isTrial ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30' : 'bg-slate-100 text-slate-600'
+                }`}>
+                  {isTrial ? '100% Gratuito no período' : '07 dias grátis'}
+                </span>
               </div>
-              <p className="text-3xl font-bold text-slate-900">
-                {planoAtivo?.name || 'Carregando...'}
-              </p>
-              <div className="space-y-3">
-                <p className="text-sm text-slate-600">
-                  {planoAtivo?.description || ''}
+              <div>
+                <p className={`text-3xl font-extrabold tracking-tight ${isTrial ? 'text-white' : 'text-slate-900'}`}>
+                  {planoAtivo?.name || (isTrial ? 'Intermediário' : 'Carregando...')}
+                </p>
+                {isTrial && (
+                  <p className="text-xs font-semibold text-blue-200 mt-1">
+                    Experimente todas as ferramentas avançadas do Gestão Eklésia sem nenhum compromisso ou cobrança agora.
+                  </p>
+                )}
+              </div>
+              <div className="space-y-3 pt-2">
+                <p className={`text-xs ${isTrial ? 'text-blue-100/90' : 'text-slate-600'}`}>
+                  {planoAtivo?.description || (isTrial ? 'Para igrejas em expansão que precisam de mais recursos, múltiplos templos e estrutura completa.' : '')}
                 </p>
                 {planoAtivo && (
-                  <ul className="space-y-2 text-xs text-slate-600">
+                  <ul className="space-y-2 text-xs">
                     {buildHighlights(planoAtivo).map((item) => (
                       <li key={item} className="flex items-center gap-2">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
-                        {item}
+                        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${isTrial ? 'bg-amber-400' : 'bg-emerald-600'}`} />
+                        <span className={isTrial ? 'text-blue-100 font-medium' : 'text-slate-600'}>{item}</span>
                       </li>
                     ))}
                   </ul>
@@ -600,7 +622,7 @@ export default function PreCadastroPage() {
                   {[
                     'Criando ministério',
                     'Configurando ambiente',
-                    'Aplicando plano Starter',
+                    'Aplicando plano Intermediário',
                     'Ativando trial de 7 dias',
                     'Finalizando acesso',
                   ].map((step, idx) => {
@@ -650,7 +672,7 @@ export default function PreCadastroPage() {
                     <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 space-y-2 text-sm">
                       <div className="flex items-center gap-2 text-slate-700">
                         <Lock className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                        <span className="font-semibold text-slate-900">Plano Starter</span>
+                        <span className="font-semibold text-slate-900">Plano Intermediário</span>
                         <span className="ml-auto text-emerald-700 font-semibold">7 dias grátis</span>
                       </div>
                       {successInfo.trialExpiresAt && (
@@ -711,9 +733,9 @@ export default function PreCadastroPage() {
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Plano</label>
                 {isTrial ? (
-                  <div className="w-full rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
-                    <span><strong>Starter</strong> — plano fixo para o período de teste grátis</span>
+                  <div className="w-full rounded-xl border border-blue-200 bg-blue-50/80 px-4 py-3 text-sm text-blue-900 flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-blue-600 shrink-0" />
+                    <span><strong>Intermediário</strong> — plano completo liberado no período de teste grátis (7 dias)</span>
                   </div>
                 ) : (
                   <select

@@ -107,6 +107,8 @@ export async function POST(request: NextRequest) {
       trial,
     } = body
 
+    const isTrialFlow = Boolean(trial === true || trial === 'true')
+
     const ministryName = upperText(ministerio)
     const pastorName = upperText(pastor)
     const cpfCnpj = onlyDigits(cpf)
@@ -342,18 +344,21 @@ export async function POST(request: NextRequest) {
     const planosList = (planosValidos || []) as { id: string; slug: string }[]
     const slugsValidos = new Set(planosList.map((p) => p.slug?.toLowerCase()).filter(Boolean))
     const planLower = typeof plan === 'string' ? plan.toLowerCase() : ''
-    const isTrialFlow = trial === true || trial === 'true'
+    // Identificador estável do plano oficial de teste gratuito
+    const TRIAL_STABLE_SLUG = 'intermediario'
 
-    // Segurança: fluxo de teste gratuito (trial=true) sempre usa Starter.
-    // Impede manipulação de ?plan=profissional no fluxo de teste grátis.
-    const planValue = isTrialFlow
-      ? 'starter'
-      : (slugsValidos.has(planLower)
-          ? planLower
-          : (slugsValidos.size > 0 ? [...slugsValidos][0] : 'basic'))
-    const planRow = planosList.find((p) => p.slug?.toLowerCase() === planValue) || null
+    // Intenção comercial de contratação: preserva o plano que o usuário escolheu contratar
+    const intendedCommercialPlan = slugsValidos.has(planLower)
+      ? planLower
+      : (slugsValidos.size > 0 ? [...slugsValidos][0] : 'basic')
 
-    // Salvar pré-cadastro na tabela pre_registrations
+    // Regra mandatória de segurança: TODO cadastro sem pagamento confirmado recebe EXCLUSIVAMENTE
+    // o plano Intermediário durante o período gratuito de 7 dias.
+    // Nenhum parâmetro (?trial=false, ?plan=xxx ou body manipulado) pode liberar planos pagos antecipadamente.
+    const activeTrialSlug = TRIAL_STABLE_SLUG
+    const activeTrialPlanRow = planosList.find((p) => p.slug?.toLowerCase() === activeTrialSlug) || null
+
+    // Salvar pré-cadastro na tabela pre_registrations (preserva intenção comercial para checkout posterior)
     const { data: prescadastro, error: prescadastroError } = await supabaseClient
       .from('pre_registrations')
       .insert({
@@ -374,7 +379,7 @@ export async function POST(request: NextRequest) {
         address_city: addressCity,
         address_state: addressState,
         description: descriptionValue,
-        plan: planValue,
+        plan: intendedCommercialPlan,
         trial_expires_at: trialExpiresAt.toISOString(),
         trial_days: 7,
         status: 'trial',
@@ -386,7 +391,7 @@ export async function POST(request: NextRequest) {
     if (prescadastroError) {
       logStep('pre_registrations.insert falhou', 'error', {
         email: maskEmail(emailValue),
-        plan: planValue,
+        plan: intendedCommercialPlan,
         trial: isTrialFlow,
         userId: signUpData.user?.id,
         errorCode: (prescadastroError as any)?.code,
@@ -453,8 +458,8 @@ export async function POST(request: NextRequest) {
         address_city: addressCity,
         address_state: addressState,
         address_zip: addressZip,
-        plan: planValue,
-        subscription_plan_id: planRow?.id || null,
+        plan: activeTrialSlug,
+        subscription_plan_id: activeTrialPlanRow?.id || null,
         subscription_status: 'trial',
         subscription_start_date: new Date().toISOString(),
         subscription_end_date: trialExpiresAt.toISOString(),
@@ -466,7 +471,8 @@ export async function POST(request: NextRequest) {
     if (ministryError || !ministry) {
       logStep('ministries.insert falhou — rollback iniciado', 'error', {
         email: maskEmail(emailValue),
-        plan: planValue,
+        plan: activeTrialSlug,
+        intendedPlan: intendedCommercialPlan,
         trial: isTrialFlow,
         userId: signUpData.user?.id,
         errorCode: (ministryError as any)?.code,
@@ -493,7 +499,8 @@ export async function POST(request: NextRequest) {
     if (muError) {
       logStep('ministry_users.insert falhou — rollback iniciado', 'error', {
         email: maskEmail(emailValue),
-        plan: planValue,
+        plan: activeTrialSlug,
+        intendedPlan: intendedCommercialPlan,
         trial: isTrialFlow,
         userId: signUpData.user?.id,
         ministryId: ministry.id,
@@ -513,7 +520,8 @@ export async function POST(request: NextRequest) {
       email: maskEmail(emailValue),
       ministryId: ministry.id,
       slug: ministrySlug,
-      plan: planValue,
+      plan: activeTrialSlug,
+      intendedPlan: intendedCommercialPlan,
       trial: isTrialFlow,
       trialExpiresAt: trialExpiresAt.toISOString(),
     })
@@ -555,7 +563,7 @@ export async function POST(request: NextRequest) {
     if (resendKey) {
       try {
         const resend = new Resend(resendKey)
-        const planLabel = planValue.charAt(0).toUpperCase() + planValue.slice(1)
+        const planLabel = intendedCommercialPlan.charAt(0).toUpperCase() + intendedCommercialPlan.slice(1)
         const emailSubject = isTrialFlow
           ? 'Gestão Eklesia | Seu teste grátis está ativo!'
           : 'Gestão Eklesia | Pré-cadastro confirmado'
@@ -634,14 +642,16 @@ export async function POST(request: NextRequest) {
         emailSent = true
         logStep('welcome_email_sent', 'info', {
           email: maskEmail(emailValue),
-          plan: planValue,
+          plan: activeTrialSlug,
+          intendedPlan: intendedCommercialPlan,
           trial: isTrialFlow,
           subject: emailSubject,
         })
       } catch (emailError: any) {
         logStep('welcome_email_failed', 'warn', {
           email: maskEmail(emailValue),
-          plan: planValue,
+          plan: activeTrialSlug,
+          intendedPlan: intendedCommercialPlan,
           trial: isTrialFlow,
           errorMessage: emailError?.message,
           errorStatus: emailError?.statusCode,
@@ -651,7 +661,8 @@ export async function POST(request: NextRequest) {
     } else {
       logStep('welcome_email_failed', 'warn', {
         reason: 'RESEND_API_KEY_NOT_SET',
-        plan: planValue,
+        plan: activeTrialSlug,
+        intendedPlan: intendedCommercialPlan,
         trial: isTrialFlow,
       })
     }
@@ -659,7 +670,8 @@ export async function POST(request: NextRequest) {
     logStep('signup_success', 'info', {
       email: maskEmail(emailValue),
       ministryId: ministry.id,
-      plan: planValue,
+      plan: activeTrialSlug,
+      intendedPlan: intendedCommercialPlan,
       trial: isTrialFlow,
       emailSent,
       trialExpiresAt: trialExpiresAt.toISOString(),
@@ -689,7 +701,8 @@ export async function POST(request: NextRequest) {
         trial_days: 7,
         is_trial: isTrialFlow,
         email_sent: emailSent,
-        plan: planValue,
+        plan: activeTrialSlug,
+        intended_plan: intendedCommercialPlan,
         login_url: loginUrl,
       },
     }, { status: 201 })

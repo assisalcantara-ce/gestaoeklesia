@@ -585,7 +585,7 @@ export default function LandingPage() {
             {/* Botões de Ação */}
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <a
-                href="/pre-cadastro?plan=starter&trial=true"
+                href="/pre-cadastro?plan=intermediario&trial=true"
                 className="inline-flex items-center gap-3.5 px-6 py-3 rounded-2xl bg-gradient-to-b from-[#ff7e1d] to-[#f45300] hover:from-[#ff8b33] hover:to-[#ff5c0a] text-white shadow-lg shadow-orange-950/40 hover:shadow-orange-600/30 border border-orange-400/30 transition-all duration-200 cursor-pointer group active:scale-[0.98]"
               >
                 <div className="flex items-center justify-center">
@@ -1128,18 +1128,31 @@ export default function LandingPage() {
                       ))}
                     </ul>
 
-                    <a
-                      href={plan.is_price_on_request ? '#contato' : `/pre-cadastro?plan=${plan.slug}`}
-                      className={`mt-6 inline-flex w-full justify-center px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer shadow-sm ${
-                        featured
-                          ? 'bg-amber-400 text-slate-950 hover:bg-amber-300 shadow-amber-950/20'
-                          : plan.is_price_on_request
-                            ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300'
-                            : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20'
-                      }`}
-                    >
-                      {plan.is_price_on_request ? 'Falar com consultor' : 'Teste grátis por 7 dias'}
-                    </a>
+                    <div className="mt-6 space-y-2">
+                      <a
+                        href={plan.is_price_on_request ? '#contato' : `/pre-cadastro?plan=${plan.slug}`}
+                        className={`inline-flex w-full justify-center px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition cursor-pointer shadow-sm ${
+                          featured
+                            ? 'bg-amber-400 text-slate-950 hover:bg-amber-300 shadow-amber-950/20'
+                            : plan.is_price_on_request
+                              ? 'bg-slate-900 hover:bg-slate-800 text-white'
+                              : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20'
+                        }`}
+                      >
+                        {plan.is_price_on_request ? 'Falar com consultor' : 'Assinar'}
+                      </a>
+
+                      <a
+                        href="/pre-cadastro?plan=intermediario&trial=true"
+                        className={`inline-flex w-full justify-center px-4 py-2 rounded-xl font-semibold text-xs transition cursor-pointer border ${
+                          featured
+                            ? 'bg-blue-950/80 hover:bg-blue-900/90 text-amber-300 border-blue-700/80'
+                            : 'bg-slate-50 hover:bg-slate-100 text-blue-700 hover:text-blue-800 border-slate-200'
+                        }`}
+                      >
+                        Testar grátis por 7 dias
+                      </a>
+                    </div>
 
                     <button
                       type="button"
@@ -1408,7 +1421,7 @@ export default function LandingPage() {
                   </a>
                 </li>
                 <li>
-                  <a href="/pre-cadastro?plan=starter&trial=true" className="hover:text-white transition">
+                  <a href="/pre-cadastro?plan=intermediario&trial=true" className="hover:text-white transition">
                     Criar Conta (Teste Grátis)
                   </a>
                 </li>

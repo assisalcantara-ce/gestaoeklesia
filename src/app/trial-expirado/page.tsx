@@ -30,6 +30,8 @@ type PlanoDB = {
   has_modulo_financeiro: boolean
   has_modulo_eventos: boolean
   has_modulo_reunioes: boolean
+  is_price_on_request?: boolean
+  display_order?: number
 }
 
 function buildHighlights(plan: PlanoDB): string[] {
@@ -102,7 +104,7 @@ export default function TrialExpiradoPage() {
         setLoading(true)
         const { data, error: plansError } = await supabase
           .from('subscription_plans')
-          .select('id,name,slug,description,price_monthly,price_annually,max_users,max_members,max_ministerios,additional_church_monthly_fee,additional_admin_users_per_church,has_api_access,has_advanced_reports,has_priority_support,has_custom_domain,has_white_label,has_automation,has_modulo_financeiro,has_modulo_eventos,has_modulo_reunioes')
+          .select('id,name,slug,description,price_monthly,price_annually,max_users,max_members,max_ministerios,additional_church_monthly_fee,additional_admin_users_per_church,has_api_access,has_advanced_reports,has_priority_support,has_custom_domain,has_white_label,has_automation,has_modulo_financeiro,has_modulo_eventos,has_modulo_reunioes,is_price_on_request,display_order')
           .eq('is_active', true)
           .order('display_order', { ascending: true })
           .order('price_monthly', { ascending: true })
@@ -350,92 +352,104 @@ export default function TrialExpiradoPage() {
           )}
 
           {!loading && !error && (() => {
-            const planosExibidos = planos.filter((p) => !p.slug?.toLowerCase().includes('basic'))
-            const planoStarter = planosExibidos.find((p) => p.slug?.toLowerCase().includes('starter') || p.price_monthly === 59.90 || p.price_monthly > 0)
-            const planosSecundarios = planosExibidos.filter((p) => p.id !== planoStarter?.id)
+            const planosExibidos = [...planos].sort((a, b) => (a.display_order ?? 999) - (b.display_order ?? 999))
 
             return (
               <div className="space-y-10">
-                {/* Seção Protagonista: Plano Starter */}
-                {planoStarter && (() => {
-                  const plan = planoStarter
-                  const isSelected = selectedPlanId === plan.id
-                  const btnLabel = isSelected ? '✓ Selecionado' : 'Selecionar Plano'
+                <div className="space-y-2 text-center md:text-left">
+                  <h3 className="text-xl font-bold text-[#062E6F]">Planos disponíveis para o seu ministério</h3>
+                  <p className="text-sm text-slate-500 font-medium">
+                    Escolha o plano que melhor atende à sua igreja. Todos os dados cadastrados durante o teste permanecem preservados.
+                  </p>
+                </div>
 
-                  return (
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                  {planosExibidos.map((plan) => {
+                    const isSelected = selectedPlanId === plan.id
+                    const isConsultation = plan.is_price_on_request || plan.price_monthly === 0
+                    const isPopular = plan.slug?.toLowerCase().includes('starter') || plan.slug?.toLowerCase().includes('inter')
 
-                    <div className="space-y-5">
-                      <div className="space-y-1 text-center md:text-left">
-                        <h3 className="text-xl font-bold text-[#062E6F]">Continue utilizando o Gestão Eklésia</h3>
-                        <p className="text-sm text-slate-500 font-medium">Este é o plano recomendado para continuar utilizando todos os recursos do seu ministério.</p>
-                      </div>
-
-                      <div className="max-w-lg md:max-w-xl mx-auto md:mx-0 w-full">
-                        <PremiumCard
-                          key={plan.id}
-                          hoverable
-                          onClick={() => {
+                    return (
+                      <PremiumCard
+                        key={plan.id}
+                        hoverable
+                        onClick={() => {
+                          if (isConsultation) {
+                            setModalPlan(plan)
+                            setIsModalOpen(true)
+                            setSolicitacaoSucesso(false)
+                            setObservacao('')
+                          } else {
                             setSelectedPlanId(plan.id)
                             setCheckoutInfo(null)
                             setCheckoutError('')
-                          }}
-                          className={`relative pt-10 pb-8 px-8 transition-all duration-300 transform hover:scale-[1.02] flex flex-col justify-between h-full overflow-visible ${
-                            isSelected ? 'border-2 border-emerald-600 bg-white shadow-2xl' : 'border-2 border-emerald-500 bg-white shadow-xl'
-                          } cursor-pointer`}
-                        >
-                          <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 inline-flex items-center px-4 py-1 rounded-full bg-emerald-600 text-white text-[9px] font-black uppercase tracking-widest shadow z-10 whitespace-nowrap">
-                            Mais escolhido
+                          }
+                        }}
+                        className={`relative pt-8 pb-6 px-5 transition-all duration-300 flex flex-col justify-between h-full overflow-visible ${
+                          isSelected
+                            ? 'border-2 border-emerald-600 bg-white shadow-xl'
+                            : isPopular
+                            ? 'border-2 border-blue-600/60 bg-white shadow-md'
+                            : 'border border-slate-200 bg-white shadow-sm'
+                        } cursor-pointer`}
+                      >
+                        {isPopular && (
+                          <span className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center px-3 py-0.5 rounded-full bg-blue-600 text-white text-[9px] font-black uppercase tracking-wider shadow z-10 whitespace-nowrap">
+                            Destaque
                           </span>
+                        )}
 
-                          <div className="flex-1 flex flex-col">
-                            <div className="flex items-start justify-between gap-4">
-                              <div>
-                                <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Plano Principal</p>
-                                <h2 className="text-2xl font-black text-slate-800 mt-2">{plan.name}</h2>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-xs font-bold text-slate-400">Mensal</p>
-                                <p className="text-2xl font-black text-[#062E6F]">{formatarPreco(plan.price_monthly)}/mês</p>
-                              </div>
+                        <div className="flex-1 flex flex-col">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-700">Plano</p>
+                              <h2 className="text-lg font-black text-slate-800 mt-1">{plan.name}</h2>
                             </div>
-
-                            {/* Bloco de benefícios adicionados */}
-                            <div className="bg-emerald-50/50 rounded-xl p-4 border border-emerald-100 mt-4 space-y-2.5 text-xs text-emerald-950">
-                              <div className="flex items-start gap-2.5 font-semibold">
-                                <span className="text-emerald-600 font-black text-sm leading-none">✓</span>
-                                <span className="leading-tight">Ativação imediata após a confirmação do pagamento</span>
-                              </div>
-                              <div className="flex items-start gap-2.5 font-semibold">
-                                <span className="text-emerald-600 font-black text-sm leading-none">✓</span>
-                                <span className="leading-tight">Continue utilizando todos os módulos já cadastrados</span>
-                              </div>
-                              <div className="flex items-start gap-2.5 font-semibold">
-                                <span className="text-emerald-600 font-black text-sm leading-none">✓</span>
-                                <span className="leading-tight">Seus dados permanecem preservados</span>
-                              </div>
+                            <div className="text-right">
+                              {isConsultation ? (
+                                <p className="text-[11px] font-bold text-slate-600 mt-1 leading-tight">
+                                  Sob consulta
+                                </p>
+                              ) : (
+                                <div>
+                                  <p className="text-[10px] font-bold text-slate-400">Mensal</p>
+                                  <p className="text-lg font-black text-[#062E6F]">{formatarPreco(plan.price_monthly)}</p>
+                                </div>
+                              )}
                             </div>
-
-                            <p className="text-xs text-slate-500 mt-4 font-medium">{plan.description || ''}</p>
-
-                            <ul className="space-y-2 text-xs text-slate-600 mt-4 flex-1">
-                              {buildHighlights(plan).map((item) => (
-                                <li key={item} className="flex items-center gap-2 font-medium">
-                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
-                                  {item}
-                                </li>
-                              ))}
-                            </ul>
                           </div>
 
-                          <div className="mt-6 pt-4 border-t border-slate-50">
-                            {/* Faixa discreta acima do botão */}
-                            <div className="text-center text-xs font-semibold text-emerald-800 bg-emerald-50 rounded-lg py-2 border border-emerald-100/50 mb-3">
-                              Recomendado para a maioria dos ministérios.
-                            </div>
+                          <p className="text-xs text-slate-500 mt-3 font-medium line-clamp-2">{plan.description || ''}</p>
 
+                          <ul className="space-y-1.5 text-xs text-slate-600 mt-4 flex-1">
+                            {buildHighlights(plan).slice(0, 6).map((item) => (
+                              <li key={item} className="flex items-center gap-1.5 font-medium">
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                                <span className="text-[11px] leading-tight">{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        <div className="mt-5 pt-3 border-t border-slate-100">
+                          {isConsultation ? (
                             <PremiumButton
-                              variant="success"
-                              className="w-full text-xs py-3"
+                              variant="secondary"
+                              className="w-full text-xs py-2"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setModalPlan(plan)
+                                setIsModalOpen(true)
+                                setSolicitacaoSucesso(false)
+                                setObservacao('')
+                              }}
+                            >
+                              Solicitar Proposta
+                            </PremiumButton>
+                          ) : (
+                            <PremiumButton
+                              variant={isSelected ? 'success' : 'primary'}
+                              className="w-full text-xs py-2"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 setSelectedPlanId(plan.id)
@@ -443,119 +457,14 @@ export default function TrialExpiradoPage() {
                                 setCheckoutError('')
                               }}
                             >
-                              {btnLabel}
+                              {isSelected ? '✓ Selecionado' : 'Assinar Plano'}
                             </PremiumButton>
-                            
-                            {/* Observação discreta de rodapé */}
-                            <p className="text-[10px] text-center text-slate-400 mt-3 font-semibold leading-normal">
-                              "A cobrança será gerada na próxima etapa e poderá ser paga via PIX, boleto ou cartão."
-                            </p>
-
-                            {/* O que acontece após a contratação */}
-                            <div className="mt-5 p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
-                              <p className="font-bold text-slate-800 text-[10px] uppercase tracking-wider mb-1">O que acontece após a contratação?</p>
-                              <div className="flex items-center gap-2 text-slate-700 font-semibold">
-                                <span className="text-emerald-600 font-black">✓</span>
-                                <span>Pagamento confirmado</span>
-                              </div>
-                              <div className="text-slate-400 font-black text-center text-[10px] py-0.5 leading-none">↓</div>
-                              <div className="flex items-center gap-2 text-slate-700 font-semibold">
-                                <span className="text-emerald-600 font-black">✓</span>
-                                <span>Sistema liberado automaticamente</span>
-                              </div>
-                              <div className="text-slate-400 font-black text-center text-[10px] py-0.5 leading-none">↓</div>
-                              <div className="flex items-center gap-2 text-slate-700 font-semibold">
-                                <span className="text-emerald-600 font-black">✓</span>
-                                <span>Continue trabalhando normalmente</span>
-                              </div>
-                            </div>
-                          </div>
-                        </PremiumCard>
-                      </div>
-
-                    </div>
-                  )
-                })()}
-
-                {/* Seção Secundária: Intermediário & Profissional */}
-                {planosSecundarios.length > 0 && (
-                  <div className="pt-10 border-t border-slate-100 space-y-6">
-                    <div className="space-y-1 text-center md:text-left">
-                      <h3 className="text-lg font-bold text-slate-800">Sua igreja precisa de uma solução personalizada?</h3>
-                      <p className="text-sm text-slate-500 font-medium">Se o seu ministério possui uma estrutura maior, múltiplas congregações ou necessidades específicas, nossa equipe poderá preparar uma proposta exclusiva.</p>
-                    </div>
-
-
-                    <div className="grid gap-6 md:grid-cols-2 max-w-3xl">
-                      {planosSecundarios.map((plan) => {
-                        const isSelected = selectedPlanId === plan.id
-                        const isProfissional = plan.slug?.toLowerCase().includes('profis')
-                        const btnLabel = isProfissional ? 'Falar com Especialista' : 'Solicitar Proposta'
-
-                        return (
-                          <PremiumCard
-                            key={plan.id}
-                            hoverable
-                            onClick={() => {
-                              setModalPlan(plan)
-                              setIsModalOpen(true)
-                              setSolicitacaoSucesso(false)
-                              setObservacao('')
-                            }}
-                            className={`relative pt-8 pb-6 px-6 transition-all flex flex-col justify-between h-full overflow-visible ${
-                              isSelected ? 'border border-emerald-400 bg-emerald-50/10' : 'border border-slate-150 bg-white'
-                            } cursor-pointer`}
-                          >
-                            <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 inline-flex items-center px-3 py-1 rounded-full bg-blue-600 text-white text-[9px] font-black uppercase tracking-wider shadow z-10 whitespace-nowrap">
-                              Recomendado
-                            </span>
-
-                            <div className="flex-1 flex flex-col">
-                              <div className="flex items-start justify-between gap-4">
-                                <div>
-                                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Plano</p>
-                                  <h2 className="text-xl font-bold text-slate-800 mt-2">{plan.name}</h2>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-xs font-semibold text-slate-500 mt-1 leading-tight">
-                                    Preço sob<br />consulta
-                                  </p>
-                                </div>
-                              </div>
-
-                              <p className="text-xs text-slate-500 mt-3 font-medium">{plan.description || ''}</p>
-
-                              <ul className="space-y-2 text-xs text-slate-600 mt-4 flex-1">
-                                {buildHighlights(plan).map((item) => (
-                                  <li key={item} className="flex items-center gap-2 font-medium">
-                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
-                                    {item}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-
-                            <div className="mt-6 pt-4 border-t border-slate-50">
-                              <PremiumButton
-                                variant="secondary"
-                                className="w-full text-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setModalPlan(plan)
-                                  setIsModalOpen(true)
-                                  setSolicitacaoSucesso(false)
-                                  setObservacao('')
-                                }}
-                              >
-                                {btnLabel}
-                              </PremiumButton>
-                            </div>
-                          </PremiumCard>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
+                          )}
+                        </div>
+                      </PremiumCard>
+                    )
+                  })}
+                </div>
               </div>
             )
           })()}

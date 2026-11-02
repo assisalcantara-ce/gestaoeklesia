@@ -130,6 +130,89 @@ export async function validarVinculoUsuarioMinisterio(
   return Boolean(ownedMinistry);
 }
 
+export async function requireValidSubscription(
+  context: TenantAuthContext,
+  request?: NextRequest
+): Promise<void> {
+  // Rotas estritamente necessárias para checagem de status, pagamento, contratação, aceite jurídico ou webhooks
+  if (request) {
+    const pathname = new URL(request.url).pathname;
+    const isExempt = [
+      '/api/v1/trial',
+      '/api/v1/juridico',
+      '/api/v1/admin',
+      '/api/v1/hub',
+      '/api/v1/public',
+      '/api/v1/auth',
+      '/api/v1/signup',
+      '/api/v1/onboarding',
+      '/api/v1/contact',
+      '/api/v1/my-ip',
+      '/api/v1/platform-webhook',
+      '/api/v1/ministry-webhook',
+    ].some((prefix) => pathname === prefix || pathname.startsWith(prefix + '/'));
+
+    if (isExempt) return;
+  }
+
+  // Se for conta de suporte técnico autorizada no servidor (app_metadata controlado exclusivamente pelo admin ou e-mail corporativo confirmado)
+  const { data: userAuth } = await context.admin.auth.admin.getUserById(context.userId);
+  const emailConfirmed = Boolean(userAuth?.user?.email_confirmed_at);
+  const isTechUser =
+    userAuth?.user?.app_metadata?.is_technical_user === true ||
+    userAuth?.user?.app_metadata?.role === 'tech_support' ||
+    (emailConfirmed && userAuth?.user?.email && userAuth.user.email.toLowerCase().startsWith('tech.suporte.gestaoeklesia.com.br'));
+
+  if (isTechUser) return;
+
+  // 1. Verificar ministério do tenant
+  const { data: ministry } = await context.admin
+    .from('ministries')
+    .select('id, is_active, subscription_status, subscription_end_date')
+    .eq('id', context.ministryId)
+    .maybeSingle();
+
+  // Se a assinatura estiver confirmada e ativa no ministério, acesso liberado
+  if (ministry?.is_active && ministry?.subscription_status === 'active') {
+    return;
+  }
+
+  // 2. Verificar pre_registrations associado ao usuário
+  const { data: preReg } = await context.admin
+    .from('pre_registrations')
+    .select('id, trial_expires_at, status')
+    .eq('user_id', context.userId)
+    .maybeSingle();
+
+  // Pagamento confirmado via pre_registrations
+  if (preReg?.status === 'efetivado') {
+    return;
+  }
+
+  // 3. Checar expiração de trial por data ou status
+  const endDate = preReg?.trial_expires_at || ministry?.subscription_end_date;
+  const expiresAt = endDate ? new Date(endDate) : null;
+  const isExpired =
+    preReg?.status === 'encerrado' ||
+    ministry?.subscription_status === 'expired' ||
+    ministry?.subscription_status === 'suspended' ||
+    (expiresAt !== null && expiresAt.getTime() <= Date.now());
+
+  if (isExpired) {
+    if (preReg && preReg.status !== 'encerrado') {
+      try {
+        await context.admin
+          .from('pre_registrations')
+          .update({ status: 'encerrado' })
+          .eq('id', preReg.id);
+      } catch {
+        // best-effort
+      }
+    }
+    throw new Error('TRIAL_EXPIRED');
+  }
+}
+
 export async function requireLegalAcceptance(
   context: TenantAuthContext,
   request?: NextRequest
@@ -162,7 +245,7 @@ export async function requireLegalAcceptance(
 
 export async function resolveTenantAuth(
   request: NextRequest,
-  options?: { checkLegalAcceptance?: boolean }
+  options?: { checkLegalAcceptance?: boolean; skipTrialCheck?: boolean }
 ): Promise<TenantAuthContext> {
   let supabase = createServerClientFromRequest(request);
   const admin = createServerClient();
@@ -239,6 +322,10 @@ export async function resolveTenantAuth(
       supervisaoId: null,
       isOwner: true,
     };
+  }
+
+  if (!options?.skipTrialCheck) {
+    await requireValidSubscription(context, request);
   }
 
   if (options?.checkLegalAcceptance) {
