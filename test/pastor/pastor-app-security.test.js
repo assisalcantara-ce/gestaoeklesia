@@ -1,24 +1,47 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { resolveNivel, temAcesso } from '../../src/lib/access-control.ts';
 
 test('App do Pastor — Regras de Segurança e Isolamento Multi-Tenant', async (t) => {
-  await t.test('1. Bloqueia papéis não autorizados (ex: membro, tesoureiro, secretaria)', () => {
-    const ROLES_AUTORIZADOS = ['presidencia', 'administrador'];
-    const rolesInvalidos = ['membro', 'tesouraria', 'secretaria', 'lideranca', 'obreiro', 'visitante'];
+  await t.test('1. Bloqueia papéis e permissões não autorizados', () => {
+    const rolesInvalidos = [
+      { role: 'operator', permissions: ['SECRETARIA_LOCAL'] },
+      { role: 'operator', permissions: ['TESOURARIA_LOCAL'] },
+      { role: 'operator', permissions: ['COORDENADOR_EBD'] },
+      { role: 'manager', permissions: ['FINANCEIRO'] },
+      { role: 'membro', permissions: [] },
+    ];
 
-    for (const role of rolesInvalidos) {
+    for (const u of rolesInvalidos) {
+      const nivel = resolveNivel(u.role, u.permissions);
+      const isAuthorized = nivel === 'presidencia' || nivel === 'administrador' || (nivel && temAcesso(nivel, 'presidencia'));
       assert.strictEqual(
-        ROLES_AUTORIZADOS.includes(role),
+        Boolean(isAuthorized),
         false,
-        `Role ${role} não pode ter permissão no App do Pastor`
+        `Role ${u.role} com permissões ${u.permissions} não pode ter permissão no App do Pastor`
       );
     }
   });
 
-  await t.test('2. Permite apenas presidência e administrador', () => {
-    const ROLES_AUTORIZADOS = ['presidencia', 'administrador'];
-    assert.strictEqual(ROLES_AUTORIZADOS.includes('presidencia'), true);
-    assert.strictEqual(ROLES_AUTORIZADOS.includes('administrador'), true);
+  await t.test('2. Permite papéis e permissões canônicos da Presidência e Administrador', () => {
+    const perfisValidos = [
+      { role: 'admin', permissions: [] },
+      { role: 'admin', permissions: ['ADMINISTRADOR'] },
+      { role: 'manager', permissions: ['PRESIDENCIA'] },
+      { role: 'presidencia', permissions: [] },
+      { role: 'operator', permissions: ['PRESIDENCIA'] },
+      { role: 'administrador', permissions: [] },
+    ];
+
+    for (const u of perfisValidos) {
+      const nivel = resolveNivel(u.role, u.permissions);
+      const isAuthorized = nivel === 'presidencia' || nivel === 'administrador' || (nivel && temAcesso(nivel, 'presidencia'));
+      assert.strictEqual(
+        Boolean(isAuthorized),
+        true,
+        `Perfil ${JSON.stringify(u)} deve ter acesso concedido ao App do Pastor`
+      );
+    }
   });
 
   await t.test('3. Validação de Feature Flag do Plano (presidency_module)', () => {

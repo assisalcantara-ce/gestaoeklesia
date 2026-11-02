@@ -10,6 +10,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-client';
+import { resolveNivel } from '@/lib/access-control';
 import PastorBottomNav from '@/components/pastor/PastorBottomNav';
 import {
   ArrowLeft,
@@ -53,26 +54,48 @@ export default function PastorMaisPage() {
 
         const { data: mu } = await supabase
           .from('ministry_users')
-          .select('role, display_name, ministry_id')
+          .select('role, permissions, ministry_id')
           .eq('user_id', session.user.id)
           .maybeSingle();
 
         if (cancelled) return;
 
-        if (mu?.display_name) setNome(mu.display_name);
-        else setNome(session.user.email?.split('@')[0] || 'Pastor');
+        const metadataName =
+          session.user.user_metadata?.full_name ||
+          session.user.user_metadata?.name ||
+          session.user.email?.split('@')[0] ||
+          'Pastor';
+        setNome(metadataName);
 
-        const roleLabel: Record<string, string> = {
-          presidencia: 'Presidência',
-          administrador: 'Administrador',
-        };
-        setCargo(roleLabel[mu?.role || ''] || 'Liderança');
+        const nivel = resolveNivel(mu?.role, mu?.permissions);
+        if (nivel === 'presidencia') {
+          setCargo('Presidência');
+        } else if (nivel === 'administrador') {
+          setCargo('Administrador');
+        } else {
+          setCargo('Liderança');
+        }
 
-        if (mu?.ministry_id) {
+        let targetMinistryId = mu?.ministry_id;
+        if (!targetMinistryId) {
+          const { data: ownedMinistry } = await supabase
+            .from('ministries')
+            .select('id, name')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+
+          if (!cancelled && ownedMinistry) {
+            targetMinistryId = ownedMinistry.id;
+            setMinisterio(ownedMinistry.name || '');
+            setCargo('Administrador');
+          }
+        }
+
+        if (targetMinistryId && !ministerio) {
           const { data: min } = await supabase
             .from('ministries')
             .select('name')
-            .eq('id', mu.ministry_id)
+            .eq('id', targetMinistryId)
             .maybeSingle();
           if (!cancelled && min?.name) setMinisterio(min.name);
         }

@@ -12,6 +12,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-client';
+import { resolveNivel, temAcesso } from '@/lib/access-control';
 import PastorBottomNav from '@/components/pastor/PastorBottomNav';
 import {
   Loader2,
@@ -142,7 +143,7 @@ export default function PastorInicioPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
 
-  const [authState, setAuthState] = useState<'loading' | 'authorized' | 'unauthorized' | 'forbidden'>('loading');
+  const [authState, setAuthState] = useState<'loading' | 'authorized' | 'unauthorized' | 'forbidden' | 'plan_required'>('loading');
   const [userName, setUserName] = useState<string>('Pastor');
   const [data, setData] = useState<DashboardData | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
@@ -164,24 +165,51 @@ export default function PastorInicioPage() {
 
         setToken(session.access_token);
 
-        // Busca perfil do usuário para verificar role no cliente
+        // Nome a partir dos metadados de autenticação do Supabase
+        const metadataName =
+          session.user.user_metadata?.full_name ||
+          session.user.user_metadata?.name ||
+          session.user.email?.split('@')[0] ||
+          'Pastor';
+        setUserName(metadataName.split(' ')[0]);
+
+        // Busca perfil do usuário em ministry_users
         const { data: mu } = await supabase
           .from('ministry_users')
-          .select('role, display_name')
+          .select('role, permissions, ministry_id')
           .eq('user_id', session.user.id)
           .maybeSingle();
 
         if (cancelled) return;
 
-        const role = String(mu?.role || '').toLowerCase();
-        if (!['presidencia', 'administrador'].includes(role)) {
+        let hasAccess = false;
+        if (mu) {
+          const nivel = resolveNivel(mu.role, mu.permissions);
+          if (nivel === 'presidencia' || nivel === 'administrador' || (nivel && temAcesso(nivel, 'presidencia'))) {
+            hasAccess = true;
+          }
+        }
+
+        // Fallback: se o usuário for proprietário direto do ministério
+        if (!hasAccess) {
+          const { data: ownedMinistry } = await supabase
+            .from('ministries')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+
+          if (ownedMinistry) {
+            hasAccess = true;
+          }
+        }
+
+        if (cancelled) return;
+
+        if (!hasAccess) {
           setAuthState('forbidden');
           return;
         }
 
-        // Busca nome de exibição
-        const nome = mu?.display_name || session.user.email?.split('@')[0] || 'Pastor';
-        setUserName(nome.split(' ')[0]);
         setAuthState('authorized');
       } catch {
         if (!cancelled) setAuthState('unauthorized');
@@ -202,9 +230,24 @@ export default function PastorInicioPage() {
         cache: 'no-store',
       });
 
-      if (res.status === 401) { setDataError('Sessão expirada. Faça login novamente.'); return; }
-      if (res.status === 403) { setDataError('Acesso negado. Este recurso requer o Módulo Presidencial.'); return; }
-      if (!res.ok) { setDataError('Erro ao carregar dados. Tente novamente.'); return; }
+      if (res.status === 401) {
+        setAuthState('unauthorized');
+        setDataError('Sessão expirada. Faça login novamente.');
+        return;
+      }
+      if (res.status === 403) {
+        const errJson = await res.json().catch(() => null);
+        if (errJson?.code === 'PLAN_REQUIRED' || errJson?.error?.includes('Módulo Presidencial')) {
+          setAuthState('plan_required');
+        } else {
+          setAuthState('forbidden');
+        }
+        return;
+      }
+      if (!res.ok) {
+        setDataError('Erro ao carregar dados. Tente novamente.');
+        return;
+      }
 
       const json: DashboardData = await res.json();
       setData(json);
@@ -266,6 +309,34 @@ export default function PastorInicioPage() {
         >
           Ir para o ERP
         </button>
+      </div>
+    );
+  }
+
+  if (authState === 'plan_required') {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center min-h-screen bg-[#0a1628] gap-4 px-8 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
+          <BookOpen size={28} className="text-amber-400" />
+        </div>
+        <h2 className="text-lg font-bold text-white">Plano Incompatível</h2>
+        <p className="text-sm text-slate-400 max-w-sm">
+          O App do Pastor requer o <span className="text-amber-400 font-semibold">Módulo Presidencial</span> ativo no plano da sua igreja.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3 mt-4">
+          <button
+            onClick={() => router.push('/dashboard/planos')}
+            className="bg-amber-500 hover:bg-amber-400 text-[#0a1628] font-bold px-6 py-2.5 rounded-2xl transition-all active:scale-95 cursor-pointer text-sm"
+          >
+            Conhecer Planos
+          </button>
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="bg-slate-700 hover:bg-slate-600 text-white font-semibold px-6 py-2.5 rounded-2xl transition-all active:scale-95 cursor-pointer text-sm"
+          >
+            Ir para o ERP
+          </button>
+        </div>
       </div>
     );
   }

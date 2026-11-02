@@ -15,10 +15,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, createServerClientFromRequest } from '@/lib/supabase-server';
 import { PresidenciaService } from '@/services/presidencia-service';
 import { resolvePlanFeatures } from '@/lib/feature-flags';
+import { resolveNivel, temAcesso } from '@/lib/access-control';
 
 export const dynamic = 'force-dynamic';
-
-const ROLES_AUTORIZADOS = ['presidencia', 'administrador'];
 
 async function resolvePastorContext(request: NextRequest) {
   const authHeader = request.headers.get('Authorization') || request.headers.get('authorization') || '';
@@ -31,33 +30,57 @@ async function resolvePastorContext(request: NextRequest) {
 
   const admin = createServerClient();
 
-  // Busca perfil do usuário na tabela ministry_users
-  const { data: mu, error: muErr } = await admin
+  // 1. Busca perfil do usuário na tabela ministry_users
+  const { data: mu } = await admin
     .from('ministry_users')
     .select('role, ministry_id, permissions')
     .eq('user_id', user.id)
     .maybeSingle();
 
-  if (muErr || !mu) throw new Error('UNAUTHORIZED');
+  let ministryId = mu?.ministry_id as string | undefined;
+  let isAuthorized = false;
 
-  const role = String(mu.role || '').toLowerCase();
-  if (!ROLES_AUTORIZADOS.includes(role)) throw new Error('FORBIDDEN');
+  if (mu) {
+    const nivel = resolveNivel(mu.role, mu.permissions);
+    if (nivel === 'presidencia' || nivel === 'administrador' || (nivel && temAcesso(nivel, 'presidencia'))) {
+      isAuthorized = true;
+    }
+  }
 
-  const ministryId = mu.ministry_id as string;
-  if (!ministryId) throw new Error('FORBIDDEN');
+  // Fallback: proprietário direto na tabela ministries
+  if (!isAuthorized) {
+    const { data: ownedMinistry } = await admin
+      .from('ministries')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle();
 
-  // Verifica plano — has_modulo_presidencial
+    if (ownedMinistry) {
+      ministryId = ownedMinistry.id;
+      isAuthorized = true;
+    }
+  }
+
+  if (!isAuthorized || !ministryId) {
+    throw new Error('FORBIDDEN');
+  }
+
+  // 2. Verifica plano — Feature Flag presidency_module (compatível com subscription_plans)
   const { data: ministry } = await admin
     .from('ministries')
-    .select('plan')
+    .select('plan, subscription_plans(*)')
     .eq('id', ministryId)
     .maybeSingle();
 
-  const plan = ministry?.plan || null;
-  const flags = resolvePlanFeatures(plan);
+  const dbPlan = (ministry as any)?.subscription_plans;
+  const mergedPlan = dbPlan
+    ? { ...dbPlan, plan: (ministry as any)?.plan }
+    : { slug: (ministry as any)?.plan, plan: (ministry as any)?.plan };
+
+  const flags = resolvePlanFeatures(mergedPlan);
   if (!flags.presidency_module) throw new Error('PLAN_REQUIRED');
 
-  return { userId: user.id, ministryId, role, admin };
+  return { userId: user.id, ministryId, admin };
 }
 
 export async function GET(request: NextRequest) {
@@ -201,7 +224,7 @@ export async function GET(request: NextRequest) {
     }
     if (msg === 'PLAN_REQUIRED') {
       return NextResponse.json(
-        { error: 'Este recurso requer o Módulo Presidencial.' },
+        { error: 'Este recurso requer o Módulo Presidencial.', code: 'PLAN_REQUIRED' },
         { status: 403 }
       );
     }
