@@ -94,7 +94,7 @@ export interface PresidenciaResumo {
   outrasCartas: number;
   agendaSolicitacoes: number;
   totalLiderancasAtivas: number;
-  indicadoresEspirituais?: IndicadoresEspirituaisConsolidados;
+  indicadoresEspirituais?: IndicadoresEspirituaisConsolidados | null;
 }
 
 export interface DeliberarAgendaInput {
@@ -177,18 +177,25 @@ export class PresidenciaService {
     const prevMes = mes === 1 ? 12 : mes - 1;
     const prevAno = mes === 1 ? ano - 1 : ano;
 
+    // Limites de competência no PostgreSQL (apenas mês anterior e mês corrente)
+    const dataInicio = `${prevAno}-${String(prevMes).padStart(2, '0')}-01`;
+    const ultimoDia = new Date(ano, mes, 0).getDate();
+    const dataFim = `${ano}-${String(mes).padStart(2, '0')}-${String(ultimoDia).padStart(2, '0')}`;
+
     // Consulta paralela aos registros e fechamentos oficiais de acolhimento
     const [fechamentoRes, registrosMesRes] = await Promise.all([
       supabase
         .from('relatorio_espiritual_fechamentos')
-        .select('*')
+        .select('id, status, mes, ano, congregacao_id')
         .eq('ministry_id', ministryId)
         .eq('mes', mes)
         .eq('ano', ano),
       supabase
         .from('relatorio_espiritual_registros')
-        .select('*')
-        .eq('ministry_id', ministryId),
+        .select('id, congregacao_id, data_atividade, almas_alcancadas, reconciliacoes, batismos_espirito_santo, visitantes_presentes, membros_cearam, cultos_realizados')
+        .eq('ministry_id', ministryId)
+        .gte('data_atividade', dataInicio)
+        .lte('data_atividade', dataFim),
     ]);
 
     const fechamentos = fechamentoRes.data || [];
@@ -277,7 +284,11 @@ export class PresidenciaService {
 
   public static async carregarCentralDecisoes(
     supabase: any,
-    ministryId: string
+    ministryId: string,
+    options?: {
+      indicadoresEspirituaisPrecarregados?: IndicadoresEspirituaisConsolidados | null;
+      ignorarIndicadoresEspirituais?: boolean;
+    }
   ): Promise<{
     fila: ProcessoDecisao[];
     resumo: PresidenciaResumo;
@@ -346,8 +357,13 @@ export class PresidenciaService {
       console.error('Erro ao carregar solicitações da agenda na Presidência:', agendaErr);
     }
 
-    // 3.2 Busca indicadores espirituais consolidados do Acolhimento
-    const indicadoresEspirituais = await this.obterIndicadoresEspirituaisConsolidados(supabase, ministryId);
+    // 3.2 Busca indicadores espirituais consolidados do Acolhimento (reutiliza se fornecido)
+    let indicadoresEspirituais: IndicadoresEspirituaisConsolidados | null = null;
+    if (options?.indicadoresEspirituaisPrecarregados !== undefined) {
+      indicadoresEspirituais = options.indicadoresEspirituaisPrecarregados;
+    } else if (!options?.ignorarIndicadoresEspirituais) {
+      indicadoresEspirituais = await this.obterIndicadoresEspirituaisConsolidados(supabase, ministryId);
+    }
 
     // 4. Busca total de lideranças ativas no ministério
     const { count: totalAtivas } = await supabase

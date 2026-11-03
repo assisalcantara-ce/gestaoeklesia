@@ -91,14 +91,29 @@ export async function GET(request: NextRequest) {
     const mesAtual = hoje.getMonth() + 1;
     const anoAtual = hoje.getFullYear();
 
-    // 1. Pendências da Presidência (Central de Decisões)
+    // 1. Indicadores espirituais consolidados do Acolhimento
+    let indicadoresEspirituais = null;
+    try {
+      indicadoresEspirituais = await PresidenciaService.obterIndicadoresEspirituaisConsolidados(
+        admin,
+        ministryId,
+        mesAtual,
+        anoAtual
+      );
+    } catch (err) {
+      console.error('[pastor/dashboard] Erro ao carregar indicadores espirituais:', err);
+    }
+
+    // 2. Pendências da Presidência (Central de Decisões - reutiliza indicadores espirituais pré-carregados)
     let totalPendencias = 0;
     let dirigentesPropostas = 0;
     let cartasPendentes = 0;
     let agendaSolicitacoes = 0;
 
     try {
-      const { resumo } = await PresidenciaService.carregarCentralDecisoes(admin, ministryId);
+      const { resumo } = await PresidenciaService.carregarCentralDecisoes(admin, ministryId, {
+        indicadoresEspirituaisPrecarregados: indicadoresEspirituais,
+      });
       totalPendencias = resumo.totalPendencias;
       dirigentesPropostas = resumo.dirigentesPropostas;
       cartasPendentes = (resumo.cartasMudanca || 0) + (resumo.cartasDesligamento || 0) + (resumo.outrasCartas || 0);
@@ -107,7 +122,7 @@ export async function GET(request: NextRequest) {
       console.error('[pastor/dashboard] Erro ao carregar Central de Decisões:', err);
     }
 
-    // 2. Membros ativos do ministério
+    // 3. Membros ativos do ministério
     let membrosAtivos = 0;
     try {
       const { count } = await admin
@@ -120,7 +135,7 @@ export async function GET(request: NextRequest) {
       console.error('[pastor/dashboard] Erro ao contar membros:', err);
     }
 
-    // 3. Saldo do mês (Tesouraria) — entradas - saídas no mês corrente
+    // 4. Saldo do mês (Tesouraria) — entradas - saídas no mês corrente
     let saldoMes = 0;
     let entradaMes = 0;
     let saidaMes = 0;
@@ -152,19 +167,6 @@ export async function GET(request: NextRequest) {
       saldoMes = entradaMes - saidaMes;
     } catch (err) {
       console.error('[pastor/dashboard] Erro ao calcular saldo:', err);
-    }
-
-    // 4. Indicadores espirituais consolidados do Acolhimento
-    let indicadoresEspirituais = null;
-    try {
-      indicadoresEspirituais = await PresidenciaService.obterIndicadoresEspirituaisConsolidados(
-        admin,
-        ministryId,
-        mesAtual,
-        anoAtual
-      );
-    } catch (err) {
-      console.error('[pastor/dashboard] Erro ao carregar indicadores espirituais:', err);
     }
 
     // 5. Dados do ministério (nome, cidade, logo_url)
