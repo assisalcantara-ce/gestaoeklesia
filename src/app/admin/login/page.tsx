@@ -74,7 +74,19 @@ export default function AdminLoginPage() {
       })
 
       if (authError) {
-        setError('E-mail ou senha incorretos.')
+        const errMsg = authError?.message || ''
+        const errName = authError?.name || ''
+        const isNetwork =
+          errName === 'AuthRetryableFetchError' ||
+          errMsg.toLowerCase().includes('failed to fetch') ||
+          errMsg.toLowerCase().includes('network') ||
+          errMsg.toLowerCase().includes('timeout') ||
+          errMsg.toLowerCase().includes('unexpected token')
+        if (isNetwork) {
+          setError('Não foi possível conectar aos servidores de autenticação no momento. Verifique sua conexão ou tente novamente em instantes.')
+        } else {
+          setError('E-mail ou senha incorretos.')
+        }
         return
       }
 
@@ -102,7 +114,19 @@ export default function AdminLoginPage() {
       // Sucesso - redirecionar para dashboard
       router.push('/admin/dashboard')
     } catch (err: any) {
-      setError(err?.message || 'Falha de comunicação com os serviços de autenticação.')
+      const errMsg = err?.message || ''
+      const errName = err?.name || ''
+      const isNetwork =
+        errName === 'AuthRetryableFetchError' ||
+        errMsg.toLowerCase().includes('failed to fetch') ||
+        errMsg.toLowerCase().includes('network') ||
+        errMsg.toLowerCase().includes('timeout') ||
+        errMsg.toLowerCase().includes('unexpected token')
+      if (isNetwork) {
+        setError('Não foi possível conectar aos servidores de autenticação no momento. Verifique sua conexão ou tente novamente em instantes.')
+      } else {
+        setError(err?.message || 'Falha de comunicação com os serviços de autenticação.')
+      }
     } finally {
       setLoading(false)
     }

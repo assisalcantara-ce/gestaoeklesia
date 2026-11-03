@@ -21,6 +21,7 @@ import {
   X,
   CheckCircle2,
   Loader2,
+  RefreshCw,
 } from 'lucide-react'
 
 export default function LoginPage() {
@@ -35,6 +36,7 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [isConnectionError, setIsConnectionError] = useState(false)
 
   // Modal Esqueci minha senha
   const [showForgotModal, setShowForgotModal] = useState(false)
@@ -71,6 +73,7 @@ export default function LoginPage() {
     if (loading) return
     setLoading(true)
     setError('')
+    setIsConnectionError(false)
 
     try {
       if (!email || !password) {
@@ -120,10 +123,41 @@ export default function LoginPage() {
         return
       }
 
-      setError('E-mail ou senha inválidos. Verifique os dados inseridos e tente novamente.')
+      // Analisar mensagem ou tipo de erro retornado pelo Supabase Auth
+      const errMsg = err?.message || ''
+      const errName = err?.name || ''
+      const isNetworkIssue =
+        errName === 'AuthRetryableFetchError' ||
+        errMsg.toLowerCase().includes('failed to fetch') ||
+        errMsg.toLowerCase().includes('network') ||
+        errMsg.toLowerCase().includes('timeout') ||
+        errMsg.toLowerCase().includes('fetch') ||
+        errMsg.toLowerCase().includes('unexpected token')
+
+      if (isNetworkIssue) {
+        setIsConnectionError(true)
+        setError('Não foi possível conectar aos servidores de autenticação no momento. Verifique sua conexão ou tente novamente em instantes.')
+      } else {
+        setError('E-mail ou senha inválidos. Verifique os dados inseridos e tente novamente.')
+      }
       setLoading(false)
-    } catch {
-      setError('Erro ao fazer login. Tente novamente.')
+    } catch (catchedErr: any) {
+      const errMsg = catchedErr?.message || ''
+      const errName = catchedErr?.name || ''
+      const isNetworkIssue =
+        errName === 'AuthRetryableFetchError' ||
+        errMsg.toLowerCase().includes('failed to fetch') ||
+        errMsg.toLowerCase().includes('network') ||
+        errMsg.toLowerCase().includes('timeout') ||
+        errMsg.toLowerCase().includes('fetch') ||
+        errMsg.toLowerCase().includes('unexpected token')
+
+      if (isNetworkIssue) {
+        setIsConnectionError(true)
+        setError('Não foi possível conectar aos servidores de autenticação no momento. Verifique sua conexão ou tente novamente em instantes.')
+      } else {
+        setError('Erro ao fazer login. Tente novamente.')
+      }
       setLoading(false)
     }
   }
@@ -333,9 +367,21 @@ export default function LoginPage() {
               <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-3.5">
                 {/* Alerta de Erro */}
                 {error && (
-                  <div className="p-2.5 sm:p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-medium flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0 text-red-500 mt-0.5" />
-                    <span>{error}</span>
+                  <div className="p-2.5 sm:p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-medium flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-red-500 mt-0.5" />
+                      <span>{error}</span>
+                    </div>
+                    {isConnectionError && (
+                      <button
+                        type="button"
+                        onClick={handleSubmit}
+                        className="shrink-0 text-blue-600 hover:text-blue-800 font-semibold underline text-[11px] flex items-center gap-1 cursor-pointer"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        <span>Tentar novamente</span>
+                      </button>
+                    )}
                   </div>
                 )}
 

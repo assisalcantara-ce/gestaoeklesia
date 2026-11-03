@@ -16,6 +16,18 @@ export function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      global: {
+        fetch: (url, options = {}) => {
+          // Timeout de 15 segundos para evitar travamento indefinido na UI
+          if (!options.signal && typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal) {
+            return fetch(url, {
+              ...options,
+              signal: AbortSignal.timeout(15000),
+            })
+          }
+          return fetch(url, options)
+        },
+      },
       auth: {
         lock: typeof window !== 'undefined'
           ? async (_name: string, _acquireTimeout: number, fn: () => Promise<any>) => fn()
