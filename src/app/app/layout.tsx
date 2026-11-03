@@ -11,7 +11,7 @@ import MobileShell from '@/components/mobile/MobileShell';
 export const dynamic = 'force-dynamic';
 
 export const viewport: Viewport = {
-  themeColor: '#0f172a',
+  themeColor: '#061D38',
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
