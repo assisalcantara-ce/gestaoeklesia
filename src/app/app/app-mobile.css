@@ -4,6 +4,22 @@
    position: fixed + overflow: hidden no root + touch-action: pan-y no scroll.
    ========================================================================== */
 
+/* Bloqueio global estrito de pinch-zoom dentro da rota /app no Safari iOS */
+html:has(.app-viewport-root),
+body:has(.app-viewport-root) {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overscroll-behavior: none !important;
+  overscroll-behavior-y: none !important;
+  touch-action: pan-y !important;
+  -webkit-text-size-adjust: 100% !important;
+}
+
 /* Contêiner raiz: trava a viewport inteira, impedindo que o Safari "veja"
    conteúdo além dos limites da tela — isso é o que efetivamente bloqueia
    o pinch-to-zoom no iOS Safari (overflow: hidden + position: fixed). */
@@ -26,6 +42,7 @@
   display: flex;
   justify-content: center;
   align-items: stretch;
+  touch-action: pan-y;
 }
 
 /* Container principal do App — largura máxima, sem overflow para o Safari expandir */
@@ -44,8 +61,7 @@
   overflow: hidden;
   overscroll-behavior: none;
   overscroll-behavior-y: none;
-  /* touch-action: manipulation bloqueia double-tap zoom e atrasos de 300ms */
-  touch-action: manipulation;
+  touch-action: pan-y;
 }
 
 /* Suporte para tablets em orientação retrato ou paisagem */
@@ -96,8 +112,22 @@
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   overscroll-behavior-y: contain;
-  touch-action: pan-y;
+  touch-action: pan-y !important;
   scroll-behavior: smooth;
+}
+
+/* Qualquer elemento filho dentro da área do app deve respeitar pan-y ou manipulation */
+.app-main-scroll * {
+  touch-action: pan-y;
+}
+
+.app-main-scroll button,
+.app-main-scroll a,
+.app-main-scroll input,
+.app-main-scroll select,
+.app-main-scroll textarea,
+.app-main-scroll [role="button"] {
+  touch-action: manipulation;
 }
 
 .app-main-scroll::-webkit-scrollbar {

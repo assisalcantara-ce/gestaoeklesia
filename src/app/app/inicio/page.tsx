@@ -211,7 +211,7 @@ export default function InicioPage() {
 
   if (isLoading || !member) {
     return (
-      <div className="min-h-[100dvh] bg-[#061D38] flex items-center justify-center">
+      <div className="min-h-full flex-1 bg-[#061D38] flex items-center justify-center">
         <Loader2 size={36} className="text-blue-400 animate-spin" />
       </div>
     );
@@ -227,7 +227,7 @@ export default function InicioPage() {
 
   return (
     <div
-      className="min-h-[100dvh] w-full text-white select-none relative overflow-x-hidden flex flex-col justify-between box-border"
+      className="min-h-full w-full text-white select-none relative overflow-x-hidden flex flex-col justify-between box-border flex-1"
       style={{
         backgroundColor: '#061D38',
         background: 'linear-gradient(160deg, #073765 0%, #052A50 45%, #061D38 100%)',
