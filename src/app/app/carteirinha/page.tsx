@@ -4,7 +4,8 @@
  * /app/carteirinha — Carteirinha digital do membro
  *
  * Exibe os dados da carteirinha com QR code para verificação.
- * Dados buscados via GET /api/v1/mobile/member/carteirinha
+ * Dados buscados via GET /api/v1/mobile/member/carteirinha.
+ * Preserva o layout da página, MobileHeader e MobileBottomNav durante carregamentos.
  */
 
 import { useState, useEffect, useRef } from 'react';
@@ -105,151 +106,153 @@ export default function CarteirinhaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [memberLoading, member?.id]);
 
-  if (memberLoading || loading) {
-    return (
-      <div className="min-h-screen bg-[#0f172a] flex items-center justify-center">
-        <Loader2 size={32} className="text-blue-500 animate-spin" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-[#0f172a] text-slate-100 pb-24">
-        <MobileHeader title="Carteirinha" />
-        <div className="pt-24 px-6 flex flex-col items-center gap-4">
-          <AlertCircle size={48} className="text-red-400" />
-          <p className="text-slate-400 text-sm text-center">{error}</p>
-          <button
-            onClick={fetchCarteirinha}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-xl text-sm font-semibold shadow-md active:scale-95 transition"
-          >
-            <RefreshCw size={14} />
-            Tentar novamente
-          </button>
-        </div>
-        <MobileBottomNav />
-      </div>
-    );
-  }
-
-  if (!data) return null;
-
-  const statusCfg = STATUS_CONFIG[data.status] ?? {
-    label: data.status,
-    color: 'bg-gray-100 text-gray-500',
+  const statusCfg = (data && STATUS_CONFIG[data.status]) ?? {
+    label: data?.status || 'Ativo',
+    color: 'bg-green-100 text-green-700',
     icon: User,
   };
   const StatusIcon = statusCfg.icon;
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-100 pb-24">
+    <div className="min-h-full flex-1 bg-[#0f172a] text-slate-100 pb-24">
       <MobileHeader title="Carteirinha Digital" />
 
-      <div className="pt-20 px-4">
-        {/* Card principal da Carteirinha */}
-        <div className="bg-[#111827] rounded-3xl overflow-hidden shadow-2xl border border-slate-800">
-          {/* Header do card */}
-          <div className="px-6 pt-6 pb-4 flex items-center gap-4 bg-gradient-to-b from-[#1e293b]/60 to-transparent">
-            {data.ministerio_logo ? (
-              <Image
-                src={data.ministerio_logo}
-                alt={data.ministerio ?? 'Ministério'}
-                width={44}
-                height={44}
-                className="w-11 h-11 rounded-xl object-cover border-2 border-blue-500/30"
-              />
-            ) : (
-              <div className="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-                <span className="text-blue-400 font-bold text-lg">
-                  {(data.ministerio ?? 'M').charAt(0)}
-                </span>
-              </div>
-            )}
-            <div>
-              <p className="text-blue-400 text-xs font-semibold tracking-wider uppercase">CARTEIRINHA DIGITAL</p>
-              <p className="text-white text-sm font-bold leading-tight">
-                {data.ministerio ?? 'Ministério'}
-              </p>
+      <div className="pt-20 px-4 max-w-md mx-auto">
+        {/* Loading Skeleton Discreto */}
+        {(memberLoading || loading) && (
+          <div className="bg-[#111827] rounded-3xl p-8 border border-slate-800 text-center space-y-4 my-4 animate-pulse">
+            <div className="w-16 h-16 rounded-full bg-slate-800 mx-auto" />
+            <div className="h-4 bg-slate-800 rounded w-3/4 mx-auto" />
+            <div className="h-3 bg-slate-800 rounded w-1/2 mx-auto" />
+            <div className="h-32 bg-slate-800 rounded-2xl w-full" />
+            <div className="flex justify-center pt-2">
+              <Loader2 size={24} className="text-blue-500 animate-spin" />
             </div>
           </div>
+        )}
 
-          {/* Divisor */}
-          <div className="h-px bg-slate-800 mx-6" />
+        {/* Error State */}
+        {!loading && error && (
+          <div className="pt-12 px-2 flex flex-col items-center gap-4">
+            <AlertCircle size={48} className="text-red-400" />
+            <p className="text-slate-400 text-sm text-center">{error}</p>
+            <button
+              onClick={fetchCarteirinha}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-xl text-sm font-semibold shadow-md active:scale-95 transition"
+            >
+              <RefreshCw size={14} />
+              Tentar novamente
+            </button>
+          </div>
+        )}
 
-          {/* Corpo do card */}
-          <div className="px-6 py-5 flex gap-5">
-            {/* Foto */}
-            <div className="flex-shrink-0">
-              {data.foto_url ? (
-                <Image
-                  src={data.foto_url}
-                  alt={data.nome}
-                  width={72}
-                  height={72}
-                  className="w-[72px] h-[72px] rounded-2xl object-cover border-2 border-blue-500/30 shadow-md"
-                />
-              ) : (
-                <div className="w-[72px] h-[72px] rounded-2xl bg-slate-800 flex items-center justify-center border border-slate-700">
-                  <User size={28} className="text-slate-500" />
+        {/* Card Principal Carregado */}
+        {!loading && !error && data && (
+          <>
+            <div className="bg-[#111827] rounded-3xl overflow-hidden shadow-2xl border border-slate-800">
+              {/* Header do card */}
+              <div className="px-6 pt-6 pb-4 flex items-center gap-4 bg-gradient-to-b from-[#1e293b]/60 to-transparent">
+                {data.ministerio_logo ? (
+                  <Image
+                    src={data.ministerio_logo}
+                    alt={data.ministerio ?? 'Ministério'}
+                    width={44}
+                    height={44}
+                    className="w-11 h-11 rounded-xl object-cover border-2 border-blue-500/30"
+                  />
+                ) : (
+                  <div className="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+                    <span className="text-blue-400 font-bold text-lg">
+                      {(data.ministerio ?? 'M').charAt(0)}
+                    </span>
+                  </div>
+                )}
+                <div>
+                  <p className="text-blue-400 text-xs font-semibold tracking-wider uppercase">CARTEIRINHA DIGITAL</p>
+                  <p className="text-white text-sm font-bold leading-tight">
+                    {data.ministerio ?? 'Ministério'}
+                  </p>
                 </div>
-              )}
-            </div>
+              </div>
 
-            {/* Dados */}
-            <div className="flex-1 min-w-0">
-              <p className="text-white font-bold text-base leading-tight truncate">
-                {data.nome}
-              </p>
-              {data.cargo_ministerial && (
-                <p className="text-slate-400 text-xs mt-0.5 truncate">{data.cargo_ministerial}</p>
-              )}
-              {data.congregacao && (
-                <p className="text-slate-400 text-xs mt-0.5 truncate">🏛 {data.congregacao}</p>
-              )}
-              <div className="mt-2">
-                <span
-                  className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${statusCfg.color}`}
-                >
-                  <StatusIcon size={10} />
-                  {statusCfg.label}
-                </span>
+              {/* Divisor */}
+              <div className="h-px bg-slate-800 mx-6" />
+
+              {/* Corpo do card */}
+              <div className="px-6 py-5 flex gap-5">
+                {/* Foto */}
+                <div className="flex-shrink-0">
+                  {data.foto_url ? (
+                    <Image
+                      src={data.foto_url}
+                      alt={data.nome}
+                      width={72}
+                      height={72}
+                      className="w-[72px] h-[72px] rounded-2xl object-cover border-2 border-blue-500/30 shadow-md"
+                    />
+                  ) : (
+                    <div className="w-[72px] h-[72px] rounded-2xl bg-slate-800 flex items-center justify-center border border-slate-700">
+                      <User size={28} className="text-slate-500" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Dados */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-white font-bold text-base leading-tight truncate">
+                    {data.nome}
+                  </p>
+                  {data.cargo_ministerial && (
+                    <p className="text-slate-400 text-xs mt-0.5 truncate">{data.cargo_ministerial}</p>
+                  )}
+                  {data.congregacao && (
+                    <p className="text-slate-400 text-xs mt-0.5 truncate">⛪ {data.congregacao}</p>
+                  )}
+                  <div className="mt-2">
+                    <span
+                      className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${statusCfg.color}`}
+                    >
+                      <StatusIcon size={10} />
+                      {statusCfg.label}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Detalhes */}
+              <div className="mx-6 mb-5 bg-[#172033] rounded-2xl px-4 py-1 border border-slate-800">
+                <InfoRow label="Matrícula" value={data.matricula} />
+                <InfoRow label="Tipo" value={data.tipo_cadastro} />
+                <InfoRow label="Batismo" value={formatDate(data.data_batismo_aguas)} />
+                <InfoRow label="Validade" value={formatDate(data.data_validade_credencial)} />
+              </div>
+
+              {/* Rodapé com QR */}
+              <div className="bg-[#0f172a] px-6 py-5 flex flex-col items-center gap-3 border-t border-slate-800">
+                <div className="bg-white p-3 rounded-2xl shadow-lg">
+                  <QRCodeSVG value={data.qr_payload} size={128} />
+                </div>
+                {data.unique_id && (
+                  <p className="text-slate-400 text-[10px] font-mono tracking-wider">
+                    {data.unique_id}
+                  </p>
+                )}
+                <p className="text-slate-500 text-[10px]">
+                  Atualizado em {new Intl.DateTimeFormat('pt-BR').format(new Date())}
+                </p>
               </div>
             </div>
-          </div>
 
-          {/* Detalhes */}
-          <div className="mx-6 mb-5 bg-[#172033] rounded-2xl px-4 py-1 border border-slate-800">
-            <InfoRow label="Matrícula" value={data.matricula} />
-            <InfoRow label="Tipo" value={data.tipo_cadastro} />
-            <InfoRow label="Batismo" value={formatDate(data.data_batismo_aguas)} />
-            <InfoRow label="Validade" value={formatDate(data.data_validade_credencial)} />
-          </div>
-
-          {/* Rodapé com QR */}
-          <div className="bg-[#0f172a] px-6 py-5 flex flex-col items-center gap-3 border-t border-slate-800">
-            <div className="bg-white p-3 rounded-2xl shadow-lg">
-              <QRCodeSVG value={data.qr_payload} size={128} />
-            </div>
-            {data.unique_id && (
-              <p className="text-slate-400 text-[10px] font-mono tracking-wider">
-                {data.unique_id}
-              </p>
-            )}
-            <p className="text-slate-500 text-[10px]">
-              Atualizado em {new Intl.DateTimeFormat('pt-BR').format(new Date())}
-            </p>
-          </div>
-        </div>
-
-        {/* Botão atualizar */}
-        <button
-          onClick={fetchCarteirinha}
-          className="mt-4 w-full flex items-center justify-center gap-2 bg-[#111827] rounded-xl py-3 text-sm font-semibold text-slate-200 border border-slate-800 shadow-xs hover:border-slate-700 hover:bg-[#172033] active:scale-[0.98] transition"
-        >
-          <RefreshCw size={14} className="text-blue-400" />
-          Atualizar carteirinha
-        </button>
+            {/* Botão atualizar */}
+            <button
+              onClick={fetchCarteirinha}
+              className="mt-4 w-full flex items-center justify-center gap-2 bg-[#111827] rounded-xl py-3 text-sm font-semibold text-slate-200 border border-slate-800 shadow-xs hover:border-slate-700 hover:bg-[#172033] active:scale-[0.98] transition cursor-pointer"
+            >
+              <RefreshCw size={14} className="text-blue-400" />
+              Atualizar carteirinha
+            </button>
+          </>
+        )}
       </div>
 
       <MobileBottomNav />

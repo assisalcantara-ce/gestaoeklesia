@@ -20,7 +20,7 @@ import { Loader2, Link2, AlertCircle, CheckCircle2, LogOut } from 'lucide-react'
 
 export default function VincularPage() {
   const router = useRouter();
-  const { refresh, isLinked } = useMobileMember();
+  const { refresh, isLinked, authState, isLoading } = useMobileMember();
   const { user } = useAuth();
   const sbRef = useRef(createClient());
 
@@ -133,6 +133,14 @@ export default function VincularPage() {
       setLoading(false);
     }
   };
+
+  if (isLoading || authState === 'initializing' || authState === 'resolving_member' || isLinked) {
+    return (
+      <div className="min-h-screen bg-[#0f172a] flex items-center justify-center">
+        <Loader2 size={36} className="text-blue-500 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-slate-100 flex flex-col selection:bg-blue-600 selection:text-white">

@@ -3,15 +3,20 @@
 /**
  * MobileMemberProvider
  *
- * Context que gerencia estado de autenticação + dados do membro
- * para o App Mobile (/app/*).
+ * Context central de autenticação e membro para o App Mobile (/app/*).
  *
- * Regra de Splash Screen Otimizada:
- * - A splash screen "Carregando a sua igreja..." só é exibida na inicialização REAL
- *   do aplicativo (cold boot / primeira verificação de sessão).
- * - Uma vez inicializado (initialized = true), NUNCA mais renderiza splash screen
- *   em transições ou navegações internas entre rotas (/app/eventos, /app/contribuir, etc.).
- * - O layout persistente e a barra inferior permanecem 100% montados sem flashes.
+ * Estados de Máquina Finitos:
+ * - initializing: Verificando sessão de usuário inicial
+ * - resolving_member: Sessão existe, consultando se o membro está vinculado ao tenant
+ * - linked: Membro identificado e vinculado com sucesso
+ * - unlinked: Usuário autenticado mas sem membro vinculado
+ * - unauthenticated: Nenhum usuário autenticado
+ *
+ * Regras Estritas de Redirecionamento e Interface:
+ * 1. Splash Screen: exibida EXCLUSIVAMENTE durante o boot inicial (isInitialBoot).
+ * 2. Transições Internas: navegação direta e fluida entre abas sem jamais remontar a splash.
+ * 3. Prevenção de Falso Unlinked: NUNCA redirecionar para /app/vincular enquanto a consulta de membro estiver em andamento (resolving_member).
+ * 4. Após Login Válido: o método setAuthenticatedMember permite sincronização síncrona/imediata sem flashes intermediários.
  */
 
 import React, {
@@ -27,7 +32,13 @@ import { useAuth } from '@/providers/AuthProvider';
 import { createClient } from '@/lib/supabase-client';
 import MobileSplashScreen from '@/components/mobile/MobileSplashScreen';
 
-// Rotas acessíveis sem member vinculado
+export type MobileAuthState =
+  | 'initializing'
+  | 'resolving_member'
+  | 'linked'
+  | 'unlinked'
+  | 'unauthenticated';
+
 const PUBLIC_MOBILE_PATHS = ['/app/login', '/app/vincular', '/app/auth/callback', '/app'];
 
 export interface MemberData {
@@ -37,7 +48,7 @@ export interface MemberData {
   phone: string | null;
   celular: string | null;
   whatsapp: string | null;
-  cpf: string; // mascarado
+  cpf: string;
   foto_url: string | null;
   matricula: string | null;
   unique_id: string | null;
@@ -62,29 +73,32 @@ interface MobileMemberContextType {
   member: MemberData | null;
   isLoading: boolean;
   isLinked: boolean;
-  refresh: () => Promise<void>;
+  authState: MobileAuthState;
+  refresh: () => Promise<MemberData | null>;
+  setAuthenticatedMember: (data: MemberData) => void;
 }
 
 const MobileMemberContext = createContext<MobileMemberContextType>({
   member: null,
   isLoading: true,
   isLinked: false,
-  refresh: async () => {},
+  authState: 'initializing',
+  refresh: async () => null,
+  setAuthenticatedMember: () => {},
 });
 
 export function MobileMemberProvider({ children }: { children: React.ReactNode }) {
   const { user, isLoading: authLoading } = useAuth();
   const [member, setMember] = useState<MemberData | null>(null);
-  const [memberLoading, setMemberLoading] = useState(false);
-  const [isLinked, setIsLinked] = useState(false);
-  const [initialized, setInitialized] = useState(false);
-  const hasMountedRef = useRef(false);
+  const [authState, setAuthState] = useState<MobileAuthState>('initializing');
+  const [isInitialBoot, setIsInitialBoot] = useState(true);
+
   const router = useRouter();
   const pathname = usePathname();
   const sbRef = useRef(createClient());
 
   // Busca os dados do membro autenticado via API
-  const doFetch = useCallback(async (): Promise<void> => {
+  const doFetch = useCallback(async (): Promise<MemberData | null> => {
     let token: string | undefined;
     try {
       const {
@@ -107,77 +121,108 @@ export function MobileMemberProvider({ children }: { children: React.ReactNode }
     if (res.ok) {
       const data: MemberData = await res.json();
       setMember(data);
-      setIsLinked(true);
+      setAuthState('linked');
+      return data;
     } else {
       setMember(null);
-      setIsLinked(false);
+      setAuthState('unlinked');
+      return null;
     }
   }, []);
 
-  // Re-executa quando o usuário muda (login/logout)
+  // Sincronização direta e instantânea no login
+  const setAuthenticatedMember = useCallback((data: MemberData) => {
+    setMember(data);
+    setAuthState('linked');
+    setIsInitialBoot(false);
+  }, []);
+
+  // Efeito reativo a mudanças do Supabase Auth (User)
   useEffect(() => {
     if (authLoading) return;
 
     if (!user) {
       setMember(null);
-      setIsLinked(false);
-      setInitialized(true);
+      setAuthState('unauthenticated');
+      setIsInitialBoot(false);
       return;
     }
 
-    setMemberLoading(true);
+    // Se já está com membro vinculado para este mesmo usuário, não reinicia busca
+    if (authState === 'linked' && member) {
+      setIsInitialBoot(false);
+      return;
+    }
+
+    setAuthState('resolving_member');
     doFetch()
       .catch(() => {
         setMember(null);
-        setIsLinked(false);
+        setAuthState('unlinked');
       })
       .finally(() => {
-        setMemberLoading(false);
-        setInitialized(true);
-        hasMountedRef.current = true;
+        setIsInitialBoot(false);
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, authLoading]);
 
-  // Guard de roteamento
+  // Guard de Roteamento Estrito
   useEffect(() => {
-    if (authLoading || memberLoading || !initialized) return;
+    // NUNCA tomar decisão de roteamento enquanto estiver inicializando ou resolvendo o membro
+    if (authLoading || authState === 'initializing' || authState === 'resolving_member') {
+      return;
+    }
 
     const isPublic = PUBLIC_MOBILE_PATHS.some((p) => pathname === p);
 
-    if (!user) {
-      if (!isPublic) router.replace('/app/login');
-    } else if (!isLinked) {
-      if (pathname !== '/app/vincular') router.replace('/app/vincular');
-    } else {
-      // Vinculado: redirecionar de /app, /app/login, /app/vincular para /app/inicio
+    if (authState === 'unauthenticated') {
+      if (!isPublic) {
+        router.replace('/app/login');
+      }
+    } else if (authState === 'unlinked') {
+      // Usuário autenticado mas sem vínculo confirmado
+      if (pathname !== '/app/vincular') {
+        router.replace('/app/vincular');
+      }
+    } else if (authState === 'linked') {
+      // Usuário autenticado e com vínculo confirmado
       if (pathname === '/app' || pathname === '/app/login' || pathname === '/app/vincular') {
         router.replace('/app/inicio');
       }
     }
-  }, [initialized, authLoading, memberLoading, user, isLinked, pathname, router]);
+  }, [authState, authLoading, pathname, router]);
 
   const refresh = useCallback(async () => {
-    if (!user) return;
-    await doFetch().catch(() => {});
-  }, [user, doFetch]);
+    setAuthState('resolving_member');
+    try {
+      return await doFetch();
+    } catch {
+      setMember(null);
+      setAuthState('unlinked');
+      return null;
+    }
+  }, [doFetch]);
 
-  const isLoading = authLoading || memberLoading || !initialized;
+  const isLoading = authLoading || authState === 'initializing' || authState === 'resolving_member';
+  const isLinked = authState === 'linked';
   const isPublic = PUBLIC_MOBILE_PATHS.some((p) => pathname === p) || pathname === '/app';
 
-  // REGRA CRÍTICA ANTI-FLASH:
-  // Apenas exibe a MobileSplashScreen durante o boot frio inicial do provider.
-  // Uma vez que o provider foi inicializado (hasMountedRef.current ou initialized),
-  // as rotas internas realizam transição fluida sem nunca mais disparar a splash.
-  const shouldShowSplash = !initialized && !isPublic;
+  // REGRA CRÍTICA:
+  // Splash Screen da família apenas no boot inicial (frio) do app para rotas protegidas
+  const showSplash = isInitialBoot && isLoading && !isPublic;
 
   return (
-    <MobileMemberContext.Provider value={{ member, isLoading, isLinked, refresh }}>
-      {shouldShowSplash ? (
-        <MobileSplashScreen />
-      ) : (
-        children
-      )}
+    <MobileMemberContext.Provider
+      value={{
+        member,
+        isLoading,
+        isLinked,
+        authState,
+        refresh,
+        setAuthenticatedMember,
+      }}
+    >
+      {showSplash ? <MobileSplashScreen /> : children}
     </MobileMemberContext.Provider>
   );
 }
