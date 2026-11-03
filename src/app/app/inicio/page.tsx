@@ -36,8 +36,9 @@ import { createClient } from '@/lib/supabase-client';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
-  BookOpen,
+  PlayCircle,
   Calendar,
+  CalendarDays,
   Users,
   Heart,
   MessageCircle,
@@ -251,18 +252,20 @@ export default function InicioPage() {
           {/* Lado Esquerdo: Logomarca + Identificação */}
           <div className="flex items-center min-w-0 pr-2">
             {/* Logomarca oficial */}
-            <div className="w-[54px] h-[54px] rounded-full bg-white border border-white/20 p-[5px] flex items-center justify-center shrink-0 shadow-md shadow-black/20 overflow-hidden">
+            <div className="w-[44px] h-[44px] rounded-full bg-white border-[1.5px] border-white/80 p-[2px] flex items-center justify-center shrink-0 shadow-md shadow-black/20 overflow-hidden">
               {member.ministerio_logo ? (
-                <Image
-                  src={member.ministerio_logo}
-                  alt={nomeInstitucional}
-                  width={44}
-                  height={44}
-                  className="w-full h-full object-contain"
-                />
+                <div className="relative w-full h-full">
+                  <Image
+                    src={member.ministerio_logo}
+                    alt={nomeInstitucional}
+                    fill
+                    sizes="44px"
+                    className="object-contain"
+                  />
+                </div>
               ) : (
                 <div className="w-full h-full rounded-full bg-gradient-to-tr from-[#092B55] to-[#1354C8] flex items-center justify-center text-white">
-                  <Church size={24} />
+                  <Church size={22} />
                 </div>
               )}
             </div>
@@ -382,14 +385,14 @@ export default function InicioPage() {
         <section className="w-full mt-[18px]">
           <div className="grid grid-cols-3 gap-x-[8px] gap-y-[10px]">
 
-            {/* 1. Mensagens */}
+            {/* 1. Mídias */}
             <button
-              onClick={() => handleCardClick('mensagens', '/app/midia')}
+              onClick={() => handleCardClick('midia', '/app/midia')}
               className="w-full h-[94px] xs:h-[100px] sm:h-[104px] bg-[#FFFFFF] rounded-[12px] p-[8px] flex flex-col items-center justify-center text-center shadow-[0_4px_14px_rgba(0,0,0,0.12)] hover:bg-slate-50 active:scale-[0.97] transition-all cursor-pointer select-none"
             >
-              <BookOpen size={28} strokeWidth={2} className="text-[#092B55] shrink-0" />
+              <PlayCircle size={28} strokeWidth={2} className="text-[#092B55] shrink-0" />
               <span className="text-[11px] xs:text-[12px] font-semibold text-[#092344] leading-tight line-clamp-2 mt-[9px]">
-                Mensagens
+                Mídias
               </span>
             </button>
 
@@ -404,14 +407,14 @@ export default function InicioPage() {
               </span>
             </button>
 
-            {/* 3. Células */}
+            {/* 3. Agenda Ministerial */}
             <button
-              onClick={() => handleCardClick('celulas', '/app/comunicados')}
+              onClick={() => handleCardClick('agenda', '/app/programacao')}
               className="w-full h-[94px] xs:h-[100px] sm:h-[104px] bg-[#FFFFFF] rounded-[12px] p-[8px] flex flex-col items-center justify-center text-center shadow-[0_4px_14px_rgba(0,0,0,0.12)] hover:bg-slate-50 active:scale-[0.97] transition-all cursor-pointer select-none"
             >
-              <Users size={28} strokeWidth={2} className="text-[#092B55] shrink-0" />
-              <span className="text-[11px] xs:text-[12px] font-semibold text-[#092344] leading-tight line-clamp-2 mt-[9px]">
-                Células
+              <CalendarDays size={28} strokeWidth={2} className="text-[#092B55] shrink-0" />
+              <span className="text-[10px] xs:text-[11px] font-semibold text-[#092344] leading-[13px] line-clamp-2 mt-[9px]">
+                Agenda<br />Ministerial
               </span>
             </button>
 

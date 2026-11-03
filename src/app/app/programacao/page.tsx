@@ -83,6 +83,7 @@ export default function ProgramacaoPage() {
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<AgendaResponse | null>(null);
   const [filtro, setFiltro] = useState<'todos' | 'cultos' | 'eventos' | 'congregacao'>('todos');
+  const [visaoTempo, setVisaoTempo] = useState<'todos' | 'semana' | 'mes'>('todos');
 
   const loadAgenda = useCallback(async () => {
     setLoading(true);
@@ -98,10 +99,14 @@ export default function ProgramacaoPage() {
         return;
       }
 
-      let url = '/api/v1/mobile/agenda';
-      if (filtro === 'cultos') url += '?tipo=culto';
-      if (filtro === 'eventos') url += '?tipo=evento';
-      if (filtro === 'congregacao') url += '?apenas_congregacao=true';
+      const params = new URLSearchParams();
+      if (filtro === 'cultos') params.append('tipo', 'culto');
+      if (filtro === 'eventos') params.append('tipo', 'evento');
+      if (filtro === 'congregacao') params.append('apenas_congregacao', 'true');
+      if (visaoTempo !== 'todos') params.append('tempo', visaoTempo);
+
+      const qs = params.toString();
+      const url = qs ? `/api/v1/mobile/agenda?${qs}` : '/api/v1/mobile/agenda';
 
       const res = await fetch(url, {
         headers: {
@@ -121,7 +126,7 @@ export default function ProgramacaoPage() {
     } finally {
       setLoading(false);
     }
-  }, [supabase, filtro]);
+  }, [supabase, filtro, visaoTempo]);
 
   useEffect(() => {
     loadAgenda();
@@ -129,9 +134,43 @@ export default function ProgramacaoPage() {
 
   return (
     <div className="min-h-full flex-1 flex flex-col">
-      <MobileHeader title="Programação" />
+      <MobileHeader title="Agenda Ministerial" />
 
       <main className="flex-1 px-4 py-5 max-w-lg mx-auto w-full pb-28 space-y-4 bg-[#0f172a] text-slate-100">
+        {/* Alternador de Período: Semanal vs Mensal vs Todos */}
+        <div className="flex bg-[#111827] p-1 rounded-xl border border-slate-800">
+          <button
+            onClick={() => setVisaoTempo('todos')}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+              visaoTempo === 'todos'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Todos
+          </button>
+          <button
+            onClick={() => setVisaoTempo('semana')}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+              visaoTempo === 'semana'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Esta Semana
+          </button>
+          <button
+            onClick={() => setVisaoTempo('mes')}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+              visaoTempo === 'mes'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Próximos 30 dias
+          </button>
+        </div>
+
         {/* Filtros rápidos */}
         <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
           <button

@@ -181,7 +181,7 @@ export function MobileMemberProvider({ children }: { children: React.ReactNode }
       }
     } else if (authState === 'unlinked') {
       // Usuário autenticado mas sem vínculo confirmado
-      if (pathname !== '/app/vincular') {
+      if (!isPublic && pathname !== '/app/vincular') {
         router.replace('/app/vincular');
       }
     } else if (authState === 'linked') {

@@ -39,11 +39,25 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const tipoFiltro = searchParams.get('tipo'); // 'culto', 'evento', etc.
     const apenasCongregacao = searchParams.get('apenas_congregacao') === 'true';
+    const visualizacaoTempo = searchParams.get('tempo'); // 'semana' | 'mes' | 'todos'
 
     // 3. Buscar eventos a partir de hoje (início do dia atual UTC/local)
     const agora = new Date();
     agora.setHours(0, 0, 0, 0);
     const dataLimiteInferior = agora.toISOString();
+
+    let dataLimiteSuperior: string | null = null;
+    if (visualizacaoTempo === 'semana') {
+      const fimSemana = new Date(agora);
+      fimSemana.setDate(fimSemana.getDate() + 7);
+      fimSemana.setHours(23, 59, 59, 999);
+      dataLimiteSuperior = fimSemana.toISOString();
+    } else if (visualizacaoTempo === 'mes') {
+      const fimMes = new Date(agora);
+      fimMes.setDate(fimMes.getDate() + 30);
+      fimMes.setHours(23, 59, 59, 999);
+      dataLimiteSuperior = fimMes.toISOString();
+    }
 
     let query = admin
       .from('agenda_eventos')
@@ -67,8 +81,13 @@ export async function GET(request: NextRequest) {
       .eq('ministry_id', ctx.ministryId)
       .in('visibilidade', ['publico', 'igreja', 'ministerio'])
       .neq('status', 'cancelado')
-      .gte('data_inicio', dataLimiteInferior)
-      .order('data_inicio', { ascending: true });
+      .gte('data_inicio', dataLimiteInferior);
+
+    if (dataLimiteSuperior) {
+      query = query.lte('data_inicio', dataLimiteSuperior);
+    }
+
+    query = query.order('data_inicio', { ascending: true });
 
     if (tipoFiltro) {
       query = query.eq('tipo', tipoFiltro);
