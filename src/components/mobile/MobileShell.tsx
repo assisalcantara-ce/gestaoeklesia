@@ -2,7 +2,14 @@
 
 /**
  * MobileShell — wrapper client-side para o App Mobile.
- * Fornece o MobileMemberProvider, banner offline, instalador PWA e estrutura base da UI.
+ *
+ * Usa as classes CSS de app-mobile.css (importadas no layout.tsx do /app):
+ *   .app-viewport-root  →  position:fixed + overflow:hidden → bloqueia pinch-to-zoom no Safari iOS
+ *   .app-container-frame → touch-action:manipulation → sem double-tap zoom, sem atraso 300ms
+ *   .app-main-scroll    → touch-action:pan-y → só scroll vertical, sem pinch
+ *
+ * Esta estrutura é a mesma comprovada no SISCOMIEADEPA que bloqueia efetivamente
+ * o pinch-to-zoom no iPhone Safari sem depender de event listeners JS agressivos.
  */
 
 import { MobileMemberProvider } from '@/providers/MobileMemberProvider';
@@ -12,11 +19,11 @@ import MobileViewportDiagnostics from '@/components/mobile/MobileViewportDiagnos
 
 export default function MobileShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-[100dvh] bg-[#030e1d] text-slate-100 selection:bg-blue-600 selection:text-white">
-      <div className="min-h-[100dvh] bg-[#061D38] max-w-[430px] w-full mx-auto shadow-[0_0_50px_rgba(0,0,0,0.5)] border-x border-slate-800/40 relative overflow-x-hidden flex flex-col justify-between">
+    <div className="app-viewport-root">
+      <div className="app-container-frame">
         <MobileMemberProvider>
           <OfflineBanner />
-          <main className="flex-1">{children}</main>
+          <main className="app-main-scroll">{children}</main>
           <PwaInstaller />
           <MobileViewportDiagnostics />
         </MobileMemberProvider>

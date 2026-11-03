@@ -1,0 +1,126 @@
+/* ==========================================================================
+   Estilos de escopo exclusivo para o App Mobile de Membros (/app)
+   Baseado na estrutura comprovada que bloqueia pinch-to-zoom no Safari iOS:
+   position: fixed + overflow: hidden no root + touch-action: pan-y no scroll.
+   ========================================================================== */
+
+/* Contêiner raiz: trava a viewport inteira, impedindo que o Safari "veja"
+   conteúdo além dos limites da tela — isso é o que efetivamente bloqueia
+   o pinch-to-zoom no iOS Safari (overflow: hidden + position: fixed). */
+.app-viewport-root {
+  width: 100%;
+  width: 100vw;
+  height: 100dvh;
+  min-height: 100dvh;
+  max-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  position: fixed;
+  inset: 0;
+  background-color: #030e1d;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+}
+
+/* Container principal do App — largura máxima, sem overflow para o Safari expandir */
+.app-container-frame {
+  width: 100%;
+  max-width: 430px;
+  height: 100%;
+  max-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background-color: #061D38;
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+  border-left: 1px solid rgba(148, 163, 184, 0.1);
+  border-right: 1px solid rgba(148, 163, 184, 0.1);
+  overflow: hidden;
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+  /* touch-action: manipulation bloqueia double-tap zoom e atrasos de 300ms */
+  touch-action: manipulation;
+}
+
+/* Suporte para tablets em orientação retrato ou paisagem */
+@media (min-width: 768px) {
+  .app-container-frame {
+    max-width: 600px;
+    border-radius: 24px;
+    height: min(920px, 98dvh);
+    margin: auto;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* Modo Paisagem em smartphones */
+@media (max-height: 500px) and (orientation: landscape) {
+  .app-container-frame {
+    max-width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+    border: none;
+  }
+}
+
+/* Botões, links e controles: toque imediato, sem atraso de 300ms,
+   sem double-tap para zoom */
+.app-container-frame button,
+.app-container-frame a,
+.app-container-frame [role="button"] {
+  touch-action: manipulation;
+}
+
+/* Prevenção de zoom automático ao focar inputs no Safari iOS
+   (font-size >= 16px impede o zoom automático) */
+.app-container-frame input,
+.app-container-frame select,
+.app-container-frame textarea {
+  font-size: max(16px, 1rem) !important;
+  touch-action: manipulation;
+}
+
+/* Área de rolagem principal do aplicativo:
+   touch-action: pan-y é crucial — permite apenas deslizamento vertical,
+   bloqueando gestos de pinch (que usam dois dedos em direções opostas). */
+.app-main-scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+  scroll-behavior: smooth;
+}
+
+.app-main-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.app-main-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app-main-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 4px;
+}
+
+/* Display Standalone PWA (instalado na tela inicial) */
+@media all and (display-mode: standalone) {
+  .app-viewport-root {
+    /* Safe area para notch e barra de status */
+    padding-top: env(safe-area-inset-top);
+  }
+  .app-container-frame {
+    max-height: 100dvh;
+    height: 100dvh;
+  }
+}

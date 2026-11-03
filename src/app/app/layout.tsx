@@ -2,11 +2,14 @@
  * Layout do App Mobile — /app/*
  *
  * Server component: exporta metadata completa PWA, Apple Mobile e Viewport.
+ * Importa app-mobile.css com estrutura position:fixed + overflow:hidden que
+ * bloqueia pinch-to-zoom no Safari iOS sem depender de event listeners.
  * Renderiza o MobileShell (client) com MobileMemberProvider, OfflineBanner e PwaInstaller.
  */
 
 import type { Metadata, Viewport } from 'next';
 import MobileShell from '@/components/mobile/MobileShell';
+import './app-mobile.css';
 
 export const dynamic = 'force-dynamic';
 
