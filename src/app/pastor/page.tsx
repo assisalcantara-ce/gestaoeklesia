@@ -326,46 +326,15 @@ export default function PastorInicioPage() {
 
   return (
     <div className="min-h-screen bg-[#061224] text-slate-100 flex justify-center select-none antialiased">
-      {/* Container Mobile Centralizado limitado a 430px */}
-      <div className="relative w-full max-w-[430px] min-h-screen flex flex-col pb-28 overflow-x-hidden">
-
-        {/* ── CAMADA DE BACKGROUND VISUAL RESPONSIVA ── */}
-        <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
-          {/* Fundo escuro azul-marinho base */}
-          <div className="absolute inset-0 bg-gradient-to-b from-[#061328] via-[#091b36] to-[#050e1d]" />
-
-          {/* Igreja iluminada no canto superior direito */}
-          <div className="absolute top-0 right-0 w-[240px] h-[210px] sm:w-[260px] sm:h-[230px]">
-            <Image
-              src="/img/pastor_church_header_blend.png"
-              alt="Igreja Iluminada"
-              fill
-              priority
-              className="object-cover object-right-top opacity-95"
-            />
-          </div>
-
-          {/* Curva dourada (golden wave) separadora sob o cabeçalho */}
-          <div className="absolute top-[160px] left-0 right-0 h-[45px]">
-            <Image
-              src="/img/pastor_gold_wave_blend.png"
-              alt="Onda Dourada"
-              fill
-              className="object-cover object-center opacity-85"
-            />
-          </div>
-
-          {/* Bíblia sagrada aberta sobre a mesa no rodapé inferior */}
-          <div className="absolute bottom-[60px] left-0 right-0 h-[220px]">
-            <Image
-              src="/img/pastor_bible_footer_blend.png"
-              alt="Bíblia Aberta"
-              fill
-              className="object-cover object-bottom opacity-90"
-            />
-          </div>
-        </div>
-
+      {/* Container Mobile Centralizado limitado a 430px com background oficial */}
+      <div
+        className="relative w-full max-w-[430px] min-h-screen flex flex-col pb-28 overflow-x-hidden bg-no-repeat bg-top"
+        style={{
+          backgroundImage: 'url(/img/bg_pastor.png)',
+          backgroundSize: '100% auto',
+          backgroundColor: '#061224',
+        }}
+      >
         {/* ── CONTEÚDO DA APLICAÇÃO (Sobreposto com z-10) ── */}
         <div className="relative z-10 flex-1 flex flex-col">
 
