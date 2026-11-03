@@ -12,6 +12,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/providers/AuthProvider';
+import { useMobileMember } from '@/providers/MobileMemberProvider';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-client';
 import { formatCpf, formatData } from '@/lib/mascaras';
@@ -20,6 +21,7 @@ import Image from 'next/image';
 
 export default function MobileLoginPage() {
   const { user, isLoading: authLoading } = useAuth();
+  const { refresh, isLinked } = useMobileMember();
   const router = useRouter();
 
   const [cpf, setCpf] = useState('');
@@ -38,12 +40,12 @@ export default function MobileLoginPage() {
     }
   }, []);
 
-  // Se já autenticado, redireciona para a tela inicial
+  // Se já autenticado e com cadastro de membro reconhecido, redireciona para a tela inicial
   useEffect(() => {
-    if (!authLoading && user) {
+    if (!authLoading && user && isLinked) {
       router.replace('/app/inicio');
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading, isLinked, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,6 +91,8 @@ export default function MobileLoginPage() {
         try {
           const supabase = createClient();
           await supabase.auth.setSession(data.session);
+          // Forçar atualização do MobileMemberContext para reconhecer o vínculo sem esperar
+          await refresh();
         } catch (sessionErr) {
           console.error('[MOBILE_LOGIN] Erro ao sincronizar sessão cliente:', sessionErr);
         }

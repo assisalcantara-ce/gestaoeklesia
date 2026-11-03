@@ -166,10 +166,37 @@ export async function POST(request: NextRequest) {
   const unlinkedMember = candidates.find((c) => !c.auth_user_id);
 
   if (!unlinkedMember) {
+    // Buscar hint da conta vinculada (ex: e-mail mascarado) para orientar o usuário com clareza
+    const linkedCandidate = candidates.find((c) => Boolean(c.auth_user_id));
+    let maskedEmailHint: string | null = null;
+
+    if (linkedCandidate?.auth_user_id) {
+      try {
+        const { data: linkedAuthUser } = await admin.auth.admin.getUserById(linkedCandidate.auth_user_id);
+        const linkedEmail = linkedAuthUser?.user?.email;
+        if (linkedEmail) {
+          const parts = linkedEmail.split('@');
+          if (parts.length === 2) {
+            const userPart = parts[0];
+            const domainPart = parts[1];
+            const maskedUser = userPart.length > 2
+              ? `${userPart.slice(0, 2)}***${userPart.slice(-1)}`
+              : `${userPart.slice(0, 1)}***`;
+            maskedEmailHint = `${maskedUser}@${domainPart}`;
+          } else {
+            maskedEmailHint = `${linkedEmail.slice(0, 3)}***`;
+          }
+        }
+      } catch (e) {
+        console.warn('[link-member] Não foi possível obter detalhes da conta vinculada:', e);
+      }
+    }
+
     return NextResponse.json(
       {
-        error: 'Este membro já está vinculado a outra conta.',
+        error: 'Este cadastro de membro já está vinculado a outra conta.',
         code: 'ALREADY_LINKED_OTHER',
+        linked_account_hint: maskedEmailHint,
       },
       { status: 409 },
     );

@@ -16,7 +16,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { createClient } from '@/lib/supabase-client';
 import { formatCpf, formatData } from '@/lib/mascaras';
 import MobileHeader from '@/components/mobile/MobileHeader';
-import { Loader2, Link2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Loader2, Link2, AlertCircle, CheckCircle2, LogOut } from 'lucide-react';
 
 export default function VincularPage() {
   const router = useRouter();
@@ -27,12 +27,27 @@ export default function VincularPage() {
   const [cpf, setCpf] = useState('');
   const [dataNascimento, setDataNascimento] = useState('');
   const [loading, setLoading] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState('');
+  const [errorHint, setErrorHint] = useState<string | null>(null);
+  const [isLinkedOther, setIsLinkedOther] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  const handleSignOutAndLogin = async () => {
+    setSigningOut(true);
+    try {
+      await sbRef.current.auth.signOut();
+      router.replace('/app/login');
+    } catch {
+      router.replace('/app/login');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setErrorHint(null);
+    setIsLinkedOther(false);
 
     // Obter access_token se disponível na sessão do cliente
     const {
@@ -71,7 +86,7 @@ export default function VincularPage() {
         const code = data.code || data.error;
         switch (code) {
           case 'UNAUTHORIZED':
-            setError('Sessão expirada ou não encontrada. Por favor, solicite um novo link de acesso.');
+            setError('Sessão expirada ou não encontrada. Por favor, acerte seu login.');
             break;
           case 'MEMBER_NOT_FOUND':
             setError(
@@ -82,8 +97,12 @@ export default function VincularPage() {
             setError('Sua conta já está vinculada a um cadastro.');
             break;
           case 'ALREADY_LINKED_OTHER':
+            setIsLinkedOther(true);
+            if (data.linked_account_hint) {
+              setErrorHint(data.linked_account_hint);
+            }
             setError(
-              'Este cadastro de membro já está vinculado a outra conta. Entre em contato com a secretaria da sua igreja.',
+              'Este cadastro de membro já está vinculado a outra conta de acesso. Para sua segurança, não é permitida transferência automática.'
             );
             break;
           case 'INVALID_CPF':
@@ -176,9 +195,39 @@ export default function VincularPage() {
               </div>
 
               {error && (
-                <div className="flex items-start gap-2.5 bg-red-500/10 border border-red-500/30 text-red-300 text-xs px-3.5 py-3 rounded-xl">
-                  <AlertCircle size={16} className="shrink-0 mt-0.5 text-red-400" />
-                  <span>{error}</span>
+                <div className="flex flex-col gap-2.5 bg-red-500/10 border border-red-500/30 text-red-300 text-xs px-3.5 py-3 rounded-xl">
+                  <div className="flex items-start gap-2.5">
+                    <AlertCircle size={16} className="shrink-0 mt-0.5 text-red-400" />
+                    <div className="space-y-1">
+                      <span>{error}</span>
+                      {errorHint && (
+                        <div className="text-amber-300/90 font-medium pt-1">
+                          Conta original vinculada: <span className="font-mono text-amber-200 underline">{errorHint}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {isLinkedOther && (
+                    <div className="mt-2 pt-2.5 border-t border-red-500/20 space-y-2">
+                      <p className="text-[11px] text-slate-300 leading-relaxed">
+                        Se este cadastro é seu, entre com a conta de e-mail original ou solicite a recuperação segura à secretaria da sua igreja.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleSignOutAndLogin}
+                        disabled={signingOut}
+                        className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/40 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        {signingOut ? (
+                          <Loader2 size={13} className="animate-spin" />
+                        ) : (
+                          <LogOut size={13} />
+                        )}
+                        <span>Sair desta conta e fazer login como Membro</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -204,8 +253,19 @@ export default function VincularPage() {
         </div>
 
         {user && (
-          <div className="mt-6 bg-[#111827]/60 border border-slate-800/80 rounded-xl px-4 py-2.5 text-center text-xs text-slate-400 truncate max-w-full">
-            Conectado como: <span className="text-slate-200 font-medium">{user.email}</span>
+          <div className="mt-6 flex flex-col items-center gap-2">
+            <div className="bg-[#111827]/60 border border-slate-800/80 rounded-xl px-4 py-2.5 text-center text-xs text-slate-400 truncate max-w-full">
+              Conectado como: <span className="text-slate-200 font-medium">{user.email}</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleSignOutAndLogin}
+              disabled={signingOut}
+              className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors py-1 cursor-pointer"
+            >
+              <LogOut size={12} />
+              <span>Trocar de conta / Fazer login com outro acesso</span>
+            </button>
           </div>
         )}
       </div>

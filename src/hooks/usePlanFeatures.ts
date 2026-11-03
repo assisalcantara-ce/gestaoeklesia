@@ -19,6 +19,7 @@ export interface PlanFeatures {
   has_modulo_conselho_fiscal: boolean;
   has_modulo_contabilidade: boolean;
   has_arrecadacao_digital: boolean;
+  has_app_pastor: boolean;
   /** Mapa completo de Feature Flags resolvidos para o plano */
   flags: Record<FeatureFlag, boolean>;
   /** Método utilitário para checar qualquer Feature Flag */
@@ -48,6 +49,7 @@ const DEFAULT_FEATURES: PlanFeatures = {
   has_modulo_conselho_fiscal: false, // default fail-closed para os Planos Básico, Starter e Intermediário
   has_modulo_contabilidade: false,   // default fail-closed para os Planos Básico, Starter e Intermediário
   has_arrecadacao_digital: false, // default fail-closed para o Plano Básico enquanto carrega
+  has_app_pastor: false,          // Liberado para Starter, Intermediário e Profissional
   flags: DEFAULT_FLAGS,
   hasFeature: (feature: FeatureFlag) => DEFAULT_FLAGS[feature] ?? false,
   subscription_status: null,
@@ -120,6 +122,7 @@ export function usePlanFeatures(): PlanFeatures {
             has_modulo_conselho_fiscal: resolvedFlags.fiscal_council_module,
             has_modulo_contabilidade: resolvedFlags.accounting_module,
             has_arrecadacao_digital: resolvedFlags.digital_collection,
+            has_app_pastor: resolvedFlags.pastor_app,
             flags: resolvedFlags,
             hasFeature: (feature: FeatureFlag) => resolvedFlags[feature] ?? false,
             subscription_status: (ministry as any)?.subscription_status ?? null,

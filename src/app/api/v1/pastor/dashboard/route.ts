@@ -65,7 +65,7 @@ async function resolvePastorContext(request: NextRequest) {
     throw new Error('FORBIDDEN');
   }
 
-  // 2. Verifica plano — Feature Flag presidency_module (compatível com subscription_plans)
+  // 2. Verifica plano — Feature Flag pastor_app (liberado nos planos Starter, Intermediário e Profissional)
   const { data: ministry } = await admin
     .from('ministries')
     .select('plan, subscription_plans(*)')
@@ -78,7 +78,7 @@ async function resolvePastorContext(request: NextRequest) {
     : { slug: (ministry as any)?.plan, plan: (ministry as any)?.plan };
 
   const flags = resolvePlanFeatures(mergedPlan);
-  if (!flags.presidency_module) throw new Error('PLAN_REQUIRED');
+  if (!flags.pastor_app) throw new Error('PLAN_REQUIRED');
 
   return { userId: user.id, ministryId, admin };
 }

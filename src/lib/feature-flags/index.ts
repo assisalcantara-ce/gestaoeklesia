@@ -23,6 +23,7 @@ export type FeatureFlag =
   | 'student_portal'            // Portal do Aluno (EBD)
   | 'teacher_portal'            // Portal do Professor (EBD)
   | 'mobile_app'                // Aplicativo Mobile
+  | 'pastor_app'                // Aplicativo do Pastor (Mobile Executivo)
   | 'whatsapp_integration'      // WhatsApp Oficial
   | 'advanced_bi'               // BI Avançado & Relatórios Executivos
   | 'integrations'              // Integrações & APIs
@@ -176,6 +177,12 @@ export const FEATURE_CATALOG: Record<FeatureFlag, FeatureMetadata> = {
     description: 'Acesso nativo via aplicativo para membros e liderança.',
     minTier: 'professional',
   },
+  pastor_app: {
+    key: 'pastor_app',
+    label: 'Aplicativo do Pastor',
+    description: 'Acesso executivo mobile para pastores e presidentes.',
+    minTier: 'starter',
+  },
   whatsapp_integration: {
     key: 'whatsapp_integration',
     label: 'Integração WhatsApp Oficial',
@@ -283,6 +290,9 @@ const ALIAS_MAP: Record<string, FeatureFlag> = {
   'portal do aluno': 'student_portal',
   'portal do professor': 'teacher_portal',
   'aplicativo mobile': 'mobile_app',
+  'aplicativo do pastor': 'pastor_app',
+  'app do pastor': 'pastor_app',
+  'pastor_app': 'pastor_app',
   'whatsapp oficial': 'whatsapp_integration',
   'bi avançado': 'advanced_bi',
   'integrações': 'integrations',
@@ -409,6 +419,7 @@ export function resolvePlanFeatures(plan?: any): Record<FeatureFlag, boolean> {
     // [TEMPORÁRIO PARA TESTES]: Liberado provisoriamente para o 3º plano comercial (Intermediário / Tier >= 2) e superiores
     events_module:        LIBERACAO_TEMPORARIA_EVENTOS_PLANO_3 ? (tierRank >= 2 || isPlanoIntermediario(plan)) : tierRank >= 3,
     mobile_app:           tierRank >= 3,
+    pastor_app:           false, // Avaliado especificamente abaixo para os planos autorizados (Starter, Intermediário, Profissional)
     whatsapp_integration: tierRank >= 3,
     integrations:         tierRank >= 3,
     advanced_bi:          tierRank >= 4,
@@ -420,7 +431,55 @@ export function resolvePlanFeatures(plan?: any): Record<FeatureFlag, boolean> {
 
   if (!plan) return resolved;
 
-  // 1. Sobrescritas por colunas explícitas no banco (se presentes)
+  // 1. Regra Oficial Comercial do Aplicativo do Pastor (/pastor):
+  // Liberado estritamente para os planos: Starter, Intermediário e Profissional. Demais planos bloqueados.
+  // IDs Oficiais:
+  // - Starter:       503104e9-d532-433f-98b5-c7345152e275
+  // - Intermediário: 39c12fb2-dd08-4327-9411-f8bf4c0a226d
+  // - Profissional:  3eed6a7e-f5dc-42e7-a976-de79fd397f3c
+  const planId = String(plan.id ?? plan.subscription_plan_id ?? '').toLowerCase().trim();
+  const planSlug = String(plan.slug ?? plan.plan ?? '').toLowerCase().trim();
+  const planName = String(plan.name ?? '').toLowerCase().trim();
+
+  const isStarter =
+    planId === '503104e9-d532-433f-98b5-c7345152e275' ||
+    planSlug === 'starter' ||
+    planSlug.includes('starter') ||
+    planName.includes('starter');
+
+  const isIntermediario =
+    planId === '39c12fb2-dd08-4327-9411-f8bf4c0a226d' ||
+    isPlanoIntermediario(plan) ||
+    planSlug.includes('intermediar') ||
+    planName.includes('intermediar');
+
+  const isProfissional =
+    planId === '3eed6a7e-f5dc-42e7-a976-de79fd397f3c' ||
+    planSlug === 'profissional' ||
+    planSlug === 'professional' ||
+    planSlug.includes('profissional') ||
+    planSlug.includes('professional') ||
+    planName.includes('profissional') ||
+    planName.includes('professional');
+
+  const isExplicitlyBlocked =
+    planId === '187a57b1-b4cb-4f40-8517-6527df1d10c4' || // Basic
+    planId === 'b958c5c1-24dc-40b2-9b89-6e576055d288' || // Junior
+    planSlug === 'basic' ||
+    planSlug === 'basico' ||
+    planSlug.includes('basic') ||
+    planSlug.includes('basico') ||
+    planSlug === 'junior' ||
+    planSlug.includes('junior') ||
+    planName.includes('básico') ||
+    planName.includes('basico') ||
+    planName.includes('junior');
+
+  if ((isStarter || isIntermediario || isProfissional) && !isExplicitlyBlocked) {
+    resolved.pastor_app = true;
+  }
+
+  // 2. Sobrescritas por colunas explícitas no banco (se presentes)
   if (typeof plan.has_modulo_financeiro === 'boolean') resolved.financial_module = plan.has_modulo_financeiro;
   if (typeof plan.has_modulo_financeiro_avancado === 'boolean') resolved.advanced_finance = plan.has_modulo_financeiro_avancado;
   if (typeof plan.has_modulo_eventos === 'boolean') {

@@ -207,7 +207,7 @@ export default function PastorInicioPage() {
       }
       if (res.status === 403) {
         const errJson = await res.json().catch(() => null);
-        if (errJson?.code === 'PLAN_REQUIRED' || errJson?.error?.includes('Módulo Presidencial')) {
+        if (errJson?.code === 'PLAN_REQUIRED' || errJson?.error?.includes('plano') || errJson?.error?.includes('Módulo Presidencial')) {
           setAuthState('plan_required');
         } else {
           setAuthState('forbidden');
@@ -294,7 +294,9 @@ export default function PastorInicioPage() {
         </div>
         <h2 className="text-lg font-bold text-white">Plano Incompatível</h2>
         <p className="text-sm text-slate-400 max-w-sm">
-          O App do Pastor requer o <span className="text-amber-400 font-semibold">Módulo Presidencial</span> ativo no plano da sua igreja.
+          O App do Pastor está disponível nos planos <span className="text-amber-400 font-semibold">Starter</span>,{' '}
+          <span className="text-amber-400 font-semibold">Intermediário</span> e{' '}
+          <span className="text-amber-400 font-semibold">Profissional</span>.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 mt-4">
           <button

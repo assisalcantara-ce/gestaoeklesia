@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Seleciona o membro ativo (priorizando o que já possui auth_user_id ou email)
+    // Seleciona o membro ativo (priorizando o que já possui auth_user_id válido ou email)
     const targetMember = members.find((m) => m.auth_user_id) || members.find((m) => m.email) || members[0];
 
     // ── 4. Resolver ou provisionar conta de autenticação (Supabase Auth) ───
@@ -119,9 +119,13 @@ export async function POST(request: NextRequest) {
     let authUserId = targetMember.auth_user_id;
 
     if (authUserId) {
-      const { data: existingAuth } = await admin.auth.admin.getUserById(authUserId);
+      const { data: existingAuth, error: authLookupErr } = await admin.auth.admin.getUserById(authUserId);
       if (existingAuth?.user?.email) {
         targetEmail = existingAuth.user.email;
+      } else if (authLookupErr || !existingAuth?.user) {
+        // Se a referência em auth_user_id estiver órfã (usuário excluído no Auth), resetar para re-provisionar
+        console.warn('[MOBILE_AUTH_LOGIN] auth_user_id órfão detectado para membro:', targetMember.id);
+        authUserId = null;
       }
     }
 
@@ -146,7 +150,7 @@ export async function POST(request: NextRequest) {
       if (created?.user) {
         authUserRecord = created.user;
       } else {
-        // Se já existia usuário com este e-mail no Auth, recuperamos o ID
+        // Se o usuário já existia no Auth com esse e-mail, recuperamos o usuário existente
         const { data: linkInfo } = await admin.auth.admin.generateLink({
           type: 'magiclink',
           email: targetEmail,
@@ -165,7 +169,7 @@ export async function POST(request: NextRequest) {
             updated_at: new Date().toISOString(),
           })
           .eq('id', targetMember.id);
-        console.log('[MOBILE_AUTH_LOGIN] ✅ Membro vinculado a auth.users:', targetMember.id);
+        console.log('[MOBILE_AUTH_LOGIN] ✅ Membro vinculado a auth.users:', targetMember.id, 'authUserId:', authUserId);
       }
     }
 
