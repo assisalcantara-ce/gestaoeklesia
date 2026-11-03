@@ -10,7 +10,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useMobileMember } from '@/providers/MobileMemberProvider';
-import MobileShell from '@/components/mobile/MobileShell';
 import MobileHeader from '@/components/mobile/MobileHeader';
 import { createClient } from '@/lib/supabase-client';
 import {
@@ -180,7 +179,7 @@ export default function ContribuirDetalhePage() {
 
   if (errorDestino || !destino) {
     return (
-      <MobileShell>
+      <div className="min-h-full flex-1 flex flex-col">
         <MobileHeader title="Contribuir" showBack backHref="/app/contribuir" />
         <main className="pt-24 px-6 flex flex-col items-center gap-4 text-center flex-1 text-slate-100">
           <AlertCircle size={44} className="text-rose-400" />
@@ -192,14 +191,14 @@ export default function ContribuirDetalhePage() {
             Voltar para opções
           </button>
         </main>
-      </MobileShell>
+      </div>
     );
   }
 
   const hasFixedValue = destino.valor_fixo != null && destino.valor_fixo > 0;
 
   return (
-    <MobileShell>
+    <div className="min-h-full flex-1 flex flex-col">
       <MobileHeader title={destino.label} showBack backHref="/app/contribuir" />
 
       <main className="pb-12 px-4 pt-4 space-y-4 flex-1 text-slate-100 max-w-lg mx-auto w-full">
@@ -353,6 +352,6 @@ export default function ContribuirDetalhePage() {
           </div>
         </form>
       </main>
-    </MobileShell>
+    </div>
   );
 }

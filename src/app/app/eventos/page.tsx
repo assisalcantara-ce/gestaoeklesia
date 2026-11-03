@@ -8,7 +8,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMobileMember } from '@/providers/MobileMemberProvider';
-import MobileShell from '@/components/mobile/MobileShell';
 import MobileHeader from '@/components/mobile/MobileHeader';
 import MobileBottomNav from '@/components/mobile/MobileBottomNav';
 import IngressoModal from '@/components/mobile/IngressoModal';
@@ -205,7 +204,7 @@ export default function EventosPage() {
   };
 
   return (
-    <MobileShell>
+    <div className="min-h-full flex-1 flex flex-col">
       <div className="min-h-screen bg-[#0F172A] text-slate-100 pb-28">
         <MobileHeader title="Eventos" />
 
@@ -520,6 +519,6 @@ export default function EventosPage() {
 
         <MobileBottomNav />
       </div>
-    </MobileShell>
+    </div>
   );
 }

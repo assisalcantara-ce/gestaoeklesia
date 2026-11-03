@@ -5,7 +5,6 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import MobileShell from '@/components/mobile/MobileShell';
 import MobileHeader from '@/components/mobile/MobileHeader';
 import MobileBottomNav from '@/components/mobile/MobileBottomNav';
 import { createClient } from '@/lib/supabase-client';
@@ -129,7 +128,7 @@ export default function ProgramacaoPage() {
   }, [loadAgenda]);
 
   return (
-    <MobileShell>
+    <div className="min-h-full flex-1 flex flex-col">
       <MobileHeader title="Programação" />
 
       <main className="flex-1 px-4 py-5 max-w-lg mx-auto w-full pb-28 space-y-4 bg-[#0f172a] text-slate-100">
@@ -301,7 +300,7 @@ export default function ProgramacaoPage() {
       </main>
 
       <MobileBottomNav />
-    </MobileShell>
+    </div>
   );
 }
 

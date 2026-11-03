@@ -7,7 +7,6 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import MobileShell from '@/components/mobile/MobileShell';
 import MobileHeader from '@/components/mobile/MobileHeader';
 import MobileBottomNav from '@/components/mobile/MobileBottomNav';
 import { createClient } from '@/lib/supabase-client';
@@ -246,7 +245,7 @@ export default function MobileDocumentosPage() {
   };
 
   return (
-    <MobileShell>
+    <div className="min-h-full flex-1 flex flex-col">
       <MobileHeader title="Central de Documentos" showBack={false} />
 
       <main className="flex-1 pb-28 px-4 pt-4 space-y-4 text-slate-100 max-w-lg mx-auto w-full">
@@ -606,6 +605,6 @@ export default function MobileDocumentosPage() {
       </main>
 
       <MobileBottomNav />
-    </MobileShell>
+    </div>
   );
 }

@@ -8,7 +8,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useMobileMember } from '@/providers/MobileMemberProvider';
-import MobileShell from '@/components/mobile/MobileShell';
 import MobileHeader from '@/components/mobile/MobileHeader';
 import IngressoModal from '@/components/mobile/IngressoModal';
 import { createClient } from '@/lib/supabase-client';
@@ -234,7 +233,7 @@ export default function EventoDetalhesPage() {
 
   if (error || !evento) {
     return (
-      <MobileShell>
+      <div className="min-h-full flex-1 flex flex-col">
         <div className="min-h-screen bg-[#0F172A] p-6 flex flex-col justify-between text-slate-100">
           <MobileHeader title="Evento" />
           <div className="my-auto text-center bg-[#111827] rounded-3xl p-8 border border-slate-800/80 shadow-md max-w-sm mx-auto">
@@ -249,7 +248,7 @@ export default function EventoDetalhesPage() {
             </button>
           </div>
         </div>
-      </MobileShell>
+      </div>
     );
   }
 
@@ -259,7 +258,7 @@ export default function EventoDetalhesPage() {
   const tipoLabel = TIPO_LABELS[evento.tipo] || 'Evento';
 
   return (
-    <MobileShell>
+    <div className="min-h-full flex-1 flex flex-col">
       <div className="min-h-screen bg-[#0F172A] text-slate-100 pb-28">
         {/* Header com botão Voltar */}
         <div className="bg-[#0F172A]/95 backdrop-blur-md border-b border-slate-800/80 px-4 py-3 sticky top-0 z-20 flex items-center gap-3">
@@ -580,7 +579,7 @@ export default function EventoDetalhesPage() {
           }
         />
       </div>
-    </MobileShell>
+    </div>
   );
 }
 

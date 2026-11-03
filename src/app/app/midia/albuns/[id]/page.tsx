@@ -14,7 +14,6 @@
 
 import { useState, useEffect, useCallback, useMemo, use } from 'react';
 import Link from 'next/link';
-import MobileShell from '@/components/mobile/MobileShell';
 import MobileHeader from '@/components/mobile/MobileHeader';
 import MobileBottomNav from '@/components/mobile/MobileBottomNav';
 import { createClient } from '@/lib/supabase-client';
@@ -159,7 +158,7 @@ export default function MobileAlbumDetailPage({
   }, [lightboxIndex, prevPhoto, nextPhoto]);
 
   return (
-    <MobileShell>
+    <div className="min-h-full flex-1 flex flex-col">
       <MobileHeader title="Galeria de Fotos" />
 
       <main className="min-h-screen bg-[#0f172a] text-slate-100 pb-28">
@@ -359,6 +358,6 @@ export default function MobileAlbumDetailPage({
       </main>
 
       <MobileBottomNav />
-    </MobileShell>
+    </div>
   );
 }

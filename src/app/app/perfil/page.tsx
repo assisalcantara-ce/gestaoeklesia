@@ -13,7 +13,6 @@ import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMobileMember, MemberData } from '@/providers/MobileMemberProvider';
 import { useAuth } from '@/providers/AuthProvider';
-import MobileShell from '@/components/mobile/MobileShell';
 import MobileHeader from '@/components/mobile/MobileHeader';
 import MobileBottomNav from '@/components/mobile/MobileBottomNav';
 import { createClient } from '@/lib/supabase-client';
@@ -208,7 +207,7 @@ export default function PerfilPage() {
   }
 
   return (
-    <MobileShell>
+    <div className="min-h-full flex-1 flex flex-col">
       <div className="min-h-screen bg-[#0F172A] text-slate-100 pb-28">
         <MobileHeader
           title="Meu Perfil"
@@ -472,7 +471,7 @@ export default function PerfilPage() {
 
         <MobileBottomNav />
       </div>
-    </MobileShell>
+    </div>
   );
 }
 

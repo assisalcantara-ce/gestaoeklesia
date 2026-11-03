@@ -10,7 +10,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter, useParams } from 'next/navigation';
 import { useMobileMember } from '@/providers/MobileMemberProvider';
-import MobileShell from '@/components/mobile/MobileShell';
 import MobileHeader from '@/components/mobile/MobileHeader';
 import { createClient } from '@/lib/supabase-client';
 import { QRCodeSVG } from 'qrcode.react';
@@ -163,7 +162,7 @@ export default function ContribuirPixPage() {
 
   if (error || !charge) {
     return (
-      <MobileShell>
+      <div className="min-h-full flex-1 flex flex-col">
         <MobileHeader title="Pagamento PIX" showBack backHref={`/app/contribuir/${destinoId}`} />
         <main className="pt-24 px-6 flex flex-col items-center gap-4 text-center flex-1 text-slate-100">
           <AlertCircle size={44} className="text-rose-400" />
@@ -175,14 +174,14 @@ export default function ContribuirPixPage() {
             Voltar para Contribuir
           </button>
         </main>
-      </MobileShell>
+      </div>
     );
   }
 
   // ─── ESTADO: SUCESSO (PAGO) ────────────────────────────────────────────────
   if (charge.status === 'pago') {
     return (
-      <MobileShell>
+      <div className="min-h-full flex-1 flex flex-col">
         <MobileHeader title="Contribuição Confirmada" />
 
         <main className="pt-16 pb-12 px-4 flex-1 flex flex-col items-center justify-center text-center text-slate-100 max-w-lg mx-auto w-full">
@@ -234,14 +233,14 @@ export default function ContribuirPixPage() {
             </button>
           </div>
         </main>
-      </MobileShell>
+      </div>
     );
   }
 
   // ─── ESTADO: EXPIRADO OU CANCELADO ─────────────────────────────────────────
   if (charge.status === 'expirado' || charge.status === 'cancelado') {
     return (
-      <MobileShell>
+      <div className="min-h-full flex-1 flex flex-col">
         <MobileHeader title="Cobrança Expirada" showBack backHref={`/app/contribuir/${destinoId}`} />
         <main className="pt-24 px-6 flex flex-col items-center gap-4 text-center flex-1 text-slate-100 max-w-lg mx-auto w-full">
           <XCircle size={48} className="text-rose-400" />
@@ -256,13 +255,13 @@ export default function ContribuirPixPage() {
             Gerar novo PIX
           </button>
         </main>
-      </MobileShell>
+      </div>
     );
   }
 
   // ─── ESTADO: PENDENTE (QR CODE + COPIA E COLA) ─────────────────────────────
   return (
-    <MobileShell>
+    <div className="min-h-full flex-1 flex flex-col">
       <MobileHeader title="Pagar com PIX" showBack backHref={`/app/contribuir/${destinoId}`} />
 
       <main className="pb-12 px-4 pt-4 space-y-4 flex-1 text-slate-100 max-w-lg mx-auto w-full">
@@ -343,6 +342,6 @@ export default function ContribuirPixPage() {
           </div>
         </div>
       </main>
-    </MobileShell>
+    </div>
   );
 }

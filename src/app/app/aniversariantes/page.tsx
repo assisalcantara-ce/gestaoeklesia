@@ -14,7 +14,6 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import MobileShell from '@/components/mobile/MobileShell';
 import MobileHeader from '@/components/mobile/MobileHeader';
 import MobileBottomNav from '@/components/mobile/MobileBottomNav';
 import { createClient } from '@/lib/supabase-client';
@@ -137,7 +136,7 @@ export default function MobileAniversariantesPage() {
   }, [periodo]);
 
   return (
-    <MobileShell>
+    <div className="min-h-full flex-1 flex flex-col">
       <MobileHeader title="Aniversariantes" showBack={true} backHref="/app/inicio" />
 
       <main className="flex-1 pb-28 px-4 pt-4 space-y-4 bg-[#0f172a] text-slate-100">
@@ -436,6 +435,6 @@ export default function MobileAniversariantesPage() {
       </main>
 
       <MobileBottomNav />
-    </MobileShell>
+    </div>
   );
 }

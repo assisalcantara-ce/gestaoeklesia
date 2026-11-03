@@ -8,7 +8,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useMobileMember } from '@/providers/MobileMemberProvider';
-import MobileShell from '@/components/mobile/MobileShell';
 import MobileHeader from '@/components/mobile/MobileHeader';
 import { createClient } from '@/lib/supabase-client';
 import { QRCodeSVG } from 'qrcode.react';
@@ -178,7 +177,7 @@ export default function EventoPixPage() {
 
   if (error || !pagamento) {
     return (
-      <MobileShell>
+      <div className="min-h-full flex-1 flex flex-col">
         <div className="min-h-screen bg-[#0F172A] p-6 flex flex-col justify-between text-slate-100">
           <MobileHeader title="Pagamento PIX" />
           <div className="my-auto text-center bg-[#111827] rounded-3xl p-8 border border-slate-800/80 shadow-md max-w-sm mx-auto">
@@ -193,14 +192,14 @@ export default function EventoPixPage() {
             </button>
           </div>
         </div>
-      </MobileShell>
+      </div>
     );
   }
 
   // ── ESTADO: PAGO / CONFIRMADO ───────────────────────────────────────────────
   if (pagamento.status === 'pago') {
     return (
-      <MobileShell>
+      <div className="min-h-full flex-1 flex flex-col">
         <div className="min-h-screen bg-[#0F172A] flex flex-col justify-between p-6 text-slate-100">
           <div className="my-auto text-center max-w-sm mx-auto w-full space-y-6 animate-in zoom-in-95 duration-300">
             <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-full flex items-center justify-center mx-auto shadow-lg ring-8 ring-emerald-500/5">
@@ -243,14 +242,14 @@ export default function EventoPixPage() {
             </div>
           </div>
         </div>
-      </MobileShell>
+      </div>
     );
   }
 
   // ── ESTADO: EXPIRADO OU CANCELADO ──────────────────────────────────────────
   if (pagamento.status === 'expirado' || pagamento.status === 'cancelado') {
     return (
-      <MobileShell>
+      <div className="min-h-full flex-1 flex flex-col">
         <div className="min-h-screen bg-[#0F172A] flex flex-col justify-between p-6 text-slate-100">
           <div className="my-auto text-center max-w-sm mx-auto w-full space-y-5">
             <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-full flex items-center justify-center mx-auto shadow-md">
@@ -274,7 +273,7 @@ export default function EventoPixPage() {
             </button>
           </div>
         </div>
-      </MobileShell>
+      </div>
     );
   }
 
@@ -282,7 +281,7 @@ export default function EventoPixPage() {
   const pixPayload = pagamento.pix?.payload || '';
 
   return (
-    <MobileShell>
+    <div className="min-h-full flex-1 flex flex-col">
       <div className="min-h-screen bg-[#0F172A] text-slate-100 pb-20">
         {/* Header */}
         <div className="bg-[#0F172A]/95 backdrop-blur-md border-b border-slate-800/80 px-4 py-3 sticky top-0 z-20 flex items-center gap-3">
@@ -381,7 +380,7 @@ export default function EventoPixPage() {
           </div>
         </div>
       </div>
-    </MobileShell>
+    </div>
   );
 }
 
