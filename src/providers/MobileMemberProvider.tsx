@@ -6,10 +6,12 @@
  * Context que gerencia estado de autenticação + dados do membro
  * para o App Mobile (/app/*).
  *
- * Lógica de roteamento:
- * - Não autenticado + rota protegida  → /app/login
- * - Autenticado + não vinculado       → /app/vincular
- * - Autenticado + vinculado + /app/*público → /app/inicio
+ * Regra de Splash Screen Otimizada:
+ * - A splash screen "Carregando a sua igreja..." só é exibida na inicialização REAL
+ *   do aplicativo (cold boot / primeira verificação de sessão).
+ * - Uma vez inicializado (initialized = true), NUNCA mais renderiza splash screen
+ *   em transições ou navegações internas entre rotas (/app/eventos, /app/contribuir, etc.).
+ * - O layout persistente e a barra inferior permanecem 100% montados sem flashes.
  */
 
 import React, {
@@ -76,6 +78,7 @@ export function MobileMemberProvider({ children }: { children: React.ReactNode }
   const [memberLoading, setMemberLoading] = useState(false);
   const [isLinked, setIsLinked] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  const hasMountedRef = useRef(false);
   const router = useRouter();
   const pathname = usePathname();
   const sbRef = useRef(createClient());
@@ -131,6 +134,7 @@ export function MobileMemberProvider({ children }: { children: React.ReactNode }
       .finally(() => {
         setMemberLoading(false);
         setInitialized(true);
+        hasMountedRef.current = true;
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, authLoading]);
@@ -161,9 +165,15 @@ export function MobileMemberProvider({ children }: { children: React.ReactNode }
   const isLoading = authLoading || memberLoading || !initialized;
   const isPublic = PUBLIC_MOBILE_PATHS.some((p) => pathname === p) || pathname === '/app';
 
+  // REGRA CRÍTICA ANTI-FLASH:
+  // Apenas exibe a MobileSplashScreen durante o boot frio inicial do provider.
+  // Uma vez que o provider foi inicializado (hasMountedRef.current ou initialized),
+  // as rotas internas realizam transição fluida sem nunca mais disparar a splash.
+  const shouldShowSplash = !initialized && !isPublic;
+
   return (
     <MobileMemberContext.Provider value={{ member, isLoading, isLinked, refresh }}>
-      {isLoading && !isPublic ? (
+      {shouldShowSplash ? (
         <MobileSplashScreen />
       ) : (
         children

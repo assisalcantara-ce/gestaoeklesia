@@ -85,16 +85,47 @@ body:has(.app-viewport-root) {
   }
 }
 
-/* Botões, links e controles: toque imediato, sem atraso de 300ms,
-   sem double-tap para zoom */
+/* ==========================================================================
+   FEEDBACK TÁTIL UNIVERSAL (ANIMAÇÃO DE CLIQUE / ACTIVE SCALE 0.96)
+   - Reduz suavemente para scale(0.96) ao pressionar
+   - Transição fluida de 150ms
+   - Sem deslocamento de layout
+   - Respeita prefers-reduced-motion
+   ========================================================================== */
 .app-container-frame button,
 .app-container-frame a,
-.app-container-frame [role="button"] {
+.app-container-frame [role="button"],
+.app-container-frame .btn-interactive {
   touch-action: manipulation;
+  transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1), opacity 150ms ease;
+  will-change: transform;
 }
 
-/* Prevenção de zoom automático ao focar inputs no Safari iOS
-   (font-size >= 16px impede o zoom automático) */
+.app-container-frame button:active:not(:disabled),
+.app-container-frame a:active:not([aria-disabled="true"]),
+.app-container-frame [role="button"]:active:not([aria-disabled="true"]),
+.app-container-frame .btn-interactive:active {
+  transform: scale(0.96) !important;
+}
+
+.app-container-frame button:disabled,
+.app-container-frame [aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-container-frame button,
+  .app-container-frame a,
+  .app-container-frame [role="button"],
+  .app-container-frame .btn-interactive {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+/* Prevenção de zoom automático ao focar inputs no Safari iOS */
 .app-container-frame input,
 .app-container-frame select,
 .app-container-frame textarea {
