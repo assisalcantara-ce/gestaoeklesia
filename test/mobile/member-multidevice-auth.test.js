@@ -140,7 +140,13 @@ function handleLinkMember(authenticatedUserId, rawCpf, normalizedDate) {
 
   const alreadyLinked = mockDb.members.find((m) => m.auth_user_id === authenticatedUserId);
   if (alreadyLinked) {
-    return { status: 409, code: 'ALREADY_LINKED' };
+    return {
+      status: 200,
+      success: true,
+      already_linked: true,
+      member_id: alreadyLinked.id,
+      name: alreadyLinked.name,
+    };
   }
 
   const cleanCpf = String(rawCpf || '').replace(/\D/g, '');

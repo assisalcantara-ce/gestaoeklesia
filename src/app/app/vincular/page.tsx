@@ -9,7 +9,7 @@
  * 3. Sucesso → refresh() no context → provider redireciona para /app/inicio
  */
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMobileMember } from '@/providers/MobileMemberProvider';
 import { useAuth } from '@/providers/AuthProvider';
@@ -20,9 +20,16 @@ import { Loader2, Link2, AlertCircle, CheckCircle2, LogOut } from 'lucide-react'
 
 export default function VincularPage() {
   const router = useRouter();
-  const { refresh } = useMobileMember();
+  const { refresh, isLinked } = useMobileMember();
   const { user } = useAuth();
   const sbRef = useRef(createClient());
+
+  // Se o contexto já identificou que o usuário está vinculado, avança para o início imediatamente
+  useEffect(() => {
+    if (isLinked) {
+      router.replace('/app/inicio');
+    }
+  }, [isLinked, router]);
 
   const [cpf, setCpf] = useState('');
   const [dataNascimento, setDataNascimento] = useState('');
@@ -79,9 +86,7 @@ export default function VincularPage() {
       if (res.ok) {
         setSuccess(true);
         await refresh();
-        setTimeout(() => {
-          router.replace('/app/inicio');
-        }, 1000);
+        router.replace('/app/inicio');
       } else {
         const code = data.code || data.error;
         switch (code) {
@@ -94,7 +99,10 @@ export default function VincularPage() {
             );
             break;
           case 'ALREADY_LINKED':
-            setError('Sua conta já está vinculada a um cadastro.');
+            // Se já vinculado, forçar refresh e ir direto para o início
+            setSuccess(true);
+            await refresh();
+            router.replace('/app/inicio');
             break;
           case 'ALREADY_LINKED_OTHER':
             setIsLinkedOther(true);

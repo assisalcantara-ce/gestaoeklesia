@@ -114,15 +114,15 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
 
   if (alreadyLinked) {
-    return NextResponse.json(
-      {
-        error: 'Esta conta já está vinculada a um membro.',
-        code: 'ALREADY_LINKED',
-        member_id: alreadyLinked.id,
-        ministry_id: alreadyLinked.ministry_id,
-      },
-      { status: 409 },
-    );
+    // Se a conta já está vinculada, responder com sucesso idempotente para destravar o app
+    return NextResponse.json({
+      success: true,
+      already_linked: true,
+      member_id: alreadyLinked.id,
+      name: alreadyLinked.name,
+      ministry_id: alreadyLinked.ministry_id,
+      message: 'Sua conta já está vinculada.',
+    });
   }
 
   // ── 4. Buscar membros pelo CPF (normalizado) + data_nascimento ──────
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
 
   const { data: candidates, error: searchError } = await admin
     .from('members')
-    .select('id, ministry_id, name, auth_user_id, status, congregacao_id')
+    .select('id, ministry_id, name, email, auth_user_id, status, congregacao_id')
     .or(`cpf.eq.${rawCpf},cpf.eq.${cpfFormatted}`)
     .eq('data_nascimento', normalizedDate)
     .eq('status', 'active');
@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Se algum dos candidatos já pertencer a este user.id
+  // 4.1 Se algum dos candidatos já pertencer a este user.id
   const existingSelfLink = candidates.find((c) => c.auth_user_id === user.id);
   if (existingSelfLink) {
     return NextResponse.json({
@@ -162,8 +162,14 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // Priorizar candidato elegível que ainda não possua auth_user_id
-  const unlinkedMember = candidates.find((c) => !c.auth_user_id);
+  // 4.2 Se o usuário autenticado possui o mesmo e-mail do cadastro de membro e o membro estava sem auth_user_id
+  // ou com vínculo pendente, permitir reconciliação legítima
+  const emailMatchedCandidate = candidates.find(
+    (c) => user.email && c.email && c.email.trim().toLowerCase() === user.email.trim().toLowerCase()
+  );
+
+  // Priorizar candidato elegível que ainda não possua auth_user_id ou cujo e-mail coincida com o usuário logado
+  const unlinkedMember = candidates.find((c) => !c.auth_user_id) || emailMatchedCandidate;
 
   if (!unlinkedMember) {
     // Buscar hint da conta vinculada (ex: e-mail mascarado) para orientar o usuário com clareza
