@@ -68,7 +68,12 @@
     min-width: 0;
   }
 
-  /* Prevenção de auto-zoom indesejado no Safari/iOS para elementos de formulário */
+    /* Prevencao de zoom por duplo toque em elementos interativos */
+  button, a, input, select, textarea, [role="button"] {
+    touch-action: manipulation;
+  }
+
+/* Prevenção de auto-zoom indesejado no Safari/iOS para elementos de formulário */
   @media screen and (max-width: 768px) {
     input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
     select,
