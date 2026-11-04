@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic';
  * - Filtra tipo 'culto' ou categoria 'culto' em agenda_tipos
  * - Visibilidade permitida ao membro ('publico', 'igreja', 'ministerio')
  * - Isola por tenant e congregação
+ * - Desacopla congregações do schema cache do PostgREST
  */
 export async function GET(request: NextRequest) {
   try {
@@ -44,8 +45,7 @@ export async function GET(request: NextRequest) {
         local,
         visibilidade,
         status,
-        agenda_tipos ( id, nome, categoria, cor, icone ),
-        congregacoes ( id, nome, endereco, cidade, uf, cep, latitude, longitude )
+        agenda_tipos ( id, nome, categoria, cor, icone )
       `)
       .eq('ministry_id', ctx.ministryId)
       .in('visibilidade', ['publico', 'igreja', 'ministerio'])
@@ -54,22 +54,39 @@ export async function GET(request: NextRequest) {
       .order('data_inicio', { ascending: true });
 
     if (error) {
+      console.error('[MOBILE_AGENDA_CULTOS] Erro ao consultar agenda_eventos:', error);
       return NextResponse.json(
         { error: 'Erro ao consultar cultos.', detail: error.message },
         { status: 500 }
       );
     }
 
-    // 3. Filtrar cultos compatíveis com a congregação do membro
-    const cultos = (eventos || []).filter((e) => {
-      const isCulto =
-        e.tipo === 'culto' || (e.agenda_tipos as any)?.categoria === 'culto';
-      if (!isCulto) return false;
+    // 3. Buscar congregações ativas de forma desacoplada
+    const { data: congsData } = await admin
+      .from('congregacoes')
+      .select('id, nome, endereco, cidade, uf, cep, latitude, longitude')
+      .eq('ministry_id', ctx.ministryId);
 
-      if (!e.church_id) return true; // Geral
-      if (!memberCongregacaoId) return true;
-      return e.church_id === memberCongregacaoId;
+    const mapaCongregacoes = new Map<string, any>();
+    (congsData || []).forEach((c) => {
+      mapaCongregacoes.set(c.id, c);
     });
+
+    // 4. Filtrar cultos compatíveis com a congregação do membro e anexar dados congregacionais
+    const cultos = (eventos || [])
+      .map((e) => ({
+        ...e,
+        congregacoes: e.church_id ? mapaCongregacoes.get(e.church_id) || null : null,
+      }))
+      .filter((e) => {
+        const isCulto =
+          e.tipo === 'culto' || (e.agenda_tipos as any)?.categoria === 'culto';
+        if (!isCulto) return false;
+
+        if (!e.church_id) return true; // Geral
+        if (!memberCongregacaoId) return true;
+        return e.church_id === memberCongregacaoId;
+      });
 
     return NextResponse.json({
       total: cultos.length,

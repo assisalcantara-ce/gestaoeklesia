@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic';
  * Retorna os detalhes de um evento/culto da agenda do membro:
  * - Proteção estrita anti-IDOR por tenant, congregação e visibilidade
  * - Formatação completa de localização e link direto para aplicativo de mapas
+ * - Desacopla congregações do schema cache do PostgREST
  */
 export async function GET(
   request: NextRequest,
@@ -46,14 +47,16 @@ export async function GET(
         visibilidade,
         status,
         recorrente,
-        agenda_tipos ( id, nome, categoria, cor, icone ),
-        congregacoes ( id, nome, endereco, cidade, uf, cep, latitude, longitude )
+        agenda_tipos ( id, nome, categoria, cor, icone )
       `)
       .eq('id', id)
       .eq('ministry_id', ctx.ministryId)
       .maybeSingle();
 
     if (error || !evento) {
+      if (error) {
+        console.error('[MOBILE_AGENDA_DETAIL] Erro ao consultar agenda_eventos:', error);
+      }
       return NextResponse.json(
         { error: 'Evento não encontrado.', code: 'EVENT_NOT_FOUND' },
         { status: 404 }
@@ -77,8 +80,20 @@ export async function GET(
       );
     }
 
-    // 5. Montar endereço e query para mapas
-    const cong = evento.congregacoes as any;
+    // 5. Buscar congregação de forma desacoplada se church_id estiver presente
+    let cong: any = null;
+    if (evento.church_id) {
+      const { data: congData } = await admin
+        .from('congregacoes')
+        .select('id, nome, endereco, cidade, uf, cep, latitude, longitude')
+        .eq('id', evento.church_id)
+        .eq('ministry_id', ctx.ministryId)
+        .maybeSingle();
+
+      cong = congData;
+    }
+
+    // 6. Montar endereço e query para mapas
     let enderecoCompleto = evento.local || '';
     let mapsQuery = '';
 
@@ -107,7 +122,7 @@ export async function GET(
       status: evento.status,
       visibilidade: evento.visibilidade,
       local: evento.local,
-      congregação: cong ? { id: cong.id, nome: cong.nome, endereco: cong.endereco, cidade: cong.cidade, uf: cong.uf } : null,
+      congregacoes: cong ? { id: cong.id, nome: cong.nome, endereco: cong.endereco, cidade: cong.cidade, uf: cong.uf } : null,
       endereco_completo: enderecoCompleto,
       maps_url: mapsUrl,
     });
