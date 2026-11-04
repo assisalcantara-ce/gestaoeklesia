@@ -1,0 +1,671 @@
+{
+  "versao": "BLIVRE",
+  "nomeVersao": "Bíblia Livre",
+  "licenca": "Creative Commons Atribuição 3.0 Brasil (CC BY 3.0 BR)",
+  "autores": "Diego Santos, Mario Sérgio, e Marco Teles",
+  "fonte": "https://github.com/blivre/BibliaLivre",
+  "creditos": "Todas as Escrituras em português citadas são da Bíblia Livre (BLIVRE), Copyright © Diego Santos, Mario Sérgio, e Marco Teles, http://sites.google.com/site/biblialivre/ - Licença Creative Commons Atribuição 3.0 Brasil (http://creativecommons.org/licenses/by/3.0/br/). Reprodução permitida desde que devidamente mencionados fonte e autores.",
+  "totalLivros": 66,
+  "livros": [
+    {
+      "id": "gn",
+      "posicao": 1,
+      "nome": "Gênesis",
+      "nomeLongo": "Gênesis",
+      "abrev": "Gn",
+      "testamento": "AT",
+      "grupo": "Pentateuco",
+      "totalCapitulos": 50
+    },
+    {
+      "id": "ex",
+      "posicao": 2,
+      "nome": "Êxodo",
+      "nomeLongo": "Livro do Êxodo",
+      "abrev": "Ex",
+      "testamento": "AT",
+      "grupo": "Pentateuco",
+      "totalCapitulos": 40
+    },
+    {
+      "id": "lv",
+      "posicao": 3,
+      "nome": "Levítico",
+      "nomeLongo": "Levítico",
+      "abrev": "Lv",
+      "testamento": "AT",
+      "grupo": "Pentateuco",
+      "totalCapitulos": 27
+    },
+    {
+      "id": "nm",
+      "posicao": 4,
+      "nome": "Números",
+      "nomeLongo": "Números",
+      "abrev": "Nm",
+      "testamento": "AT",
+      "grupo": "Pentateuco",
+      "totalCapitulos": 36
+    },
+    {
+      "id": "dt",
+      "posicao": 5,
+      "nome": "Deuteronômio",
+      "nomeLongo": "Deuteronômio",
+      "abrev": "Dt",
+      "testamento": "AT",
+      "grupo": "Pentateuco",
+      "totalCapitulos": 34
+    },
+    {
+      "id": "js",
+      "posicao": 6,
+      "nome": "Josué",
+      "nomeLongo": "Livro de Josué",
+      "abrev": "Js",
+      "testamento": "AT",
+      "grupo": "Históricos",
+      "totalCapitulos": 24
+    },
+    {
+      "id": "jz",
+      "posicao": 7,
+      "nome": "Juízes",
+      "nomeLongo": "Livro dos Juízes",
+      "abrev": "Jz",
+      "testamento": "AT",
+      "grupo": "Históricos",
+      "totalCapitulos": 21
+    },
+    {
+      "id": "rt",
+      "posicao": 8,
+      "nome": "Rute",
+      "nomeLongo": "Rute",
+      "abrev": "Rt",
+      "testamento": "AT",
+      "grupo": "Históricos",
+      "totalCapitulos": 4
+    },
+    {
+      "id": "1sm",
+      "posicao": 9,
+      "nome": "1 Samuel",
+      "nomeLongo": "Primeiro Livro de Samuel",
+      "abrev": "1Sm",
+      "testamento": "AT",
+      "grupo": "Históricos",
+      "totalCapitulos": 31
+    },
+    {
+      "id": "2sm",
+      "posicao": 10,
+      "nome": "2 Samuel",
+      "nomeLongo": "Segundo Livro de Samuel",
+      "abrev": "2Sm",
+      "testamento": "AT",
+      "grupo": "Históricos",
+      "totalCapitulos": 24
+    },
+    {
+      "id": "1rs",
+      "posicao": 11,
+      "nome": "1 Reis",
+      "nomeLongo": "Primeiro Livro dos Reis",
+      "abrev": "1Rs",
+      "testamento": "AT",
+      "grupo": "Históricos",
+      "totalCapitulos": 22
+    },
+    {
+      "id": "2rs",
+      "posicao": 12,
+      "nome": "2 Reis",
+      "nomeLongo": "Segundo Livro dos Reis",
+      "abrev": "2Rs",
+      "testamento": "AT",
+      "grupo": "Históricos",
+      "totalCapitulos": 25
+    },
+    {
+      "id": "1cr",
+      "posicao": 13,
+      "nome": "1 Crônicas",
+      "nomeLongo": "Primeiro Livro de Crônicas",
+      "abrev": "1Cr",
+      "testamento": "AT",
+      "grupo": "Históricos",
+      "totalCapitulos": 29
+    },
+    {
+      "id": "2cr",
+      "posicao": 14,
+      "nome": "2 Crônicas",
+      "nomeLongo": "Segundo Livro de Crônicas",
+      "abrev": "2Cr",
+      "testamento": "AT",
+      "grupo": "Históricos",
+      "totalCapitulos": 36
+    },
+    {
+      "id": "ed",
+      "posicao": 15,
+      "nome": "Esdras",
+      "nomeLongo": "Esdras",
+      "abrev": "Esd",
+      "testamento": "AT",
+      "grupo": "Históricos",
+      "totalCapitulos": 10
+    },
+    {
+      "id": "ne",
+      "posicao": 16,
+      "nome": "Neemias",
+      "nomeLongo": "Neemias",
+      "abrev": "Ne",
+      "testamento": "AT",
+      "grupo": "Históricos",
+      "totalCapitulos": 13
+    },
+    {
+      "id": "et",
+      "posicao": 17,
+      "nome": "Ester",
+      "nomeLongo": "Ester",
+      "abrev": "Est",
+      "testamento": "AT",
+      "grupo": "Históricos",
+      "totalCapitulos": 10
+    },
+    {
+      "id": "job",
+      "posicao": 18,
+      "nome": "Jó",
+      "nomeLongo": "Jó",
+      "abrev": "Jo",
+      "testamento": "AT",
+      "grupo": "Poéticos",
+      "totalCapitulos": 42
+    },
+    {
+      "id": "sl",
+      "posicao": 19,
+      "nome": "Salmos",
+      "nomeLongo": "Livro dos Salmos",
+      "abrev": "Sl",
+      "testamento": "AT",
+      "grupo": "Poéticos",
+      "totalCapitulos": 150
+    },
+    {
+      "id": "pv",
+      "posicao": 20,
+      "nome": "Provérbios",
+      "nomeLongo": "Provérbios de Salomão",
+      "abrev": "Prv",
+      "testamento": "AT",
+      "grupo": "Poéticos",
+      "totalCapitulos": 31
+    },
+    {
+      "id": "ec",
+      "posicao": 21,
+      "nome": "Eclesiastes",
+      "nomeLongo": "Livro do Eclesiastes ou Pregador",
+      "abrev": "Ec",
+      "testamento": "AT",
+      "grupo": "Poéticos",
+      "totalCapitulos": 12
+    },
+    {
+      "id": "ct",
+      "posicao": 22,
+      "nome": "Cantares",
+      "nomeLongo": "Cantares de Salomão",
+      "abrev": "Ct",
+      "testamento": "AT",
+      "grupo": "Poéticos",
+      "totalCapitulos": 8
+    },
+    {
+      "id": "is",
+      "posicao": 23,
+      "nome": "Isaías",
+      "nomeLongo": "Isaías",
+      "abrev": "Is",
+      "testamento": "AT",
+      "grupo": "Profetas Maiores",
+      "totalCapitulos": 66
+    },
+    {
+      "id": "jr",
+      "posicao": 24,
+      "nome": "Jeremias",
+      "nomeLongo": "Jeremias",
+      "abrev": "Jr",
+      "testamento": "AT",
+      "grupo": "Profetas Maiores",
+      "totalCapitulos": 52
+    },
+    {
+      "id": "lm",
+      "posicao": 25,
+      "nome": "Lamentações",
+      "nomeLongo": "Lamentações de Jeremias",
+      "abrev": "Lm",
+      "testamento": "AT",
+      "grupo": "Profetas Maiores",
+      "totalCapitulos": 5
+    },
+    {
+      "id": "ez",
+      "posicao": 26,
+      "nome": "Ezequiel",
+      "nomeLongo": "Ezequiel",
+      "abrev": "Ez",
+      "testamento": "AT",
+      "grupo": "Profetas Maiores",
+      "totalCapitulos": 48
+    },
+    {
+      "id": "dn",
+      "posicao": 27,
+      "nome": "Daniel",
+      "nomeLongo": "Daniel",
+      "abrev": "Dn",
+      "testamento": "AT",
+      "grupo": "Profetas Maiores",
+      "totalCapitulos": 12
+    },
+    {
+      "id": "os",
+      "posicao": 28,
+      "nome": "Oseias",
+      "nomeLongo": "Oseias",
+      "abrev": "Os",
+      "testamento": "AT",
+      "grupo": "Profetas Menores",
+      "totalCapitulos": 14
+    },
+    {
+      "id": "jl",
+      "posicao": 29,
+      "nome": "Joel",
+      "nomeLongo": "Joel",
+      "abrev": "Joel",
+      "testamento": "AT",
+      "grupo": "Profetas Menores",
+      "totalCapitulos": 3
+    },
+    {
+      "id": "am",
+      "posicao": 30,
+      "nome": "Amós",
+      "nomeLongo": "Amós",
+      "abrev": "Am",
+      "testamento": "AT",
+      "grupo": "Profetas Menores",
+      "totalCapitulos": 9
+    },
+    {
+      "id": "ob",
+      "posicao": 31,
+      "nome": "Obadias",
+      "nomeLongo": "Obadias",
+      "abrev": "Ob",
+      "testamento": "AT",
+      "grupo": "Profetas Menores",
+      "totalCapitulos": 1
+    },
+    {
+      "id": "jn",
+      "posicao": 32,
+      "nome": "Jonas",
+      "nomeLongo": "Jonas",
+      "abrev": "Jn",
+      "testamento": "AT",
+      "grupo": "Profetas Menores",
+      "totalCapitulos": 4
+    },
+    {
+      "id": "mq",
+      "posicao": 33,
+      "nome": "Miqueias",
+      "nomeLongo": "Miqueias",
+      "abrev": "Mq",
+      "testamento": "AT",
+      "grupo": "Profetas Menores",
+      "totalCapitulos": 7
+    },
+    {
+      "id": "na",
+      "posicao": 34,
+      "nome": "Naum",
+      "nomeLongo": "Naum",
+      "abrev": "Na",
+      "testamento": "AT",
+      "grupo": "Profetas Menores",
+      "totalCapitulos": 3
+    },
+    {
+      "id": "hc",
+      "posicao": 35,
+      "nome": "Habacuque",
+      "nomeLongo": "Habacuque",
+      "abrev": "Hab",
+      "testamento": "AT",
+      "grupo": "Profetas Menores",
+      "totalCapitulos": 3
+    },
+    {
+      "id": "sf",
+      "posicao": 36,
+      "nome": "Sofonias",
+      "nomeLongo": "Sofonias",
+      "abrev": "Sf",
+      "testamento": "AT",
+      "grupo": "Profetas Menores",
+      "totalCapitulos": 3
+    },
+    {
+      "id": "ag",
+      "posicao": 37,
+      "nome": "Ageu",
+      "nomeLongo": "Ageu",
+      "abrev": "Ag",
+      "testamento": "AT",
+      "grupo": "Profetas Menores",
+      "totalCapitulos": 2
+    },
+    {
+      "id": "zc",
+      "posicao": 38,
+      "nome": "Zacarias",
+      "nomeLongo": "Zacarias",
+      "abrev": "Zc",
+      "testamento": "AT",
+      "grupo": "Profetas Menores",
+      "totalCapitulos": 14
+    },
+    {
+      "id": "ml",
+      "posicao": 39,
+      "nome": "Malaquias",
+      "nomeLongo": "Malaquias",
+      "abrev": "Ml",
+      "testamento": "AT",
+      "grupo": "Profetas Menores",
+      "totalCapitulos": 4
+    },
+    {
+      "id": "mt",
+      "posicao": 40,
+      "nome": "Mateus",
+      "nomeLongo": "Evangelho Segundo Mateus",
+      "abrev": "Mt",
+      "testamento": "NT",
+      "grupo": "Evangelhos",
+      "totalCapitulos": 28
+    },
+    {
+      "id": "mc",
+      "posicao": 41,
+      "nome": "Marcos",
+      "nomeLongo": "Evangelho Segundo Marcos",
+      "abrev": "Mc",
+      "testamento": "NT",
+      "grupo": "Evangelhos",
+      "totalCapitulos": 16
+    },
+    {
+      "id": "lc",
+      "posicao": 42,
+      "nome": "Lucas",
+      "nomeLongo": "Evangelho Segundo Lucas",
+      "abrev": "Lc",
+      "testamento": "NT",
+      "grupo": "Evangelhos",
+      "totalCapitulos": 24
+    },
+    {
+      "id": "jo",
+      "posicao": 43,
+      "nome": "João",
+      "nomeLongo": "Evangelho Segundo João",
+      "abrev": "Joao",
+      "testamento": "NT",
+      "grupo": "Evangelhos",
+      "totalCapitulos": 21
+    },
+    {
+      "id": "at",
+      "posicao": 44,
+      "nome": "Atos",
+      "nomeLongo": "Atos dos Apóstolos",
+      "abrev": "At",
+      "testamento": "NT",
+      "grupo": "Histórico",
+      "totalCapitulos": 28
+    },
+    {
+      "id": "rm",
+      "posicao": 45,
+      "nome": "Romanos",
+      "nomeLongo": "Carta de Paulo aos Romanos",
+      "abrev": "Rm",
+      "testamento": "NT",
+      "grupo": "Epístolas Paulinas",
+      "totalCapitulos": 16
+    },
+    {
+      "id": "1co",
+      "posicao": 46,
+      "nome": "1 Coríntios",
+      "nomeLongo": "Primeira Carta de Paulo aos Coríntios",
+      "abrev": "1Co",
+      "testamento": "NT",
+      "grupo": "Epístolas Paulinas",
+      "totalCapitulos": 16
+    },
+    {
+      "id": "2co",
+      "posicao": 47,
+      "nome": "2 Coríntios",
+      "nomeLongo": "Segunda Carta de Paulo aos Coríntios",
+      "abrev": "2Co",
+      "testamento": "NT",
+      "grupo": "Epístolas Paulinas",
+      "totalCapitulos": 13
+    },
+    {
+      "id": "gl",
+      "posicao": 48,
+      "nome": "Gálatas",
+      "nomeLongo": "Carta de Paulo aos Gálatas",
+      "abrev": "Gl",
+      "testamento": "NT",
+      "grupo": "Epístolas Paulinas",
+      "totalCapitulos": 6
+    },
+    {
+      "id": "ef",
+      "posicao": 49,
+      "nome": "Efésios",
+      "nomeLongo": "Carta de Paulo aos Efésios",
+      "abrev": "Ef",
+      "testamento": "NT",
+      "grupo": "Epístolas Paulinas",
+      "totalCapitulos": 6
+    },
+    {
+      "id": "fp",
+      "posicao": 50,
+      "nome": "Filipenses",
+      "nomeLongo": "Carta de Paulo aos Filipenses",
+      "abrev": "Fp",
+      "testamento": "NT",
+      "grupo": "Epístolas Paulinas",
+      "totalCapitulos": 4
+    },
+    {
+      "id": "cl",
+      "posicao": 51,
+      "nome": "Colossenses",
+      "nomeLongo": "Carta de Paulo aos Colossenses",
+      "abrev": "Cl",
+      "testamento": "NT",
+      "grupo": "Epístolas Paulinas",
+      "totalCapitulos": 4
+    },
+    {
+      "id": "1ts",
+      "posicao": 52,
+      "nome": "1 Tessalonicenses",
+      "nomeLongo": "Primeira Carta de Paulo aos Tessalonicenses",
+      "abrev": "1Ts",
+      "testamento": "NT",
+      "grupo": "Epístolas Paulinas",
+      "totalCapitulos": 5
+    },
+    {
+      "id": "2ts",
+      "posicao": 53,
+      "nome": "2 Tessalonicenses",
+      "nomeLongo": "Segunda Carta de Paulo aos Tessalonicenses",
+      "abrev": "2Ts",
+      "testamento": "NT",
+      "grupo": "Epístolas Paulinas",
+      "totalCapitulos": 3
+    },
+    {
+      "id": "1tm",
+      "posicao": 54,
+      "nome": "1 Timóteo",
+      "nomeLongo": "Primeira Carta de Paulo a Timóteo",
+      "abrev": "1Tm",
+      "testamento": "NT",
+      "grupo": "Epístolas Paulinas",
+      "totalCapitulos": 6
+    },
+    {
+      "id": "2tm",
+      "posicao": 55,
+      "nome": "2 Timóteo",
+      "nomeLongo": "Segunda Carta de Paulo a Timóteo",
+      "abrev": "2Tm",
+      "testamento": "NT",
+      "grupo": "Epístolas Paulinas",
+      "totalCapitulos": 4
+    },
+    {
+      "id": "tt",
+      "posicao": 56,
+      "nome": "Tito",
+      "nomeLongo": "Carta de Paulo a Tito",
+      "abrev": "Tt",
+      "testamento": "NT",
+      "grupo": "Epístolas Paulinas",
+      "totalCapitulos": 3
+    },
+    {
+      "id": "fm",
+      "posicao": 57,
+      "nome": "Filemom",
+      "nomeLongo": "Carta de Paulo a Filemom",
+      "abrev": "Flm",
+      "testamento": "NT",
+      "grupo": "Epístolas Paulinas",
+      "totalCapitulos": 1
+    },
+    {
+      "id": "hb",
+      "posicao": 58,
+      "nome": "Hebreus",
+      "nomeLongo": "Carta aos Hebreus",
+      "abrev": "Hb",
+      "testamento": "NT",
+      "grupo": "Epístolas Gerais",
+      "totalCapitulos": 13
+    },
+    {
+      "id": "tg",
+      "posicao": 59,
+      "nome": "Tiago",
+      "nomeLongo": "Carta Universal de Tiago",
+      "abrev": "Tg",
+      "testamento": "NT",
+      "grupo": "Epístolas Gerais",
+      "totalCapitulos": 5
+    },
+    {
+      "id": "1pe",
+      "posicao": 60,
+      "nome": "1 Pedro",
+      "nomeLongo": "Primeira Carta Universal de Pedro",
+      "abrev": "1Pd",
+      "testamento": "NT",
+      "grupo": "Epístolas Gerais",
+      "totalCapitulos": 5
+    },
+    {
+      "id": "2pe",
+      "posicao": 61,
+      "nome": "2 Pedro",
+      "nomeLongo": "Segunda Carta Universal de Pedro",
+      "abrev": "2Pd",
+      "testamento": "NT",
+      "grupo": "Epístolas Gerais",
+      "totalCapitulos": 3
+    },
+    {
+      "id": "1jo",
+      "posicao": 62,
+      "nome": "1 João",
+      "nomeLongo": "Primeira Carta Universal de João",
+      "abrev": "1Joao",
+      "testamento": "NT",
+      "grupo": "Epístolas Gerais",
+      "totalCapitulos": 5
+    },
+    {
+      "id": "2jo",
+      "posicao": 63,
+      "nome": "2 João",
+      "nomeLongo": "Segunda Carta de João",
+      "abrev": "2Joao",
+      "testamento": "NT",
+      "grupo": "Epístolas Gerais",
+      "totalCapitulos": 1
+    },
+    {
+      "id": "3jo",
+      "posicao": 64,
+      "nome": "3 João",
+      "nomeLongo": "Terceira Carta de João",
+      "abrev": "3Joao",
+      "testamento": "NT",
+      "grupo": "Epístolas Gerais",
+      "totalCapitulos": 1
+    },
+    {
+      "id": "jd",
+      "posicao": 65,
+      "nome": "Judas",
+      "nomeLongo": "Carta Universal de Judas",
+      "abrev": "Jd",
+      "testamento": "NT",
+      "grupo": "Epístolas Gerais",
+      "totalCapitulos": 1
+    },
+    {
+      "id": "ap",
+      "posicao": 66,
+      "nome": "Apocalipse",
+      "nomeLongo": "Apocalipse de João",
+      "abrev": "Ap",
+      "testamento": "NT",
+      "grupo": "Revelação",
+      "totalCapitulos": 22
+    }
+  ]
+}

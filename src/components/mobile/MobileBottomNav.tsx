@@ -13,7 +13,7 @@ import {
 const NAV_ITEMS = [
   { href: '/app/inicio', label: 'Início', icon: Home, exact: true },
   { href: '/app/midia', label: 'Conteúdo', icon: PlayCircle },
-  { href: '/app/ebd', label: 'Bíblia', icon: BookOpen },
+  { href: '/app/biblia', label: 'Bíblia', icon: BookOpen },
   { href: '/app/contribuir', label: 'Doações', icon: Heart },
   { href: '/app/perfil', label: 'Mais', icon: MoreHorizontal },
 ] as const;

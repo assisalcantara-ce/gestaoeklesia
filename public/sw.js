@@ -81,11 +81,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. ASSETS ESTÁTICOS IMUTÁVEIS (/_next/static/*, imagens, fontes) -> Cache First / Stale-While-Revalidate
+  // 2. ASSETS ESTÁTICOS IMUTÁVEIS (/_next/static/*, imagens, fontes, Bíblia offline) -> Cache First / Stale-While-Revalidate
   if (
     url.pathname.startsWith('/_next/static/') ||
     url.pathname.startsWith('/icons/') ||
     url.pathname.startsWith('/brand/') ||
+    url.pathname.startsWith('/data/biblia/') ||
     url.pathname.endsWith('.png') ||
     url.pathname.endsWith('.jpg') ||
     url.pathname.endsWith('.svg') ||
