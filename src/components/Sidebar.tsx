@@ -257,6 +257,7 @@ export default function Sidebar() {
       submenu: [
         { id: 'cultos', label: 'Cultos', path: '/secretaria/cultos', modulo: 'gestao' },
         { id: 'visitantes', label: 'Visitantes', path: '/acolhimento/visitantes', modulo: 'secretaria_local' },
+        { id: 'discipulado', label: 'Discipulado', path: '/acolhimento/discipulado', modulo: 'secretaria_local' },
         { id: 'relatorio-espiritual', label: 'Livro Espiritual', path: '/secretaria/relatorio-espiritual', modulo: 'gestao' },
         { id: 'relatorios-acolhimento', label: 'Relatórios', path: '/acolhimento/relatorios', modulo: 'gestao' },
       ],

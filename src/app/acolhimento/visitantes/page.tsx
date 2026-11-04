@@ -182,7 +182,8 @@ export default function VisitantesPage() {
             nome
           )
         `)
-        .eq('ministry_id', ctx.ministryId);
+        .eq('ministry_id', ctx.ministryId)
+        .is('converted_to_member_id', null);
 
       // Usuário local só visualiza da própria congregação
       if (isLocalUser && ctx.congregacaoId) {
