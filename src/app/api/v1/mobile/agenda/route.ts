@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic';
  * - Filtra por visibilidade permitida ao membro ('publico', 'igreja', 'ministerio')
  * - Bloqueia compromissos administrativos privados ('privado', 'lideranca')
  * - Isola por tenant (ministry_id) e por congregação do membro (church_id NULL ou church_id do membro)
+ * - Mapeia congregações ativas de forma desacoplada do PostgREST schema cache
  * - Agrupa em 'hoje', 'esta_semana' e 'proximos'
  * - Destaca o 'proximo_culto'
  */
@@ -75,8 +76,7 @@ export async function GET(request: NextRequest) {
         visibilidade,
         status,
         recorrente,
-        agenda_tipos ( id, nome, categoria, cor, icone ),
-        congregacoes ( id, nome, endereco, cidade, uf, cep, latitude, longitude )
+        agenda_tipos ( id, nome, categoria, cor, icone )
       `)
       .eq('ministry_id', ctx.ministryId)
       .in('visibilidade', ['publico', 'igreja', 'ministerio'])
@@ -96,23 +96,44 @@ export async function GET(request: NextRequest) {
     const { data: eventos, error: eventosErr } = await query;
 
     if (eventosErr) {
+      console.error('[MOBILE_AGENDA] Erro ao consultar agenda_eventos:', eventosErr);
       return NextResponse.json(
         { error: 'Erro ao consultar programação.', detail: eventosErr.message },
         { status: 500 }
       );
     }
 
-    // 4. Filtrar por congregação do membro (eventos da sede/geral com church_id null OU da congregação do membro)
-    const eventosFiltrados = (eventos || []).filter((e) => {
-      if (apenasCongregacao && memberCongregacaoId) {
-        return e.church_id === memberCongregacaoId;
-      }
-      if (!e.church_id) return true; // Geral do ministério
-      if (!memberCongregacaoId) return true; // Membro sem congregação vê geral e públicas
-      return e.church_id === memberCongregacaoId;
+    // 4. Mapear congregações ativas do ministério de forma desacoplada
+    const { data: congsData, error: congsErr } = await admin
+      .from('congregacoes')
+      .select('id, nome, endereco, cidade, uf, cep, latitude, longitude')
+      .eq('ministry_id', ctx.ministryId);
+
+    if (congsErr) {
+      console.warn('[MOBILE_AGENDA] Aviso ao consultar congregacoes:', congsErr.message);
+    }
+
+    const mapaCongregacoes = new Map<string, any>();
+    (congsData || []).forEach((c) => {
+      mapaCongregacoes.set(c.id, c);
     });
 
-    // 5. Agrupamento temporal inteligente
+    // 5. Filtrar por congregação do membro (eventos da sede/geral com church_id null OU da congregação do membro)
+    const eventosFiltrados = (eventos || [])
+      .filter((e) => {
+        if (apenasCongregacao && memberCongregacaoId) {
+          return e.church_id === memberCongregacaoId;
+        }
+        if (!e.church_id) return true; // Geral do ministério
+        if (!memberCongregacaoId) return true; // Membro sem congregação vê geral e públicas
+        return e.church_id === memberCongregacaoId;
+      })
+      .map((e) => ({
+        ...e,
+        congregacoes: e.church_id ? mapaCongregacoes.get(e.church_id) || null : null,
+      }));
+
+    // 6. Agrupamento temporal inteligente
     const hojeStart = new Date();
     hojeStart.setHours(0, 0, 0, 0);
     const hojeEnd = new Date();
