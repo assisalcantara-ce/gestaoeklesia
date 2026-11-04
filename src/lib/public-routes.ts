@@ -18,6 +18,7 @@ export function isPublicAcolhimentoPath(pathname: string | null | undefined): bo
   const adminPaths = [
     '/acolhimento/visitantes',
     '/acolhimento/relatorios',
+    '/acolhimento/discipulado',
   ];
 
   const isAdmin = adminPaths.some(

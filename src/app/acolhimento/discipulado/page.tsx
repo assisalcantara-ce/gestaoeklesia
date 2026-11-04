@@ -3,21 +3,21 @@
 /**
  * /acolhimento/discipulado — Central de Acolhimento e Acompanhamento do Discipulado (Fase 1)
  *
- * Características da Implementação:
- * 1. Formulário Inteligente de Conversão:
- *    - Entrada prioritária por Telefone para buscar visitante no Acolhimento (culto_visitantes).
- *    - Se encontrado, preenche automaticamente Nome, Cidade, Bairro e Congregação.
- *    - Solicitação obrigatória do CPF com validação matemática oficial da Secretaria.
- *    - Consulta duplicidade em members: se já existir, vincula sem duplicar; se for Membro ou Ministro, não rebaixa.
- * 2. Transacional e Seguro:
- *    - Marca converted_to_member_id e converted_at no registro do visitante (SEM usar deleted_at).
- *    - Cria a jornada em discipulado_jornadas (garantindo apenas 1 ativa por membro).
- * 3. Listagem e Acompanhamento das Jornadas com filtros por Fase e Status.
+ * Características da Interface (Alinhada a Secretaria → Membros):
+ * 1. Menu Lateral & Estrutura:
+ *    - Reutiliza AppShell com Sidebar fixa na viewport e rolagem independente.
+ *    - Rota mapeada no menu e desbloqueada de rotas públicas de recepção.
+ * 2. Cadastro em Modal:
+ *    - Botão destacado "+ Novo Convertido" no topo/toolbar da listagem.
+ *    - Modal responsivo com busca de visitante no Acolhimento por telefone e formulário oficial da Secretaria.
+ *    - Retenção de estado para evitar perda de dados e rolagem interna suave.
+ * 3. Identidade Visual do ERP:
+ *    - Tipografia, paleta institucional (slate/teal/emerald), cards de métricas executivas,
+ *      filtros e tabela com os mesmos padrões de Secretaria → Membros.
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import PageLayout from '@/components/PageLayout';
-import Section from '@/components/Section';
 import NotificationModal from '@/components/NotificationModal';
 import ExecutiveMetricCard from '@/components/dashboard/ExecutiveMetricCard';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
@@ -25,7 +25,6 @@ import { createClient } from '@/lib/supabase-client';
 import {
   Users,
   Search,
-  PlusCircle,
   CheckCircle2,
   Loader2,
   Phone,
@@ -35,6 +34,9 @@ import {
   RefreshCw,
   X,
   Compass,
+  UserPlus,
+  RotateCcw,
+  BookOpen,
 } from 'lucide-react';
 
 function formatPhone(v: string | null | undefined): string {
@@ -99,35 +101,64 @@ export interface VisitanteSugestao {
   congregacao_nome?: string | null;
 }
 
-const FASE_LABELS: Record<string, { label: string; badgeColor: string }> = {
-  primeiros_passos: { label: 'Primeiros Passos', badgeColor: 'bg-blue-50 text-blue-700 border-blue-200' },
-  fundamentos: { label: 'Fundamentos', badgeColor: 'bg-purple-50 text-purple-700 border-purple-200' },
-  preparacao_batismo: { label: 'Candidato ao Batismo', badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  integracao: { label: 'Integração Ministerial', badgeColor: 'bg-amber-50 text-amber-700 border-amber-200' },
+const FASE_LABELS: Record<string, { label: string; badgeClass: string }> = {
+  primeiros_passos: {
+    label: 'Primeiros Passos',
+    badgeClass: 'bg-teal-50 text-teal-800 border-teal-200',
+  },
+  fundamentos: {
+    label: 'Fundamentos',
+    badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  },
+  preparacao_batismo: {
+    label: 'Candidato ao Batismo',
+    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+  },
+  integracao: {
+    label: 'Integração Ministerial',
+    badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
+  },
 };
 
-const STATUS_LABELS: Record<string, { label: string; dotColor: string }> = {
-  ativo: { label: 'Em Andamento', dotColor: 'bg-emerald-500' },
-  concluido: { label: 'Concluído', dotColor: 'bg-blue-500' },
-  pausado: { label: 'Pausado', dotColor: 'bg-amber-500' },
-  desistente: { label: 'Desistente', dotColor: 'bg-rose-500' },
+const STATUS_LABELS: Record<string, { label: string; dotClass: string; textClass: string }> = {
+  ativo: {
+    label: 'Em Andamento',
+    dotClass: 'bg-emerald-500 ring-4 ring-emerald-100',
+    textClass: 'text-emerald-800 font-semibold',
+  },
+  concluido: {
+    label: 'Concluído',
+    dotClass: 'bg-blue-500 ring-4 ring-blue-100',
+    textClass: 'text-blue-800 font-semibold',
+  },
+  pausado: {
+    label: 'Pausado',
+    dotClass: 'bg-amber-500 ring-4 ring-amber-100',
+    textClass: 'text-amber-800 font-semibold',
+  },
+  desistente: {
+    label: 'Desistente',
+    dotClass: 'bg-rose-500 ring-4 ring-rose-100',
+    textClass: 'text-rose-800 font-semibold',
+  },
 };
 
 export default function DiscipuladoPage() {
   const { ctx } = useRequireModulo('secretaria_local');
   const supabase = useMemo(() => createClient(), []);
 
-  const [activeTab, setActiveTab] = useState<'jornadas' | 'nova_jornada'>('jornadas');
   const [jornadas, setJornadas] = useState<JornadaItem[]>([]);
   const [loading, setLoading] = useState(true);
-  
 
-  // Filtros
-  const [filtroStatus, setFiltroStatus] = useState<string>('ativo');
+  // Modal de Novo Convertido
+  const [modalNovoConvertidoOpen, setModalNovoConvertidoOpen] = useState(false);
+
+  // Filtros (Toolbar)
+  const [filtroStatus, setFiltroStatus] = useState<string>('todos');
   const [filtroFase, setFiltroFase] = useState<string>('todas');
   const [buscaTexto, setBuscaTexto] = useState<string>('');
 
-  // Estados do Formulário de Entrada
+  // Estados do Formulário de Entrada (Modal)
   const [telInput, setTelInput] = useState('');
   const [buscandoVisitante, setBuscandoVisitante] = useState(false);
   const [visitantesEncontrados, setVisitantesEncontrados] = useState<VisitanteSugestao[]>([]);
@@ -164,7 +195,7 @@ export default function DiscipuladoPage() {
   const loadJornadas = useCallback(async () => {
     if (!ctx?.ministryId) return;
     setLoading(true);
-    
+
     try {
       let query = supabase
         .from('discipulado_jornadas')
@@ -195,7 +226,6 @@ export default function DiscipuladoPage() {
       setJornadas((data || []) as unknown as JornadaItem[]);
     } catch (err: any) {
       console.error('[loadJornadas]', err);
-      
     } finally {
       setLoading(false);
     }
@@ -207,7 +237,7 @@ export default function DiscipuladoPage() {
     }
   }, [ctx?.loading, ctx?.ministryId, loadJornadas]);
 
-  // Busca rápida de visitante por telefone
+  // Busca de visitante por telefone
   const handleBuscarTelefone = async () => {
     const cleanTel = telInput.replace(/\D/g, '');
     if (!cleanTel || cleanTel.length < 8) {
@@ -253,6 +283,19 @@ export default function DiscipuladoPage() {
     setVisitanteSelecionado(null);
   };
 
+  const resetFormulario = () => {
+    setTelInput('');
+    setCpfInput('');
+    setNomeInput('');
+    setNascimentoInput('');
+    setSexoInput('M');
+    setBairroInput('');
+    setCidadeInput('');
+    setObservacoesInput('');
+    setVisitanteSelecionado(null);
+    setVisitantesEncontrados([]);
+  };
+
   // Salvar / Iniciar Jornada de Discipulado
   const handleSalvarJornada = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -296,23 +339,21 @@ export default function DiscipuladoPage() {
 
       showNotification('success', 'Jornada Iniciada', data.mensagem || 'Jornada de discipulado iniciada com sucesso!');
 
-      // Reset form
-      setTelInput('');
-      setCpfInput('');
-      setNomeInput('');
-      setBairroInput('');
-      setCidadeInput('');
-      setObservacoesInput('');
-      setVisitanteSelecionado(null);
-      setVisitantesEncontrados([]);
-
+      resetFormulario();
+      setModalNovoConvertidoOpen(false);
       await loadJornadas();
-      setActiveTab('jornadas');
     } catch (err: any) {
       showNotification('error', 'Falha no Cadastro', err?.message || 'Erro ao salvar novo discípulo.');
     } finally {
       setSalvando(false);
     }
+  };
+
+  // Limpar filtros da Toolbar
+  const handleLimparFiltros = () => {
+    setBuscaTexto('');
+    setFiltroStatus('todos');
+    setFiltroFase('todas');
   };
 
   // Filtragem local por texto
@@ -341,181 +382,296 @@ export default function DiscipuladoPage() {
       description="Acolhimento de novos convertidos, validação na secretaria e acompanhamento espiritual"
     >
       <div className="space-y-6">
-        {/* Métricas do Módulo */}
+        {/* CARDS DE MÉTRICAS EXECUTIVAS — Idênticos ao padrão do ERP */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <ExecutiveMetricCard
             title="Discípulos Ativos"
             value={metricas.totalAtivos}
             subtitle="Em acompanhamento"
-            icon={Users} color="blue"
+            icon={Users}
+            color="blue"
           />
           <ExecutiveMetricCard
             title="Primeiros Passos"
             value={metricas.totalPrimeirosPassos}
             subtitle="Recém-convertidos"
-            icon={Compass} color="indigo"
+            icon={Compass}
+            color="indigo"
           />
           <ExecutiveMetricCard
             title="Candidatos ao Batismo"
             value={metricas.totalBatismo}
             subtitle="Preparação doutrinária"
-            icon={Sparkles} color="emerald"
+            icon={Sparkles}
+            color="emerald"
           />
           <ExecutiveMetricCard
             title="Jornadas Concluídas"
             value={metricas.totalConcluidos}
             subtitle="Membros integrados"
-            icon={UserCheck} color="slate"
+            icon={UserCheck}
+            color="slate"
           />
         </div>
 
-        {/* Abas Principais */}
-        <div className="flex items-center justify-between border-b border-gray-200">
-          <div className="flex gap-2">
-            <button
-              onClick={() => setActiveTab('jornadas')}
-              className={`py-3 px-4 font-bold text-sm border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
-                activeTab === 'jornadas'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Users size={16} />
-              <span>Painel de Discípulos ({jornadas.length})</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('nova_jornada')}
-              className={`py-3 px-4 font-bold text-sm border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
-                activeTab === 'nova_jornada'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <PlusCircle size={16} />
-              <span>Novo Convertido / Iniciar Jornada</span>
-            </button>
-          </div>
-
-          <button
-            onClick={loadJornadas}
-            disabled={loading}
-            className="text-xs font-semibold text-gray-600 hover:text-blue-600 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition cursor-pointer"
-          >
-            <RefreshCw size={13} className={loading ? 'animate-spin text-blue-600' : ''} />
-            <span>Atualizar</span>
-          </button>
-        </div>
-
-        {/* ─── ABA 1: PAINEL DE JORNADAS ─── */}
-        {activeTab === 'jornadas' && (
-          <Section title="Painel Geral de Discípulos">
-            {/* Barra de Filtros */}
-            <div className="p-4 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3">
-              <div className="relative flex-1 min-w-[240px] max-w-md">
-                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+        {/* TOOLBAR E FILTROS — Padrão Secretaria → Membros */}
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-4 sm:p-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 sm:gap-4 items-end">
+            {/* Campo de Pesquisa */}
+            <div className="sm:col-span-2 lg:col-span-5">
+              <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
+                Buscar Discípulo
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                  <Search className="w-4 h-4 text-slate-400" />
+                </div>
                 <input
                   type="text"
                   value={buscaTexto}
                   onChange={(e) => setBuscaTexto(e.target.value)}
-                  placeholder="Buscar discípulo por nome, CPF ou telefone..."
-                  className="w-full pl-9 pr-3 py-2 text-xs border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Nome, CPF ou telefone..."
+                  className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50/70 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
                 />
-              </div>
-
-              <div className="flex items-center gap-2 flex-wrap">
-                <select
-                  value={filtroStatus}
-                  onChange={(e) => setFiltroStatus(e.target.value)}
-                  className="text-xs border border-gray-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="ativo">Status: Ativo</option>
-                  <option value="concluido">Status: Concluído</option>
-                  <option value="pausado">Status: Pausado</option>
-                  <option value="desistente">Status: Desistente</option>
-                  <option value="todos">Status: Todos</option>
-                </select>
-
-                <select
-                  value={filtroFase}
-                  onChange={(e) => setFiltroFase(e.target.value)}
-                  className="text-xs border border-gray-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="todas">Fase: Todas</option>
-                  <option value="primeiros_passos">Primeiros Passos</option>
-                  <option value="fundamentos">Fundamentos</option>
-                  <option value="preparacao_batismo">Candidato ao Batismo</option>
-                  <option value="integracao">Integração</option>
-                </select>
               </div>
             </div>
 
-            {/* Listagem */}
-            {loading ? (
-              <div className="py-16 text-center">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-2" />
-                <p className="text-xs text-gray-500 font-medium">Carregando jornadas de discipulado...</p>
+            {/* Filtro de Fase */}
+            <div className="lg:col-span-3">
+              <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
+                Fase da Jornada
+              </label>
+              <select
+                value={filtroFase}
+                onChange={(e) => setFiltroFase(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-50/70 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition cursor-pointer"
+              >
+                <option value="todas">Todas as Fases</option>
+                <option value="primeiros_passos">Primeiros Passos</option>
+                <option value="fundamentos">Fundamentos</option>
+                <option value="preparacao_batismo">Candidato ao Batismo</option>
+                <option value="integracao">Integração Ministerial</option>
+              </select>
+            </div>
+
+            {/* Filtro de Status */}
+            <div className="lg:col-span-2">
+              <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
+                Status
+              </label>
+              <select
+                value={filtroStatus}
+                onChange={(e) => setFiltroStatus(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-50/70 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition cursor-pointer"
+              >
+                <option value="todos">Todos</option>
+                <option value="ativo">Ativo</option>
+                <option value="concluido">Concluído</option>
+                <option value="pausado">Pausado</option>
+                <option value="desistente">Desistente</option>
+              </select>
+            </div>
+
+            {/* Botão Limpar Filtros */}
+            <div className="sm:col-span-2 lg:col-span-2 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleLimparFiltros}
+                className="w-full px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-xl font-bold text-xs sm:text-sm transition shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer"
+                title="Limpar filtros"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-slate-600" />
+                <span>Limpar</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* BLOCO DA TABELA / LISTAGEM COM BOTÃO DESTACADO "+ NOVO CONVERTIDO" */}
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
+          {/* Cabeçalho da Listagem */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 border-b border-slate-200/80 bg-white">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-700 border border-teal-200 flex items-center justify-center font-bold">
+                <BookOpen className="w-5 h-5 text-teal-700" />
               </div>
-            ) : jornadasFiltradas.length === 0 ? (
-              <div className="py-16 text-center space-y-2">
-                <Users className="w-12 h-12 text-gray-300 mx-auto" />
-                <h3 className="text-sm font-bold text-gray-700">Nenhum discípulo encontrado</h3>
-                <p className="text-xs text-gray-500 max-w-sm mx-auto">
-                  Utilize a aba &quot;Novo Convertido / Iniciar Jornada&quot; para registrar conversões e acompanhar discípulos.
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">
+                  Painel de Discípulos
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Acompanhamento contínuo dos novos convertidos e candidatos ao batismo
                 </p>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-gray-100/70 border-b border-gray-200 text-gray-600 font-semibold uppercase tracking-wider">
-                    <tr>
-                      <th className="py-3 px-4">Discípulo</th>
-                      <th className="py-3 px-4">Contatos</th>
-                      <th className="py-3 px-4">Fase Atual</th>
-                      <th className="py-3 px-4">Data Decisão</th>
-                      <th className="py-3 px-4">Congregação</th>
-                      <th className="py-3 px-4">Status</th>
+              <span className="ml-2 px-3 py-1 bg-teal-50 text-teal-800 border border-teal-200/90 rounded-full text-xs font-bold">
+                {jornadasFiltradas.length} {jornadasFiltradas.length === 1 ? 'discípulo' : 'discípulos'}
+                {jornadasFiltradas.length !== jornadas.length && (
+                  <span className="ml-1 text-[11px] text-teal-700 font-medium">de {jornadas.length}</span>
+                )}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={loadJornadas}
+                disabled={loading}
+                className="px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-2xs disabled:opacity-60"
+                title="Atualizar listagem"
+              >
+                <RefreshCw size={13} className={loading ? 'animate-spin text-teal-600' : 'text-slate-600'} />
+                <span>Atualizar</span>
+              </button>
+
+              {/* BOTÃO DESTACADO "+ NOVO CONVERTIDO" */}
+              <button
+                type="button"
+                onClick={() => setModalNovoConvertidoOpen(true)}
+                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 rounded-xl transition text-xs sm:text-sm font-bold flex items-center gap-2 shadow-sm cursor-pointer"
+                title="Cadastrar novo convertido e iniciar jornada de discipulado"
+              >
+                <UserPlus size={16} className="text-white" />
+                <span>+ Novo Convertido</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Estado de Carregamento */}
+          {loading ? (
+            <div className="py-20 text-center">
+              <Loader2 className="w-8 h-8 animate-spin text-teal-600 mx-auto mb-3" />
+              <p className="text-xs text-slate-500 font-semibold">Carregando jornadas de discipulado...</p>
+            </div>
+          ) : jornadasFiltradas.length === 0 ? (
+            <div className="py-20 text-center space-y-3 p-6">
+              <div className="w-14 h-14 rounded-2xl bg-slate-100 border border-slate-200 text-slate-400 flex items-center justify-center mx-auto">
+                <Users className="w-7 h-7 text-slate-400" />
+              </div>
+              <h3 className="text-base font-bold text-slate-800">Nenhum discípulo encontrado</h3>
+              <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+                Não há registros correspondentes aos filtros selecionados. Clique no botão destacado <strong>&quot;+ Novo Convertido&quot;</strong> acima para registrar uma decisão e acolher o discípulo.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* CARDS MOBILE (telas < md) — Padrão MembrosTable */}
+              <div className="md:hidden space-y-3 p-4 bg-slate-50/50">
+                {jornadasFiltradas.map((j, index) => {
+                  const faseInfo = FASE_LABELS[j.fase] || { label: j.fase, badgeClass: 'bg-slate-100 text-slate-700 border-slate-200' };
+                  const statusInfo = STATUS_LABELS[j.status] || { label: j.status, dotClass: 'bg-slate-400', textClass: 'text-slate-700' };
+
+                  return (
+                    <div
+                      key={j.id}
+                      className={`border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3 ${
+                        index % 2 === 1 ? 'bg-slate-50/80' : 'bg-white'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-11 h-11 bg-teal-100 text-teal-800 rounded-xl overflow-hidden flex items-center justify-center font-bold text-xs shrink-0 border border-teal-200 shadow-2xs">
+                          {j.member?.name ? j.member.name.slice(0, 2).toUpperCase() : 'ND'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-slate-900 text-sm break-words">{j.member?.name || 'Não identificado'}</p>
+                          <div className="text-xs text-slate-600 mt-1 space-y-0.5">
+                            <p>
+                              CPF: <span className="font-mono text-slate-800">{j.member?.cpf ? formatCpf(j.member.cpf) : '—'}</span>
+                            </p>
+                            <p>
+                              Tel: <span className="font-mono text-slate-800">{j.member?.phone || j.member?.celular ? formatPhone(j.member.phone || j.member.celular) : '—'}</span>
+                            </p>
+                            <p>
+                              Congregação: <span className="text-slate-800 font-medium">{j.congregacao?.nome || 'Sede Geral'}</span>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-200/80 text-xs">
+                        <span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-semibold border ${faseInfo.badgeClass}`}>
+                          {faseInfo.label}
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold">
+                          <span className={`w-2 h-2 rounded-full ${statusInfo.dotClass}`} />
+                          <span className={statusInfo.textClass}>{statusInfo.label}</span>
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* TABELA DESKTOP (telas md+) — Padrão MembrosTable */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[900px]">
+                  <thead>
+                    <tr className="bg-slate-100/90 border-b border-slate-200 text-[11px] font-bold text-slate-800 uppercase tracking-wider">
+                      <th className="px-5 py-3.5">Discípulo</th>
+                      <th className="px-4 py-3.5">Contatos</th>
+                      <th className="px-4 py-3.5">Fase Atual</th>
+                      <th className="px-4 py-3.5">Data Decisão</th>
+                      <th className="px-4 py-3.5">Congregação</th>
+                      <th className="px-5 py-3.5 text-right">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {jornadasFiltradas.map((j) => {
-                      const faseInfo = FASE_LABELS[j.fase] || { label: j.fase, badgeColor: 'bg-gray-100 text-gray-700' };
-                      const statusInfo = STATUS_LABELS[j.status] || { label: j.status, dotColor: 'bg-gray-400' };
+                  <tbody className="divide-y divide-slate-200/80">
+                    {jornadasFiltradas.map((j, index) => {
+                      const faseInfo = FASE_LABELS[j.fase] || { label: j.fase, badgeClass: 'bg-slate-100 text-slate-700 border-slate-200' };
+                      const statusInfo = STATUS_LABELS[j.status] || { label: j.status, dotClass: 'bg-slate-400', textClass: 'text-slate-700' };
 
                       return (
-                        <tr key={j.id} className="hover:bg-gray-50 transition">
-                          <td className="py-3.5 px-4 font-bold text-gray-900">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0">
+                        <tr
+                          key={j.id}
+                          className={`hover:bg-teal-50/30 transition-colors ${
+                            index % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'
+                          }`}
+                        >
+                          {/* Discípulo & CPF */}
+                          <td className="px-5 py-4 font-bold text-slate-900">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-800 border border-teal-200/80 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
                                 {j.member?.name ? j.member.name.slice(0, 2).toUpperCase() : 'ND'}
                               </div>
-                              <div>
-                                <span className="block font-bold">{j.member?.name || 'Não identificado'}</span>
-                                <span className="text-[11px] text-gray-500 font-normal">
-                                  CPF: {j.member?.cpf ? formatCpf(j.member.cpf) : '—'} • {j.member?.tipo_cadastro?.toUpperCase()}
+                              <div className="min-w-0">
+                                <span className="block font-bold text-slate-900 truncate max-w-[240px]">
+                                  {j.member?.name || 'Não identificado'}
+                                </span>
+                                <span className="text-[11px] text-slate-500 font-normal">
+                                  CPF: <span className="font-mono text-slate-700">{j.member?.cpf ? formatCpf(j.member.cpf) : '—'}</span> • <span className="uppercase text-[10px] font-bold text-teal-800 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200/60">{j.member?.tipo_cadastro || 'CONGREGADO'}</span>
                                 </span>
                               </div>
                             </div>
                           </td>
-                          <td className="py-3.5 px-4 text-gray-600">
-                            <span className="block font-medium">
-                              {j.member?.phone || j.member?.celular ? formatPhone(j.member.phone || j.member.celular || '') : '—'}
+
+                          {/* Contatos */}
+                          <td className="px-4 py-4 text-slate-600">
+                            <span className="font-mono text-xs text-slate-800 font-medium block">
+                              {j.member?.phone || j.member?.celular ? formatPhone(j.member.phone || j.member.celular) : '—'}
                             </span>
                           </td>
-                          <td className="py-3.5 px-4">
-                            <span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-semibold border ${faseInfo.badgeColor}`}>
+
+                          {/* Fase */}
+                          <td className="px-4 py-4">
+                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold border shadow-2xs ${faseInfo.badgeClass}`}>
                               {faseInfo.label}
                             </span>
                           </td>
-                          <td className="py-3.5 px-4 text-gray-600">
+
+                          {/* Data Decisão */}
+                          <td className="px-4 py-4 text-slate-700 font-medium text-xs">
                             {j.data_decisao ? new Date(j.data_decisao).toLocaleDateString('pt-BR') : '—'}
                           </td>
-                          <td className="py-3.5 px-4 text-gray-600">
+
+                          {/* Congregação */}
+                          <td className="px-4 py-4 text-slate-700 text-xs font-medium">
                             {j.congregacao?.nome || 'Sede Geral'}
                           </td>
-                          <td className="py-3.5 px-4">
-                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-700">
-                              <span className={`w-2 h-2 rounded-full ${statusInfo.dotColor}`} />
-                              {statusInfo.label}
+
+                          {/* Status */}
+                          <td className="px-5 py-4 text-right">
+                            <span className="inline-flex items-center gap-2 text-xs">
+                              <span className={`w-2.5 h-2.5 rounded-full ${statusInfo.dotClass}`} />
+                              <span className={statusInfo.textClass}>{statusInfo.label}</span>
                             </span>
                           </td>
                         </tr>
@@ -524,103 +680,138 @@ export default function DiscipuladoPage() {
                   </tbody>
                 </table>
               </div>
-            )}
-          </Section>
-        )}
+            </>
+          )}
+        </div>
+      </div>
 
-        {/* ─── ABA 2: FORMULÁRIO DE ENTRADA DO DISCIPULADO ─── */}
-        {activeTab === 'nova_jornada' && (
-          <div className="max-w-3xl mx-auto space-y-6">
-            {/* ETAPA 1: LOCALIZAR VISITANTE NO ACOLHIMENTO */}
-            <Section title="1. Busca Inicial no Acolhimento por Telefone">
-              <div className="p-5 space-y-4">
-                <p className="text-xs text-gray-600 leading-relaxed">
-                  Informe o telefone do novo convertido (anotado em ficha de culto). O sistema verifica se ele já esteve presente como visitante no <strong>Acolhimento</strong> para importar seus dados automaticamente.
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* MODAL RESPONSIVO: NOVO CONVERTIDO / INICIAR JORNADA                 */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {modalNovoConvertidoOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200"
+        >
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Cabeçalho do Modal — Padrão Executivo Secretaria */}
+            <div className="bg-linear-to-r from-teal-800 to-slate-900 text-white px-6 py-4.5 flex items-center justify-between border-b border-teal-900 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-teal-200 shadow-inner">
+                  <UserPlus className="w-5 h-5 text-teal-300" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-white">Novo Convertido</h3>
+                  <p className="text-xs text-teal-200/80">Acolhimento, validação oficial na Secretaria e Início da Jornada</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalNovoConvertidoOpen(false)}
+                className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer"
+                title="Fechar modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Corpo do Modal com Rolagem Independente */}
+            <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+              {/* ETAPA 1: LOCALIZAR VISITANTE NO ACOLHIMENTO */}
+              <div className="bg-slate-50/80 border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-3.5">
+                <div className="flex items-center gap-2 text-slate-900">
+                  <Phone className="w-4 h-4 text-teal-700" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    1. Busca Prévia no Acolhimento (Telefone)
+                  </h4>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Informe o telefone do novo convertido (anotado em ficha de culto). Se ele já visitou a igreja, seus dados e endereço serão importados automaticamente.
                 </p>
 
-                <div className="flex gap-2 max-w-md">
+                <div className="flex flex-col sm:flex-row gap-2 max-w-lg">
                   <div className="relative flex-1">
-                    <Phone className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
                       value={telInput}
                       onChange={(e) => setTelInput(formatPhone(e.target.value))}
                       placeholder="(00) 00000-0000"
-                      className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-mono"
+                      className="w-full pl-9 pr-3 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 font-mono"
                     />
                   </div>
                   <button
                     type="button"
                     onClick={handleBuscarTelefone}
                     disabled={buscandoVisitante}
-                    className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition flex items-center gap-2 cursor-pointer disabled:opacity-60"
+                    className="px-4 py-2.5 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-60"
                   >
                     {buscandoVisitante ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
-                    <span>Pesquisar</span>
+                    <span>Pesquisar Visitante</span>
                   </button>
                 </div>
 
                 {/* Visitante Selecionado */}
                 {visitanteSelecionado && (
-                  <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-2xl flex items-center justify-between gap-3 animate-in fade-in">
+                  <div className="p-3.5 bg-emerald-50/80 border border-emerald-300 rounded-xl flex items-center justify-between gap-3 animate-in fade-in">
                     <div className="space-y-0.5">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-emerald-800">Visitante Identificado:</span>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span className="text-xs font-bold text-emerald-900">Visitante Identificado:</span>
                         <span className="text-xs font-extrabold text-emerald-950">{visitanteSelecionado.nome}</span>
                       </div>
-                      <p className="text-[11px] text-emerald-700">
+                      <p className="text-[11px] text-emerald-800 pl-6">
                         {visitanteSelecionado.bairro ? `${visitanteSelecionado.bairro}, ` : ''}{visitanteSelecionado.cidade || 'Local não informado'} • Congregação: {visitanteSelecionado.congregacao_nome || 'Geral'}
                       </p>
                     </div>
                     <button
                       type="button"
                       onClick={limparVisitanteSelecionado}
-                      className="p-1.5 text-emerald-700 hover:text-emerald-900 rounded-lg hover:bg-emerald-100 transition"
-                      title="Remover vínculo"
+                      className="p-1.5 text-emerald-700 hover:text-emerald-900 rounded-lg hover:bg-emerald-100 transition cursor-pointer"
+                      title="Desvincular visitante"
                     >
                       <X size={16} />
                     </button>
                   </div>
                 )}
 
-                {/* Lista de visitantes caso encontre mais de um */}
+                {/* Lista de visitantes múltiplos encontrados */}
                 {!visitanteSelecionado && visitantesEncontrados.length > 1 && (
-                  <div className="space-y-2 pt-2 border-t border-gray-200">
-                    <p className="text-xs font-bold text-gray-700">Selecione o visitante correspondente:</p>
+                  <div className="space-y-2 pt-2 border-t border-slate-200">
+                    <p className="text-xs font-bold text-slate-700">Selecione o visitante correspondente:</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {visitantesEncontrados.map((v) => (
                         <div
                           key={v.id}
                           onClick={() => selecionarVisitante(v)}
-                          className="p-3 border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50/50 cursor-pointer transition text-xs space-y-1"
+                          className="p-3 border border-slate-200 bg-white rounded-xl hover:border-teal-500 hover:bg-teal-50/40 cursor-pointer transition text-xs space-y-1 shadow-2xs"
                         >
-                          <p className="font-bold text-gray-900">{v.nome}</p>
-                          <p className="text-[11px] text-gray-500">{v.bairro || 'Sem bairro'} — {v.congregacao_nome || 'Geral'}</p>
+                          <p className="font-bold text-slate-900">{v.nome}</p>
+                          <p className="text-[11px] text-slate-500">{v.bairro || 'Sem bairro'} — {v.congregacao_nome || 'Geral'}</p>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
               </div>
-            </Section>
 
-            {/* ETAPA 2: CADASTRO NA SECRETARIA & INÍCIO DA JORNADA */}
-            <Section title="2. Registro Oficial na Secretaria & Jornada de Discipulado">
-              <form onSubmit={handleSalvarJornada} className="p-5 space-y-4">
-                <div className="bg-blue-50/80 p-3.5 rounded-xl border border-blue-200 text-xs text-blue-900 space-y-1">
+              {/* ETAPA 2: CADASTRO NA SECRETARIA & INÍCIO DA JORNADA */}
+              <form onSubmit={handleSalvarJornada} className="space-y-5">
+                <div className="bg-teal-50/80 p-3.5 rounded-xl border border-teal-200 text-xs text-teal-900 space-y-1">
                   <div className="flex items-center gap-1.5 font-bold">
-                    <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
-                    <span>Cadastro Oficial em members (Governança e Anti-Duplicidade)</span>
+                    <ShieldCheck className="w-4 h-4 text-teal-700 shrink-0" />
+                    <span>Governança & Cadastro Oficial em members</span>
                   </div>
-                  <p className="text-[11px] text-blue-800 leading-relaxed">
-                    O CPF é validado matematicamente. Se a pessoa já for cadastrada, o cadastro existente é preservado e <strong>membros/ministros nunca são rebaixados</strong>. Se for inédita, é cadastrada como <strong>Congregado</strong>.
+                  <p className="text-[11px] text-teal-800 leading-relaxed">
+                    O CPF é validado matematicamente com os mesmos critérios da Secretaria. Se a pessoa já for cadastrada, o registro é preservado e <strong>membros ou ministros nunca são rebaixados</strong>.
                   </p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* CPF Obrigatório */}
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
                       CPF do Novo Convertido <span className="text-rose-500">*</span>
                     </label>
                     <input
@@ -629,13 +820,13 @@ export default function DiscipuladoPage() {
                       value={cpfInput}
                       onChange={(e) => setCpfInput(formatCpf(e.target.value))}
                       placeholder="000.000.000-00"
-                      className="w-full text-xs p-2.5 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 font-mono"
+                      className="w-full text-xs sm:text-sm p-2.5 bg-slate-50/70 rounded-xl border border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 font-mono font-medium"
                     />
                   </div>
 
                   {/* Nome Completo */}
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
                       Nome Completo <span className="text-rose-500">*</span>
                     </label>
                     <input
@@ -643,8 +834,8 @@ export default function DiscipuladoPage() {
                       required
                       value={nomeInput}
                       onChange={(e) => setNomeInput(e.target.value)}
-                      placeholder="Nome do novo convertido"
-                      className="w-full text-xs p-2.5 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                      placeholder="Nome completo do novo convertido"
+                      className="w-full text-xs sm:text-sm p-2.5 bg-slate-50/70 rounded-xl border border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 font-medium"
                     />
                   </div>
                 </div>
@@ -652,26 +843,26 @@ export default function DiscipuladoPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {/* Data de Nascimento */}
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
                       Data de Nascimento
                     </label>
                     <input
                       type="date"
                       value={nascimentoInput}
                       onChange={(e) => setNascimentoInput(e.target.value)}
-                      className="w-full text-xs p-2.5 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                      className="w-full text-xs sm:text-sm p-2.5 bg-slate-50/70 rounded-xl border border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600"
                     />
                   </div>
 
                   {/* Sexo */}
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
                       Sexo
                     </label>
                     <select
                       value={sexoInput}
                       onChange={(e) => setSexoInput(e.target.value as any)}
-                      className="w-full text-xs p-2.5 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 bg-white"
+                      className="w-full text-xs sm:text-sm p-2.5 bg-slate-50/70 rounded-xl border border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 cursor-pointer font-medium"
                     >
                       <option value="M">Masculino</option>
                       <option value="F">Feminino</option>
@@ -681,7 +872,7 @@ export default function DiscipuladoPage() {
 
                   {/* Data da Decisão */}
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
                       Data da Decisão <span className="text-rose-500">*</span>
                     </label>
                     <input
@@ -689,71 +880,86 @@ export default function DiscipuladoPage() {
                       required
                       value={dataDecisaoInput}
                       onChange={(e) => setDataDecisaoInput(e.target.value)}
-                      className="w-full text-xs p-2.5 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                      className="w-full text-xs sm:text-sm p-2.5 bg-slate-50/70 rounded-xl border border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 font-medium"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Bairro</label>
+                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
+                      Bairro
+                    </label>
                     <input
                       type="text"
                       value={bairroInput}
                       onChange={(e) => setBairroInput(e.target.value)}
                       placeholder="Bairro"
-                      className="w-full text-xs p-2.5 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                      className="w-full text-xs sm:text-sm p-2.5 bg-slate-50/70 rounded-xl border border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 font-medium"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Cidade</label>
+                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
+                      Cidade
+                    </label>
                     <input
                       type="text"
                       value={cidadeInput}
                       onChange={(e) => setCidadeInput(e.target.value)}
                       placeholder="Cidade"
-                      className="w-full text-xs p-2.5 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                      className="w-full text-xs sm:text-sm p-2.5 bg-slate-50/70 rounded-xl border border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 font-medium"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Observações Pastorais / Necessidades de Oração</label>
+                  <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
+                    Observações Pastorais / Pedidos de Oração
+                  </label>
                   <textarea
                     rows={3}
                     value={observacoesInput}
                     onChange={(e) => setObservacoesInput(e.target.value)}
-                    placeholder="Anotações pastorais sobre a decisão, histórico familiar, pedidos de oração..."
-                    className="w-full text-xs p-2.5 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 resize-none"
+                    placeholder="Anotações pastorais, histórico de aconselhamento, necessidades de oração..."
+                    className="w-full text-xs sm:text-sm p-2.5 bg-slate-50/70 rounded-xl border border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 resize-none font-medium"
                   />
                 </div>
 
-                <div className="pt-2 flex justify-end">
+                {/* Rodapé de Ações do Modal */}
+                <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setModalNovoConvertidoOpen(false)}
+                    className="px-4 py-2.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
                   <button
                     type="submit"
                     disabled={salvando}
-                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-60"
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-60 border border-emerald-700"
                   >
                     {salvando ? (
                       <>
-                        <Loader2 size={15} className="animate-spin" />
+                        <Loader2 size={16} className="animate-spin" />
                         <span>Processando conversão...</span>
                       </>
                     ) : (
                       <>
-                        <CheckCircle2 size={15} />
+                        <CheckCircle2 size={16} />
                         <span>Confirmar & Iniciar Discipulado</span>
                       </>
                     )}
                   </button>
                 </div>
               </form>
-            </Section>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
+      {/* NOTIFICAÇÃO MODAL OFICIAL */}
       <NotificationModal
         isOpen={modalNotify.isOpen}
         title={modalNotify.title}
