@@ -1,34 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabase-server';
+import { resolveTenantAuth } from '@/lib/tenant-auth';
+import { temAcesso } from '@/lib/access-control';
 import { DiscipuladoService, IniciarJornadaDiscipuladoInput } from '@/services/discipulado-service';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
+  let ctx: Awaited<ReturnType<typeof resolveTenantAuth>>;
   try {
-    const supabase = createServerClient();
-    const { data: { user }, error: authErr } = await supabase.auth.getUser();
+    ctx = await resolveTenantAuth(request);
+  } catch (err: any) {
+    const isUnauth = err?.message === 'UNAUTHORIZED';
+    return NextResponse.json(
+      { error: isUnauth ? 'Não autenticado.' : 'Acesso negado: sem ministério associado.' },
+      { status: isUnauth ? 401 : 403 }
+    );
+  }
 
-    if (authErr || !user) {
-      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
-    }
+  const { admin, ministryId, nivel } = ctx;
 
-    const { data: mu } = await supabase
-      .from('ministry_users')
-      .select('ministry_id, congregacao_id, role')
-      .eq('user_id', user.id)
-      .maybeSingle();
+  if (!temAcesso(nivel, 'secretaria') && !temAcesso(nivel, 'secretaria_local') && !temAcesso(nivel, 'acolhimento')) {
+    return NextResponse.json({ error: 'Acesso negado ao módulo de Discipulado.' }, { status: 403 });
+  }
 
-    const ministryId = mu?.ministry_id;
-    if (!ministryId) {
-      return NextResponse.json({ error: 'Ministério não encontrado.' }, { status: 403 });
-    }
-
+  try {
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get('status') || 'ativo';
     const fase = searchParams.get('fase');
 
-    let query = supabase
+    let query = admin
       .from('discipulado_jornadas')
       .select(`
         id, fase, status, data_decisao, data_inicio, data_conclusao, observacoes, created_at,
@@ -48,50 +48,45 @@ export async function GET(request: NextRequest) {
     if (status !== 'todos') {
       query = query.eq('status', status);
     }
-    if (fase) {
+    if (fase && fase !== 'todas') {
       query = query.eq('fase', fase);
     }
 
-    const { data: jornadas, error } = await query;
-
+    const { data, error } = await query;
     if (error) {
-      console.error('[GET /api/v1/discipulado/jornadas]', error);
-      return NextResponse.json(
-        { error: 'Erro ao consultar jornadas de discipulado.' },
-        { status: 500 }
-      );
+      console.error('[GET /api/v1/discipulado/jornadas] Erro query:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ jornadas: jornadas || [] });
+    return NextResponse.json({ jornadas: data || [] });
   } catch (err: any) {
     console.error('[GET /api/v1/discipulado/jornadas]', err);
     return NextResponse.json(
-      { error: err?.message || 'Erro interno ao consultar jornadas.' },
+      { error: err?.message || 'Erro interno ao consultar jornadas de discipulado.' },
       { status: 500 }
     );
   }
 }
 
 export async function POST(request: NextRequest) {
+  let ctx: Awaited<ReturnType<typeof resolveTenantAuth>>;
   try {
-    const supabase = createServerClient();
-    const { data: { user }, error: authErr } = await supabase.auth.getUser();
+    ctx = await resolveTenantAuth(request);
+  } catch (err: any) {
+    const isUnauth = err?.message === 'UNAUTHORIZED';
+    return NextResponse.json(
+      { error: isUnauth ? 'Não autenticado.' : 'Acesso negado: sem ministério associado.' },
+      { status: isUnauth ? 401 : 403 }
+    );
+  }
 
-    if (authErr || !user) {
-      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
-    }
+  const { admin, ministryId, nivel, congregacaoId } = ctx;
 
-    const { data: mu } = await supabase
-      .from('ministry_users')
-      .select('ministry_id, congregacao_id')
-      .eq('user_id', user.id)
-      .maybeSingle();
+  if (!temAcesso(nivel, 'secretaria') && !temAcesso(nivel, 'secretaria_local') && !temAcesso(nivel, 'acolhimento')) {
+    return NextResponse.json({ error: 'Acesso negado ao módulo de Discipulado.' }, { status: 403 });
+  }
 
-    const ministryId = mu?.ministry_id;
-    if (!ministryId) {
-      return NextResponse.json({ error: 'Ministério não encontrado.' }, { status: 403 });
-    }
-
+  try {
     let body: any;
     try {
       body = await request.json();
@@ -101,7 +96,7 @@ export async function POST(request: NextRequest) {
 
     const input: IniciarJornadaDiscipuladoInput = {
       ministryId,
-      congregacaoId: body.congregacao_id || mu.congregacao_id || null,
+      congregacaoId: body.congregacao_id || congregacaoId || null,
       telefone: body.telefone || null,
       cpf: body.cpf,
       nome: body.nome,
@@ -119,7 +114,7 @@ export async function POST(request: NextRequest) {
       observacoes: body.observacoes || null,
     };
 
-    const resultado = await DiscipuladoService.iniciarJornada(supabase, input);
+    const resultado = await DiscipuladoService.iniciarJornada(admin, input);
 
     return NextResponse.json(resultado, { status: 201 });
   } catch (err: any) {

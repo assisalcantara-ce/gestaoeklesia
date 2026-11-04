@@ -201,10 +201,10 @@ export default function DiscipuladoPage() {
         .from('discipulado_jornadas')
         .select(`
           id, fase, status, data_decisao, data_inicio, data_conclusao, observacoes, created_at,
-          member:members (
+          member:members!discipulado_jornadas_member_id_fkey (
             id, name, cpf, phone, celular, whatsapp, tipo_cadastro, status, foto_url
           ),
-          responsavel:members (
+          responsavel:members!discipulado_jornadas_responsavel_id_fkey (
             id, name
           ),
           congregacao:congregacoes (

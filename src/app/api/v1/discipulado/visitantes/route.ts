@@ -1,18 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabase-server';
+import { resolveTenantAuth } from '@/lib/tenant-auth';
+import { temAcesso } from '@/lib/access-control';
 import { DiscipuladoService } from '@/services/discipulado-service';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
+  let ctx: Awaited<ReturnType<typeof resolveTenantAuth>>;
   try {
-    const supabase = createServerClient();
-    const { data: { user }, error: authErr } = await supabase.auth.getUser();
+    ctx = await resolveTenantAuth(request);
+  } catch (err: any) {
+    const isUnauth = err?.message === 'UNAUTHORIZED';
+    return NextResponse.json(
+      { error: isUnauth ? 'Não autenticado.' : 'Acesso negado: sem ministério associado.' },
+      { status: isUnauth ? 401 : 403 }
+    );
+  }
 
-    if (authErr || !user) {
-      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
-    }
+  const { admin, ministryId, nivel } = ctx;
 
+  // Validação de acesso ao módulo (Acolhimento ou Secretaria)
+  if (!temAcesso(nivel, 'secretaria') && !temAcesso(nivel, 'secretaria_local') && !temAcesso(nivel, 'acolhimento')) {
+    return NextResponse.json({ error: 'Acesso negado ao módulo de Acolhimento e Discipulado.' }, { status: 403 });
+  }
+
+  try {
     const searchParams = request.nextUrl.searchParams;
     const telefone = searchParams.get('telefone');
 
@@ -23,23 +35,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Obter ministry_id do usuário logado
-    const { data: mu } = await supabase
-      .from('ministry_users')
-      .select('ministry_id')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    const ministryId = mu?.ministry_id;
-    if (!ministryId) {
-      return NextResponse.json(
-        { error: 'Ministério não encontrado para o usuário.' },
-        { status: 403 }
-      );
-    }
-
     const visitantes = await DiscipuladoService.buscarVisitantesPorTelefone(
-      supabase,
+      admin,
       ministryId,
       telefone
     );
