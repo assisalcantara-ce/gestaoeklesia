@@ -9,6 +9,7 @@ import {
   Loader2,
   ShieldCheck,
   XCircle,
+  UserCheck,
 } from 'lucide-react';
 import { EquipeDiscipuladoItem } from '@/services/discipulado-pedagogico-service';
 
@@ -17,11 +18,16 @@ interface TabEquipeProps {
   onNotification: (type: 'success' | 'error' | 'warning' | 'info', title: string, message: string) => void;
 }
 
-interface MemberOption {
+interface MembroElegivel {
   id: string;
   name: string;
+  cpf?: string | null;
   phone?: string | null;
-  celular?: string | null;
+  cargo_ministerial?: string | null;
+  tipo_cadastro?: string | null;
+  status?: string | null;
+  congregacao_id?: string | null;
+  congregacao_nome?: string;
 }
 
 export default function TabEquipe({ ministryId: _ministryId, onNotification }: TabEquipeProps) {
@@ -33,9 +39,10 @@ export default function TabEquipe({ ministryId: _ministryId, onNotification }: T
 
   // Modal Novo Membro
   const [modalNovoMembroOpen, setModalNovoMembroOpen] = useState(false);
-  const [membrosDisponiveis, setMembrosDisponiveis] = useState<MemberOption[]>([]);
-  const [loadingMembros, setLoadingMembros] = useState(false);
-  const [memberId, setMemberId] = useState('');
+  const [termoBuscaMembro, setTermoBuscaMembro] = useState('');
+  const [sugestoesMembros, setSugestoesMembros] = useState<MembroElegivel[]>([]);
+  const [buscandoMembros, setBuscandoMembros] = useState(false);
+  const [membroSelecionado, setMembroSelecionado] = useState<MembroElegivel | null>(null);
   const [papel, setPapel] = useState<'professor' | 'discipulador' | 'coordenador'>('professor');
   const [observacoes, setObservacoes] = useState('');
   const [salvando, setSalvando] = useState(false);
@@ -69,37 +76,53 @@ export default function TabEquipe({ ministryId: _ministryId, onNotification }: T
     carregarEquipe();
   }, [carregarEquipe]);
 
-  // Carregar lista de membros para seleção
-  const carregarMembros = async () => {
-    setLoadingMembros(true);
-    try {
-      const res = await fetch('/api/v1/membros?limit=100');
-      if (res.ok) {
-        const data = await res.json();
-        setMembrosDisponiveis(data.membros || data.data || []);
-      }
-    } catch (err) {
-      console.error('[carregarMembros]', err);
-    } finally {
-      setLoadingMembros(false);
+  // Busca dinâmica de membros elegíveis com debounce de 300ms
+  useEffect(() => {
+    if (!modalNovoMembroOpen) return;
+    if (membroSelecionado) return;
+
+    const termo = termoBuscaMembro.trim();
+    if (termo.length < 3) {
+      setSugestoesMembros([]);
+      setBuscandoMembros(false);
+      return;
     }
-  };
+
+    setBuscandoMembros(true);
+    const handler = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/v1/discipulado/equipe/membros-elegiveis?q=${encodeURIComponent(termo)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSugestoesMembros(data.membros || []);
+        } else {
+          setSugestoesMembros([]);
+        }
+      } catch (err) {
+        console.error('[buscaMembrosElegiveis]', err);
+        setSugestoesMembros([]);
+      } finally {
+        setBuscandoMembros(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(handler);
+  }, [termoBuscaMembro, modalNovoMembroOpen, membroSelecionado]);
 
   const handleOpenNovoMembro = () => {
-    setMemberId('');
+    setMembroSelecionado(null);
+    setTermoBuscaMembro('');
+    setSugestoesMembros([]);
     setPapel('professor');
     setObservacoes('');
     setModalNovoMembroOpen(true);
-    if (membrosDisponiveis.length === 0) {
-      carregarMembros();
-    }
   };
 
   // Salvar novo membro na equipe
   const handleSalvarMembro = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!memberId) {
-      onNotification('warning', 'Atenção', 'Selecione um membro da igreja para autorizar.');
+    if (!membroSelecionado) {
+      onNotification('warning', 'Atenção', 'Pesquise e selecione um membro da igreja para autorizar.');
       return;
     }
 
@@ -109,24 +132,30 @@ export default function TabEquipe({ ministryId: _ministryId, onNotification }: T
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          memberId,
+          memberId: membroSelecionado.id,
           papel,
-          autorizadoPorId: memberId, // vinculado ao ministério pelo backend
+          congregacaoId: membroSelecionado.congregacao_id || null,
+          autorizadoPorId: membroSelecionado.id, // backend valida e vincula ao ministério
           observacoes,
         }),
       });
 
       const resJson = await res.json();
       if (!res.ok) {
+        if (res.status === 409) {
+          throw new Error('Este membro já está autorizado com este papel na equipe de discipulado.');
+        }
         throw new Error(resJson.error || 'Falha ao cadastrar na equipe.');
       }
 
-      onNotification('success', 'Sucesso', 'Membro autorizado na equipe com êxito!');
+      onNotification('success', 'Sucesso', `${membroSelecionado.name} foi autorizado como ${papel} com êxito!`);
       setModalNovoMembroOpen(false);
+      setMembroSelecionado(null);
+      setTermoBuscaMembro('');
       carregarEquipe();
     } catch (err: any) {
       console.error('[handleSalvarMembro]', err);
-      onNotification('error', 'Erro', err.message || 'Não foi possível cadastrar membro.');
+      onNotification('error', 'Atenção', err.message || 'Não foi possível autorizar o membro na equipe.');
     } finally {
       setSalvando(false);
     }
@@ -468,29 +497,88 @@ export default function TabEquipe({ ministryId: _ministryId, onNotification }: T
             </div>
 
             <form onSubmit={handleSalvarMembro} className="p-5 space-y-4">
+              {/* BUSCA DINÂMICA DE MEMBRO */}
               <div>
-                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
-                  Selecione o Membro da Igreja *
+                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
+                  Membro da Igreja *
                 </label>
-                {loadingMembros ? (
-                  <div className="py-3 text-xs text-slate-500 flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin text-teal-600" />
-                    Carregando membros cadastrados...
+
+                {membroSelecionado ? (
+                  <div className="p-3 bg-teal-50/80 border border-teal-200 rounded-xl flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-lg bg-teal-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                        <UserCheck className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-900 text-sm leading-tight">
+                          {membroSelecionado.name}
+                        </p>
+                        <p className="text-xs text-slate-600">
+                          {membroSelecionado.cargo_ministerial || 'Membro'} • {membroSelecionado.congregacao_nome || 'Sede Geral'}
+                          {membroSelecionado.phone ? ` • ${membroSelecionado.phone}` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setMembroSelecionado(null)}
+                      className="text-xs font-semibold text-teal-700 hover:text-teal-900 underline px-2 py-1"
+                    >
+                      Trocar
+                    </button>
                   </div>
                 ) : (
-                  <select
-                    value={memberId}
-                    onChange={(e) => setMemberId(e.target.value)}
-                    required
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
-                  >
-                    <option value="">-- Selecione o membro --</option>
-                    {membrosDisponiveis.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name} {m.celular ? `(${m.celular})` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={termoBuscaMembro}
+                        onChange={(e) => setTermoBuscaMembro(e.target.value)}
+                        placeholder="Digite ao menos 3 letras do nome do membro..."
+                        className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                      />
+                      {buscandoMembros && (
+                        <Loader2 className="w-4 h-4 animate-spin text-teal-600 absolute right-3.5 top-3 pointer-events-none" />
+                      )}
+                    </div>
+
+                    {termoBuscaMembro.trim().length >= 3 && !buscandoMembros && sugestoesMembros.length === 0 && (
+                      <p className="text-xs text-slate-500 italic px-1">
+                        Nenhum membro elegível encontrado para "{termoBuscaMembro}". (Congregados não são elegíveis para a equipe de discipulado).
+                      </p>
+                    )}
+
+                    {sugestoesMembros.length > 0 && (
+                      <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100 bg-white shadow-xs">
+                        {sugestoesMembros.map((m) => (
+                          <div
+                            key={m.id}
+                            className="p-2.5 hover:bg-slate-50 flex items-center justify-between gap-2 transition"
+                          >
+                            <div>
+                              <p className="font-semibold text-slate-900 text-xs">{m.name}</p>
+                              <p className="text-[11px] text-slate-500">
+                                {m.cargo_ministerial || 'Membro'} • {m.congregacao_nome || 'Sede Geral'}
+                                {m.phone ? ` • ${m.phone}` : ''}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMembroSelecionado(m);
+                                setTermoBuscaMembro('');
+                                setSugestoesMembros([]);
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-700 text-xs font-bold transition shrink-0"
+                            >
+                              Selecionar
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -543,7 +631,7 @@ export default function TabEquipe({ ministryId: _ministryId, onNotification }: T
                 </button>
                 <button
                   type="submit"
-                  disabled={salvando}
+                  disabled={salvando || !membroSelecionado}
                   className="px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-sm transition flex items-center gap-2 cursor-pointer disabled:opacity-60"
                 >
                   {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : null}

@@ -395,19 +395,6 @@ export default function DiscipuladoPage() {
 
           <button
             type="button"
-            onClick={() => setAbaAtiva('turmas')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
-              abaAtiva === 'turmas'
-                ? 'bg-teal-700 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
-            }`}
-          >
-            <School className="w-4 h-4" />
-            <span>Turmas & Diário</span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => setAbaAtiva('equipe')}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
               abaAtiva === 'equipe'
@@ -417,6 +404,19 @@ export default function DiscipuladoPage() {
           >
             <UserCog className="w-4 h-4" />
             <span>Equipe & Lideranças</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAbaAtiva('turmas')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+              abaAtiva === 'turmas'
+                ? 'bg-teal-700 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+            }`}
+          >
+            <School className="w-4 h-4" />
+            <span>Turmas & Diário</span>
           </button>
 
           <button
@@ -740,9 +740,9 @@ export default function DiscipuladoPage() {
       </div>
     )}
 
-    {/* CONTEÚDO DA ABA 2: TURMAS & DIÁRIO */}
-    {abaAtiva === 'turmas' && ctx?.ministryId && (
-      <TabTurmas
+    {/* CONTEÚDO DA ABA 2: EQUIPE & LIDERANÇAS */}
+    {abaAtiva === 'equipe' && ctx?.ministryId && (
+      <TabEquipe
         ministryId={ctx.ministryId}
         onNotification={(type, title, message) =>
           showNotification(type, title, message)
@@ -750,9 +750,9 @@ export default function DiscipuladoPage() {
       />
     )}
 
-    {/* CONTEÚDO DA ABA 3: EQUIPE & LIDERANÇAS */}
-    {abaAtiva === 'equipe' && ctx?.ministryId && (
-      <TabEquipe
+    {/* CONTEÚDO DA ABA 3: TURMAS & DIÁRIO */}
+    {abaAtiva === 'turmas' && ctx?.ministryId && (
+      <TabTurmas
         ministryId={ctx.ministryId}
         onNotification={(type, title, message) =>
           showNotification(type, title, message)
