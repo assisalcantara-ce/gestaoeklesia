@@ -62,6 +62,11 @@ export async function GET(request: NextRequest) {
     const { data: turmas, error: errTurmas } = await queryTurmas;
     if (errTurmas) throw errTurmas;
 
+    const listaTurmas = turmas || [];
+    const turmasAtivas = listaTurmas.filter((t) => t.status === 'ativa').length;
+    const turmasEncerradas = listaTurmas.filter((t) => t.status === 'encerrada').length;
+    const capacidadeTotal = listaTurmas.reduce((acc, t) => acc + (t.capacidade || 0), 0);
+
     // 3. Frequência / Chamadas Agregadas
     let queryChamadas = admin
       .from('discipulado_turma_chamadas')
@@ -79,39 +84,67 @@ export async function GET(request: NextRequest) {
     const totalChamadas = listaChamadas.length;
     const presentes = listaChamadas.filter((c) => c.status_presenca === 'presente').length;
     const ausentes = listaChamadas.filter((c) => c.status_presenca === 'ausente').length;
-    const justificadas = listaChamadas.filter((c) => c.status_presenca === 'falta_justificada').length;
-    const taxaPresenca = totalChamadas > 0 ? Math.round((presentes / totalChamadas) * 100) : 100;
+    const justificados = listaChamadas.filter((c) => c.status_presenca === 'falta_justificada').length;
+    const taxaAssiduidade = totalChamadas > 0 ? Math.round((presentes / totalChamadas) * 100) : 100;
 
-    // 4. Equipe Ativa
-    const { count: totalEquipe } = await admin
+    // 4. Equipe Ativa (professores, discipuladores, coordenadores)
+    const { data: equipe, error: errEquipe } = await admin
       .from('discipulado_equipe')
-      .select('id', { count: 'exact', head: true })
+      .select('id, papel, ativo')
       .eq('ministry_id', ministryId)
       .eq('ativo', true);
 
+    if (errEquipe) throw errEquipe;
+
+    const listaEquipe = equipe || [];
+    const professores = listaEquipe.filter((e) => e.papel === 'professor').length;
+    const discipuladores = listaEquipe.filter((e) => e.papel === 'discipulador').length;
+    const coordenadores = listaEquipe.filter((e) => e.papel === 'coordenador').length;
+
+    // 5. Lista de congregações do tenant (para filtros confiáveis)
+    const { data: congregacoes, error: errCongs } = await admin
+      .from('congregacoes')
+      .select('id, nome')
+      .eq('ministry_id', ministryId)
+      .order('nome', { ascending: true });
+
+    if (errCongs) {
+      console.warn('[GET /api/v1/discipulado/relatorios] Aviso ao carregar congregações:', errCongs.message);
+    }
+
     return NextResponse.json({
-      resumo: {
-        totalJornadas,
+      jornadas: {
+        total: totalJornadas,
         ativas,
         concluidas,
-        formacaoCompleta,
-        taxaPresenca,
-        totalEquipe: totalEquipe || 0,
-        totalTurmas: (turmas || []).length,
+        formacaoCompleta26: formacaoCompleta,
+        fases: {
+          primeirosPassos,
+          fundamentos,
+          preparacaoBatismo: batismo,
+        },
       },
-      distribuicaoFases: {
-        primeirosPassos,
-        fundamentos,
-        batismo,
+      turmas: {
+        total: listaTurmas.length,
+        ativas: turmasAtivas,
+        encerradas: turmasEncerradas,
+        capacidadeTotal,
+        lista: listaTurmas,
+      },
+      equipe: {
+        total: listaEquipe.length,
+        professores,
+        discipuladores,
+        coordenadores,
       },
       frequencia: {
         totalChamadas,
         presentes,
         ausentes,
-        justificadas,
-        taxaPresenca,
+        justificados,
+        taxaAssiduidade,
       },
-      turmas: turmas || [],
+      congregacoes: congregacoes || [],
     });
   } catch (err: any) {
     console.error('[GET /api/v1/discipulado/relatorios]', err);
