@@ -94,6 +94,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'JSON inválido.' }, { status: 400 });
     }
 
+    // Suporte prioritário ao fluxo oficial de início por congregado existente
+    if (body.member_id) {
+      const resultado = await DiscipuladoService.iniciarJornadaParaCongregado(admin, {
+        ministryId,
+        memberId: body.member_id,
+        responsavelId: body.responsavel_id || null,
+        congregacaoId: body.congregacao_id || congregacaoId || null,
+        dataDecisao: body.data_decisao || undefined,
+        observacoes: body.observacoes || null,
+      });
+
+      return NextResponse.json(resultado, { status: 201 });
+    }
+
     const input: IniciarJornadaDiscipuladoInput = {
       ministryId,
       congregacaoId: body.congregacao_id || congregacaoId || null,

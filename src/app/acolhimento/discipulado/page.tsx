@@ -96,13 +96,17 @@ export interface JornadaItem {
   } | null;
 }
 
-export interface VisitanteSugestao {
+export interface CongregadoSugestao {
   id: string;
-  nome: string;
-  telefone: string | null;
-  cidade: string | null;
+  name: string;
+  cpf: string | null;
+  phone: string | null;
   bairro: string | null;
-  igreja_origem: string | null;
+  cidade: string | null;
+  logradouro: string | null;
+  numero: string | null;
+  data_nascimento: string | null;
+  sexo: string | null;
   congregacao_id: string | null;
   congregacao_nome?: string | null;
 }
@@ -167,19 +171,14 @@ export default function DiscipuladoPage() {
   const [filtroFase, setFiltroFase] = useState<string>('todas');
   const [buscaTexto, setBuscaTexto] = useState<string>('');
 
-  // Estados do Formulário de Entrada (Modal)
-  const [telInput, setTelInput] = useState('');
-  const [buscandoVisitante, setBuscandoVisitante] = useState(false);
-  const [visitantesEncontrados, setVisitantesEncontrados] = useState<VisitanteSugestao[]>([]);
-  const [visitanteSelecionado, setVisitanteSelecionado] = useState<VisitanteSugestao | null>(null);
+  // Estados da Busca Dinâmica de Congregados
+  const [buscaCongregadoTexto, setBuscaCongregadoTexto] = useState('');
+  const [buscaCongregadoTel, setBuscaCongregadoTel] = useState('');
+  const [buscandoCongregados, setBuscandoCongregados] = useState(false);
+  const [congregadosEncontrados, setCongregadosEncontrados] = useState<CongregadoSugestao[]>([]);
+  const [congregadoSelecionado, setCongregadoSelecionado] = useState<CongregadoSugestao | null>(null);
 
-  // Dados Cadastrais (Secretaria)
-  const [cpfInput, setCpfInput] = useState('');
-  const [nomeInput, setNomeInput] = useState('');
-  const [nascimentoInput, setNascimentoInput] = useState('');
-  const [sexoInput, setSexoInput] = useState<'M' | 'F' | 'outro'>('M');
-  const [bairroInput, setBairroInput] = useState('');
-  const [cidadeInput, setCidadeInput] = useState('');
+  // Dados Específicos da Jornada
   const [dataDecisaoInput, setDataDecisaoInput] = useState(new Date().toISOString().slice(0, 10));
   const [observacoesInput, setObservacoesInput] = useState('');
   const [salvando, setSalvando] = useState(false);
@@ -246,78 +245,73 @@ export default function DiscipuladoPage() {
     }
   }, [ctx?.loading, ctx?.ministryId, loadJornadas]);
 
-  // Busca de visitante por telefone
-  const handleBuscarTelefone = async () => {
-    const cleanTel = telInput.replace(/\D/g, '');
-    if (!cleanTel || cleanTel.length < 8) {
-      showNotification('warning', 'Atenção', 'Informe ao menos 8 dígitos do telefone com DDD para pesquisar.');
-      return;
-    }
+  // Busca dinâmica de congregados em public.members
+  const buscarCongregados = useCallback(
+    async (nome: string, telefone: string) => {
+      const q = nome.trim();
+      const tel = telefone.replace(/\D/g, '').trim();
 
-    setBuscandoVisitante(true);
-    setVisitantesEncontrados([]);
-    try {
-      const res = await fetch(`/api/v1/discipulado/visitantes?telefone=${encodeURIComponent(cleanTel)}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Erro na pesquisa.');
-
-      const list: VisitanteSugestao[] = data.visitantes || [];
-      setVisitantesEncontrados(list);
-
-      if (list.length === 1) {
-        selecionarVisitante(list[0]);
-      } else if (list.length === 0) {
-        showNotification(
-          'info',
-          'Visitante não localizado',
-          'Nenhum visitante ativo encontrado com este telefone no Acolhimento. Você pode preencher os dados diretamente.'
-        );
+      if (q.length < 3 && tel.length < 4) {
+        setCongregadosEncontrados([]);
+        return;
       }
-    } catch (err: any) {
-      showNotification('error', 'Erro', err?.message || 'Falha ao buscar visitantes.');
-    } finally {
-      setBuscandoVisitante(false);
-    }
+
+      setBuscandoCongregados(true);
+      try {
+        const params = new URLSearchParams();
+        if (q.length >= 3) params.set('q', q);
+        if (tel.length >= 4) params.set('tel', tel);
+
+        const res = await fetch(`/api/v1/discipulado/congregados?${params.toString()}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erro ao buscar congregados.');
+
+        setCongregadosEncontrados(data.congregados || []);
+      } catch (err: any) {
+        console.error('[buscarCongregados]', err);
+        showNotification('error', 'Erro na Busca', err.message || 'Falha ao consultar congregados.');
+      } finally {
+        setBuscandoCongregados(false);
+      }
+    },
+    []
+  );
+
+  // Debounce para busca por nome
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (modalNovoConvertidoOpen && !congregadoSelecionado) {
+        buscarCongregados(buscaCongregadoTexto, buscaCongregadoTel);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [buscaCongregadoTexto, buscaCongregadoTel, modalNovoConvertidoOpen, congregadoSelecionado, buscarCongregados]);
+
+  const selecionarCongregado = (c: CongregadoSugestao) => {
+    setCongregadoSelecionado(c);
+    setCongregadosEncontrados([]);
   };
 
-  const selecionarVisitante = (v: VisitanteSugestao) => {
-    setVisitanteSelecionado(v);
-    setNomeInput(v.nome);
-    setBairroInput(v.bairro || '');
-    setCidadeInput(v.cidade || '');
-    if (v.telefone) setTelInput(formatPhone(v.telefone));
-  };
-
-  const limparVisitanteSelecionado = () => {
-    setVisitanteSelecionado(null);
+  const desmarcarCongregado = () => {
+    setCongregadoSelecionado(null);
   };
 
   const resetFormulario = () => {
-    setTelInput('');
-    setCpfInput('');
-    setNomeInput('');
-    setNascimentoInput('');
-    setSexoInput('M');
-    setBairroInput('');
-    setCidadeInput('');
+    setBuscaCongregadoTexto('');
+    setBuscaCongregadoTel('');
+    setCongregadosEncontrados([]);
+    setCongregadoSelecionado(null);
+    setDataDecisaoInput(new Date().toISOString().slice(0, 10));
     setObservacoesInput('');
-    setVisitanteSelecionado(null);
-    setVisitantesEncontrados([]);
   };
 
-  // Salvar / Iniciar Jornada de Discipulado
+  // Salvar / Iniciar Jornada de Discipulado vinculada ao Congregado
   const handleSalvarJornada = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ctx?.ministryId) return;
 
-    const cleanCpf = cpfInput.replace(/\D/g, '');
-    if (cleanCpf.length !== 11) {
-      showNotification('warning', 'CPF Obrigatório', 'Informe um CPF válido com 11 dígitos para o cadastro oficial da Secretaria.');
-      return;
-    }
-
-    if (!nomeInput.trim()) {
-      showNotification('warning', 'Nome Obrigatório', 'Informe o nome do novo convertido.');
+    if (!congregadoSelecionado) {
+      showNotification('warning', 'Seleção Obrigatória', 'Selecione um congregado cadastrado na Secretaria.');
       return;
     }
 
@@ -327,15 +321,8 @@ export default function DiscipuladoPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          telefone: telInput.replace(/\D/g, '') || null,
-          cpf: cleanCpf,
-          nome: nomeInput.trim(),
-          data_nascimento: nascimentoInput || null,
-          sexo: sexoInput,
-          bairro: bairroInput.trim() || null,
-          cidade: cidadeInput.trim() || null,
-          congregacao_id: visitanteSelecionado?.congregacao_id || ctx.congregacaoId || null,
-          visitante_id: visitanteSelecionado?.id || null,
+          member_id: congregadoSelecionado.id,
+          congregacao_id: congregadoSelecionado.congregacao_id || ctx.congregacaoId || null,
           data_decisao: dataDecisaoInput,
           observacoes: observacoesInput.trim() || null,
         }),
@@ -352,7 +339,7 @@ export default function DiscipuladoPage() {
       setModalNovoConvertidoOpen(false);
       await loadJornadas();
     } catch (err: any) {
-      showNotification('error', 'Falha no Cadastro', err?.message || 'Erro ao salvar novo discípulo.');
+      showNotification('error', 'Atenção', err?.message || 'Erro ao iniciar jornada do discípulo.');
     } finally {
       setSalvando(false);
     }
@@ -817,162 +804,137 @@ export default function DiscipuladoPage() {
 
             {/* Corpo do Modal com Rolagem Independente */}
             <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
-              {/* ETAPA 1: LOCALIZAR VISITANTE NO ACOLHIMENTO */}
+              {/* ETAPA 1: BUSCA DINÂMICA DE CONGREGADOS EM MEMBERS */}
               <div className="bg-slate-50/80 border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-3.5">
                 <div className="flex items-center gap-2 text-slate-900">
-                  <Phone className="w-4 h-4 text-teal-700" />
+                  <Search className="w-4 h-4 text-teal-700" />
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                    1. Busca Prévia no Acolhimento (Telefone)
+                    1. Selecionar Congregado na Secretaria
                   </h4>
                 </div>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Informe o telefone do novo convertido (anotado em ficha de culto). Se ele já visitou a igreja, seus dados e endereço serão importados automaticamente.
+                  Digite ao menos <strong>3 letras do nome</strong> ou o <strong>telefone</strong> do congregado para localizá-lo na base oficial da Secretaria. O discipulado acolhe exclusivamente pessoas já registradas como <strong>Congregado</strong>.
                 </p>
 
-                <div className="flex flex-col sm:flex-row gap-2 max-w-lg">
-                  <div className="relative flex-1">
-                    <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      value={telInput}
-                      onChange={(e) => setTelInput(formatPhone(e.target.value))}
-                      placeholder="(00) 00000-0000"
-                      className="w-full pl-9 pr-3 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 font-mono"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleBuscarTelefone}
-                    disabled={buscandoVisitante}
-                    className="px-4 py-2.5 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-60"
-                  >
-                    {buscandoVisitante ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
-                    <span>Pesquisar Visitante</span>
-                  </button>
-                </div>
-
-                {/* Visitante Selecionado */}
-                {visitanteSelecionado && (
-                  <div className="p-3.5 bg-emerald-50/80 border border-emerald-300 rounded-xl flex items-center justify-between gap-3 animate-in fade-in">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span className="text-xs font-bold text-emerald-900">Visitante Identificado:</span>
-                        <span className="text-xs font-extrabold text-emerald-950">{visitanteSelecionado.nome}</span>
-                      </div>
-                      <p className="text-[11px] text-emerald-800 pl-6">
-                        {visitanteSelecionado.bairro ? `${visitanteSelecionado.bairro}, ` : ''}{visitanteSelecionado.cidade || 'Local não informado'} • Congregação: {visitanteSelecionado.congregacao_nome || 'Geral'}
-                      </p>
+                {/* Campos de Busca */}
+                {!congregadoSelecionado && (
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                    <div className="sm:col-span-7 relative">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={buscaCongregadoTexto}
+                        onChange={(e) => setBuscaCongregadoTexto(e.target.value)}
+                        placeholder="Nome do congregado (mín. 3 letras)..."
+                        className="w-full pl-9 pr-3 py-2.5 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600"
+                      />
                     </div>
-                    <button
-                      type="button"
-                      onClick={limparVisitanteSelecionado}
-                      className="p-1.5 text-emerald-700 hover:text-emerald-900 rounded-lg hover:bg-emerald-100 transition cursor-pointer"
-                      title="Desvincular visitante"
-                    >
-                      <X size={16} />
-                    </button>
+                    <div className="sm:col-span-5 relative">
+                      <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={buscaCongregadoTel}
+                        onChange={(e) => setBuscaCongregadoTel(formatPhone(e.target.value))}
+                        placeholder="(00) 00000-0000"
+                        className="w-full pl-9 pr-3 py-2.5 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 font-mono"
+                      />
+                    </div>
                   </div>
                 )}
 
-                {/* Lista de visitantes múltiplos encontrados */}
-                {!visitanteSelecionado && visitantesEncontrados.length > 1 && (
-                  <div className="space-y-2 pt-2 border-t border-slate-200">
-                    <p className="text-xs font-bold text-slate-700">Selecione o visitante correspondente:</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {visitantesEncontrados.map((v) => (
+                {/* Loading da busca */}
+                {buscandoCongregados && (
+                  <div className="py-2 text-xs text-teal-700 flex items-center gap-2">
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Consultando base de congregados...</span>
+                  </div>
+                )}
+
+                {/* Lista de sugestões encontradas */}
+                {!congregadoSelecionado && congregadosEncontrados.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-slate-200 animate-in fade-in">
+                    <p className="text-xs font-bold text-slate-700">Congregados localizados (clique para selecionar):</p>
+                    <div className="grid grid-cols-1 gap-2 max-h-56 overflow-y-auto pr-1">
+                      {congregadosEncontrados.map((c) => (
                         <div
-                          key={v.id}
-                          onClick={() => selecionarVisitante(v)}
-                          className="p-3 border border-slate-200 bg-white rounded-xl hover:border-teal-500 hover:bg-teal-50/40 cursor-pointer transition text-xs space-y-1 shadow-2xs"
+                          key={c.id}
+                          onClick={() => selecionarCongregado(c)}
+                          className="p-3 border border-slate-200 bg-white hover:border-teal-500 hover:bg-teal-50/40 rounded-xl cursor-pointer transition text-xs flex items-center justify-between shadow-2xs"
                         >
-                          <p className="font-bold text-slate-900">{v.nome}</p>
-                          <p className="text-[11px] text-slate-500">{v.bairro || 'Sem bairro'} — {v.congregacao_nome || 'Geral'}</p>
+                          <div className="space-y-0.5">
+                            <p className="font-bold text-slate-900 text-sm">{c.name}</p>
+                            <p className="text-[11px] text-slate-600">
+                              Tel: <span className="font-mono text-slate-800">{formatPhone(c.phone)}</span> • CPF: <span className="font-mono">{c.cpf ? formatCpf(c.cpf) : 'Não informado'}</span>
+                            </p>
+                            <p className="text-[11px] text-teal-700 font-medium">
+                              Congregação: {c.congregacao_nome || 'Sede Geral'}
+                            </p>
+                          </div>
+                          <span className="px-2.5 py-1 rounded-lg bg-teal-50 text-teal-800 border border-teal-200 font-bold text-[11px] shrink-0">
+                            Selecionar
+                          </span>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
+
+                {!congregadoSelecionado && !buscandoCongregados && buscaCongregadoTexto.trim().length >= 3 && congregadosEncontrados.length === 0 && (
+                  <p className="text-xs text-slate-500 italic pt-1">
+                    Nenhum congregado localizado com esse nome. Verifique se a pessoa já possui cadastro na Secretaria como Congregado.
+                  </p>
+                )}
+
+                {/* Congregado Selecionado em Modo Somente Leitura */}
+                {congregadoSelecionado && (
+                  <div className="p-4 bg-emerald-50/80 border border-emerald-300 rounded-xl flex items-start justify-between gap-3 animate-in fade-in">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span className="text-xs font-bold text-emerald-900">Congregado Selecionado:</span>
+                        <span className="text-sm font-extrabold text-emerald-950">{congregadoSelecionado.name}</span>
+                      </div>
+                      <div className="text-xs text-emerald-900 pl-6 space-y-0.5">
+                        <p>
+                          CPF: <span className="font-mono font-bold">{congregadoSelecionado.cpf ? formatCpf(congregadoSelecionado.cpf) : 'Não informado'}</span> • Tel: <span className="font-bold">{formatPhone(congregadoSelecionado.phone)}</span>
+                        </p>
+                        <p>
+                          Congregação de Origem: <span className="font-bold">{congregadoSelecionado.congregacao_nome || 'Sede Geral'}</span>
+                        </p>
+                        <p className="text-[11px] text-emerald-800">
+                          {congregadoSelecionado.bairro ? `${congregadoSelecionado.bairro}, ` : ''}{congregadoSelecionado.cidade || 'Cidade não informada'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={desmarcarCongregado}
+                      className="px-2.5 py-1 text-xs font-bold text-emerald-800 hover:text-emerald-950 rounded-lg hover:bg-emerald-100 transition border border-emerald-300 cursor-pointer"
+                      title="Trocar congregado"
+                    >
+                      Trocar
+                    </button>
+                  </div>
+                )}
               </div>
 
-              {/* ETAPA 2: CADASTRO NA SECRETARIA & INÍCIO DA JORNADA */}
-              <form onSubmit={handleSalvarJornada} className="space-y-5">
+              {/* ETAPA 2: DADOS ESPECÍFICOS DA JORNADA */}
+              <form onSubmit={handleSalvarJornada} className="space-y-4">
                 <div className="bg-teal-50/80 p-3.5 rounded-xl border border-teal-200 text-xs text-teal-900 space-y-1">
                   <div className="flex items-center gap-1.5 font-bold">
                     <ShieldCheck className="w-4 h-4 text-teal-700 shrink-0" />
-                    <span>Governança & Cadastro Oficial em members</span>
+                    <span>Início Oficial da Jornada Pedagógica</span>
                   </div>
                   <p className="text-[11px] text-teal-800 leading-relaxed">
-                    O CPF é validado matematicamente com os mesmos critérios da Secretaria. Se a pessoa já for cadastrada, o registro é preservado e <strong>membros ou ministros nunca são rebaixados</strong>.
+                    O cadastro de membros permanece inalterado. Será iniciada uma nova jornada pedagógica de 26 lições vinculada a este congregado, com garantia de unicidade ativa.
                   </p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* CPF Obrigatório */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
-                      CPF do Novo Convertido <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={cpfInput}
-                      onChange={(e) => setCpfInput(formatCpf(e.target.value))}
-                      placeholder="000.000.000-00"
-                      className="w-full text-xs sm:text-sm p-2.5 bg-slate-50/70 rounded-xl border border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 font-mono font-medium"
-                    />
-                  </div>
-
-                  {/* Nome Completo */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
-                      Nome Completo <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={nomeInput}
-                      onChange={(e) => setNomeInput(e.target.value)}
-                      placeholder="Nome completo do novo convertido"
-                      className="w-full text-xs sm:text-sm p-2.5 bg-slate-50/70 rounded-xl border border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 font-medium"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {/* Data de Nascimento */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
-                      Data de Nascimento
-                    </label>
-                    <input
-                      type="date"
-                      value={nascimentoInput}
-                      onChange={(e) => setNascimentoInput(e.target.value)}
-                      className="w-full text-xs sm:text-sm p-2.5 bg-slate-50/70 rounded-xl border border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600"
-                    />
-                  </div>
-
-                  {/* Sexo */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
-                      Sexo
-                    </label>
-                    <select
-                      value={sexoInput}
-                      onChange={(e) => setSexoInput(e.target.value as any)}
-                      className="w-full text-xs sm:text-sm p-2.5 bg-slate-50/70 rounded-xl border border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 cursor-pointer font-medium"
-                    >
-                      <option value="M">Masculino</option>
-                      <option value="F">Feminino</option>
-                      <option value="outro">Outro</option>
-                    </select>
-                  </div>
-
                   {/* Data da Decisão */}
                   <div>
                     <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
-                      Data da Decisão <span className="text-rose-500">*</span>
+                      Data da Decisão / Entrega <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="date"
@@ -982,45 +944,30 @@ export default function DiscipuladoPage() {
                       className="w-full text-xs sm:text-sm p-2.5 bg-slate-50/70 rounded-xl border border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 font-medium"
                     />
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Congregação Destino (herdada do cadastro) */}
                   <div>
                     <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
-                      Bairro
+                      Congregação Vinculada
                     </label>
                     <input
                       type="text"
-                      value={bairroInput}
-                      onChange={(e) => setBairroInput(e.target.value)}
-                      placeholder="Bairro"
-                      className="w-full text-xs sm:text-sm p-2.5 bg-slate-50/70 rounded-xl border border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 font-medium"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
-                      Cidade
-                    </label>
-                    <input
-                      type="text"
-                      value={cidadeInput}
-                      onChange={(e) => setCidadeInput(e.target.value)}
-                      placeholder="Cidade"
-                      className="w-full text-xs sm:text-sm p-2.5 bg-slate-50/70 rounded-xl border border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 font-medium"
+                      disabled
+                      value={congregadoSelecionado?.congregacao_nome || 'Selecione o congregado acima'}
+                      className="w-full text-xs sm:text-sm p-2.5 bg-slate-100 rounded-xl border border-slate-200 text-slate-600 cursor-not-allowed font-medium"
                     />
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
-                    Observações Pastorais / Pedidos de Oração
+                    Observações Pastorais / Histórico
                   </label>
                   <textarea
                     rows={3}
                     value={observacoesInput}
                     onChange={(e) => setObservacoesInput(e.target.value)}
-                    placeholder="Anotações pastorais, histórico de aconselhamento, necessidades de oração..."
+                    placeholder="Histórico da decisão, necessidades de acompanhamento, oração..."
                     className="w-full text-xs sm:text-sm p-2.5 bg-slate-50/70 rounded-xl border border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 resize-none font-medium"
                   />
                 </div>
@@ -1029,25 +976,28 @@ export default function DiscipuladoPage() {
                 <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-3">
                   <button
                     type="button"
-                    onClick={() => setModalNovoConvertidoOpen(false)}
+                    onClick={() => {
+                      resetFormulario();
+                      setModalNovoConvertidoOpen(false);
+                    }}
                     className="px-4 py-2.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    disabled={salvando}
-                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-60 border border-emerald-700"
+                    disabled={salvando || !congregadoSelecionado}
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-50 border border-emerald-700"
                   >
                     {salvando ? (
                       <>
                         <Loader2 size={16} className="animate-spin" />
-                        <span>Processando conversão...</span>
+                        <span>Iniciando jornada...</span>
                       </>
                     ) : (
                       <>
                         <CheckCircle2 size={16} />
-                        <span>Confirmar & Iniciar Discipulado</span>
+                        <span>Iniciar Jornada de Discipulado</span>
                       </>
                     )}
                   </button>

@@ -351,4 +351,99 @@ export class DiscipuladoService {
         : `Cadastro existente localizado (${tipoCadastroFinal.toUpperCase()}) e nova jornada de discipulado vinculada com sucesso!`,
     };
   }
+
+  /**
+   * Inicia a Jornada de Discipulado vinculando a um Congregado existente na Secretaria (public.members).
+   * Regra oficial: Não cria nem altera membros, apenas inicia a jornada com validação de duplicidade ativa.
+   */
+  public static async iniciarJornadaParaCongregado(
+    supabase: any,
+    params: {
+      ministryId: string;
+      memberId: string;
+      responsavelId?: string | null;
+      congregacaoId?: string | null;
+      dataDecisao?: string;
+      observacoes?: string | null;
+    }
+  ): Promise<IniciarJornadaResult> {
+    const { ministryId, memberId, responsavelId, congregacaoId, dataDecisao, observacoes } = params;
+
+    if (!memberId) {
+      throw new Error('O congregado selecionado é obrigatório.');
+    }
+
+    // 1. Obter e validar o membro na Secretaria
+    const { data: member, error: errMember } = await supabase
+      .from('members')
+      .select('id, name, cpf, tipo_cadastro, status, congregacao_id')
+      .eq('id', memberId)
+      .eq('ministry_id', ministryId)
+      .single();
+
+    if (errMember || !member) {
+      throw new Error('Congregado não encontrado ou não pertence a este ministério.');
+    }
+
+    // 2. Verificar se o tipo de cadastro é congregado
+    const tipo = String(member.tipo_cadastro || '').toLowerCase();
+    if (tipo !== 'congregado') {
+      throw new Error(`Apenas congregados podem ser acolhidos no Discipulado. O registro atual deste membro é: ${tipo.toUpperCase()}.`);
+    }
+
+    // 3. Impedir jornadas ativas simultâneas
+    const { data: jornadaAtiva, error: errJornadaCheck } = await supabase
+      .from('discipulado_jornadas')
+      .select('id, fase, status, created_at')
+      .eq('ministry_id', ministryId)
+      .eq('member_id', memberId)
+      .eq('status', 'ativo')
+      .maybeSingle();
+
+    if (errJornadaCheck) {
+      console.error('[DiscipuladoService.iniciarJornadaParaCongregado] Erro check ativo:', errJornadaCheck);
+    }
+
+    if (jornadaAtiva) {
+      throw new Error(
+        `Este congregado já possui uma jornada de discipulado ATIVA em andamento (Fase: ${jornadaAtiva.fase}). Não é permitida duplicidade.`
+      );
+    }
+
+    // 4. Inserir a nova jornada vinculada ao member_id existente
+    const targetCongregacao = congregacaoId || member.congregacao_id || null;
+    const jornadaPayload: any = {
+      ministry_id: ministryId,
+      congregacao_id: targetCongregacao,
+      member_id: memberId,
+      responsavel_id: responsavelId || null,
+      origem: 'culto',
+      fase: 'primeiros_passos',
+      status: 'ativo',
+      data_decisao: dataDecisao || new Date().toISOString().slice(0, 10),
+      data_inicio: new Date().toISOString().slice(0, 10),
+      observacoes: observacoes || null,
+    };
+
+    const { data: novaJornada, error: errInsert } = await supabase
+      .from('discipulado_jornadas')
+      .insert(jornadaPayload)
+      .select('id')
+      .single();
+
+    if (errInsert || !novaJornada) {
+      console.error('[DiscipuladoService.iniciarJornadaParaCongregado] Erro insert:', errInsert);
+      throw new Error(`Erro ao iniciar jornada de discipulado: ${errInsert?.message || 'Falha de inserção.'}`);
+    }
+
+    return {
+      sucesso: true,
+      memberId: member.id,
+      jornadaId: novaJornada.id,
+      isNovoMember: false,
+      tipoCadastroFinal: 'congregado',
+      visitanteVinculado: false,
+      mensagem: `Jornada de discipulado iniciada com sucesso para o congregado ${member.name}!`,
+    };
+  }
 }
