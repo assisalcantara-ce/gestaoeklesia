@@ -37,7 +37,13 @@ import {
   UserPlus,
   RotateCcw,
   BookOpen,
+  School,
+  UserCog,
+  FileBarChart2,
 } from 'lucide-react';
+import TabTurmas from './turmas/TabTurmas';
+import TabEquipe from './turmas/TabEquipe';
+import TabRelatorios from './turmas/TabRelatorios';
 
 function formatPhone(v: string | null | undefined): string {
   if (!v) return 'Não informado';
@@ -146,6 +152,9 @@ const STATUS_LABELS: Record<string, { label: string; dotClass: string; textClass
 export default function DiscipuladoPage() {
   const { ctx } = useRequireModulo('secretaria_local');
   const supabase = useMemo(() => createClient(), []);
+
+  // Navegação por Abas Centralizadas
+  const [abaAtiva, setAbaAtiva] = useState<'discipulos' | 'turmas' | 'equipe' | 'relatorios'>('discipulos');
 
   const [jornadas, setJornadas] = useState<JornadaItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -379,11 +388,69 @@ export default function DiscipuladoPage() {
   return (
     <PageLayout
       title="Discipulado & Acompanhamento"
-      description="Acolhimento de novos convertidos, validação na secretaria e acompanhamento espiritual"
+      description="Central de acolhimento, turmas pedagógicas de 26 lições, equipe e relatórios integrados"
     >
       <div className="space-y-6">
-        {/* CARDS DE MÉTRICAS EXECUTIVAS — Idênticos ao padrão do ERP */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* NAVEGAÇÃO ENTRE ABAS CENTRALIZADAS */}
+        <div className="bg-white rounded-2xl border border-slate-200/90 p-1.5 shadow-2xs flex flex-wrap gap-1">
+          <button
+            type="button"
+            onClick={() => setAbaAtiva('discipulos')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+              abaAtiva === 'discipulos'
+                ? 'bg-teal-700 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Discípulos & Jornadas</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAbaAtiva('turmas')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+              abaAtiva === 'turmas'
+                ? 'bg-teal-700 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+            }`}
+          >
+            <School className="w-4 h-4" />
+            <span>Turmas & Diário</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAbaAtiva('equipe')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+              abaAtiva === 'equipe'
+                ? 'bg-teal-700 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+            }`}
+          >
+            <UserCog className="w-4 h-4" />
+            <span>Equipe & Lideranças</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAbaAtiva('relatorios')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+              abaAtiva === 'relatorios'
+                ? 'bg-teal-700 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+            }`}
+          >
+            <FileBarChart2 className="w-4 h-4" />
+            <span>Relatórios & Prestação</span>
+          </button>
+        </div>
+
+        {/* ABA 1: DISCÍPULOS & JORNADAS */}
+        {abaAtiva === 'discipulos' && (
+          <div className="space-y-6">
+            {/* CARDS DE MÉTRICAS EXECUTIVAS — Idênticos ao padrão do ERP */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <ExecutiveMetricCard
             title="Discípulos Ativos"
             value={metricas.totalAtivos}
@@ -684,6 +751,38 @@ export default function DiscipuladoPage() {
           )}
         </div>
       </div>
+    )}
+
+    {/* CONTEÚDO DA ABA 2: TURMAS & DIÁRIO */}
+    {abaAtiva === 'turmas' && ctx?.ministryId && (
+      <TabTurmas
+        ministryId={ctx.ministryId}
+        onNotification={(type, title, message) =>
+          showNotification(type, title, message)
+        }
+      />
+    )}
+
+    {/* CONTEÚDO DA ABA 3: EQUIPE & LIDERANÇAS */}
+    {abaAtiva === 'equipe' && ctx?.ministryId && (
+      <TabEquipe
+        ministryId={ctx.ministryId}
+        onNotification={(type, title, message) =>
+          showNotification(type, title, message)
+        }
+      />
+    )}
+
+    {/* CONTEÚDO DA ABA 4: RELATÓRIOS & PRESTAÇÃO */}
+    {abaAtiva === 'relatorios' && ctx?.ministryId && (
+      <TabRelatorios
+        ministryId={ctx.ministryId}
+        onNotification={(type, title, message) =>
+          showNotification(type, title, message)
+        }
+      />
+    )}
+  </div>
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* MODAL RESPONSIVO: NOVO CONVERTIDO / INICIAR JORNADA                 */}

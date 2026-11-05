@@ -125,3 +125,65 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export async function PATCH(request: NextRequest) {
+  let ctx: Awaited<ReturnType<typeof resolveTenantAuth>>;
+  try {
+    ctx = await resolveTenantAuth(request);
+  } catch (err: any) {
+    const isUnauth = err?.message === 'UNAUTHORIZED';
+    return NextResponse.json(
+      { error: isUnauth ? 'Não autenticado.' : 'Acesso negado: sem ministério associado.' },
+      { status: isUnauth ? 401 : 403 }
+    );
+  }
+
+  const { admin, ministryId, nivel } = ctx;
+
+  if (!temAcesso(nivel, 'secretaria') && !temAcesso(nivel, 'acolhimento')) {
+    return NextResponse.json({ error: 'Permissão insuficiente para alterar equipe de discipulado.' }, { status: 403 });
+  }
+
+  try {
+    const body = await request.json();
+    const { id, ativo, motivoInativacao } = body;
+
+    if (!id || typeof ativo !== 'boolean') {
+      return NextResponse.json(
+        { error: 'Campos obrigatórios: id e status ativo (booleano).' },
+        { status: 400 }
+      );
+    }
+
+    const updatePayload: any = {
+      ativo,
+      updated_at: new Date().toISOString()
+    };
+
+    if (!ativo) {
+      updatePayload.data_inativacao = new Date().toISOString().slice(0, 10);
+      updatePayload.motivo_inativacao = motivoInativacao || 'Inativado pela liderança';
+    } else {
+      updatePayload.data_inativacao = null;
+      updatePayload.motivo_inativacao = null;
+    }
+
+    const { error } = await admin
+      .from('discipulado_equipe')
+      .update(updatePayload)
+      .eq('id', id)
+      .eq('ministry_id', ministryId);
+
+    if (error) {
+      throw new Error(`Erro ao atualizar status: ${error.message}`);
+    }
+
+    return NextResponse.json({ sucesso: true });
+  } catch (err: any) {
+    console.error('[PATCH /api/v1/discipulado/equipe]', err);
+    return NextResponse.json(
+      { error: err?.message || 'Erro interno ao atualizar membro da equipe.' },
+      { status: 500 }
+    );
+  }
+}
