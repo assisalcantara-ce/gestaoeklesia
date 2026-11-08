@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
@@ -26,6 +26,46 @@ export interface FinancialBannerState {
   amountFormatted: string | null;
   daysToDue?: number;
   daysOverdue?: number;
+}
+
+/** Formata data civil YYYY-MM-DD em DD/MM/AAAA preservando o dia exato do banco */
+export function formatCivilDueDate(dateStr: string | null): string | null {
+  if (!dateStr) return null;
+  const clean = dateStr.slice(0, 10);
+  const parts = clean.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return dateStr;
+}
+
+/** Obtém a data corrente civil no fuso oficial America/Sao_Paulo (YYYY-MM-DD) */
+export function getSaoPauloDateStr(d: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
+}
+
+/** Converte string civil YYYY-MM-DD em timestamp UTC meia-noite para cálculo de dias exatos */
+function parseCivilDateToUTC(dateStr: string): number {
+  const [y, m, d] = dateStr.slice(0, 10).split('-').map(Number);
+  return Date.UTC(y, m - 1, d);
+}
+
+/**
+ * Calcula a diferença em dias de calendário entre o vencimento civil e o dia atual em São Paulo:
+ * - diff > 0: vence em N dias
+ * - diff === 0: vence hoje
+ * - diff < 0: vencido há N dias
+ */
+export function calculateCivilDaysDiff(dueStr: string, now: Date = new Date()): number {
+  const todaySP = getSaoPauloDateStr(now);
+  const dueUTC = parseCivilDateToUTC(dueStr);
+  const todayUTC = parseCivilDateToUTC(todaySP);
+  return Math.round((dueUTC - todayUTC) / (1000 * 60 * 60 * 24));
 }
 
 export default function GlobalFinancialBanner() {
@@ -107,7 +147,7 @@ export default function GlobalFinancialBanner() {
     }
 
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    const todayStr = getSaoPauloDateStr(now);
 
     // 1. REGRA CRÍTICA / SUSPENSÃO DO TENANT
     const isSuspended =
@@ -130,14 +170,17 @@ export default function GlobalFinancialBanner() {
       const st = (inv.status || '').toLowerCase();
       if (st === 'overdue' || st === 'vencida') return true;
       if ((st === 'pending' || st === 'pendente') && inv.due_date) {
-        return inv.due_date < todayStr;
+        return inv.due_date.slice(0, 10) < todayStr;
       }
       return false;
     });
 
     if (overdueInvoice) {
+      const diffDays = overdueInvoice.due_date
+        ? calculateCivilDaysDiff(overdueInvoice.due_date, now)
+        : 0;
       const dueDaysOverdue = overdueInvoice.due_date
-        ? Math.max(1, Math.floor((now.getTime() - new Date(overdueInvoice.due_date).getTime()) / (1000 * 60 * 60 * 24)))
+        ? Math.max(1, -diffDays)
         : undefined;
 
       const valorFmt = overdueInvoice.amount
@@ -148,7 +191,7 @@ export default function GlobalFinancialBanner() {
         severity: 'overdue',
         title: 'Fatura Vencida',
         message: 'Existe uma fatura vencida. Regularize sua assinatura para evitar a interrupção dos serviços.',
-        dueDateFormatted: overdueInvoice.due_date ? new Date(overdueInvoice.due_date).toLocaleDateString('pt-BR') : null,
+        dueDateFormatted: formatCivilDueDate(overdueInvoice.due_date),
         amountFormatted: valorFmt,
         daysOverdue: dueDaysOverdue,
       };
@@ -158,18 +201,14 @@ export default function GlobalFinancialBanner() {
     const upcomingInvoice = invoices.find((inv) => {
       const st = (inv.status || '').toLowerCase();
       if ((st === 'pending' || st === 'pendente') && inv.due_date) {
-        const dueDate = new Date(inv.due_date);
-        const diffMs = dueDate.getTime() - now.getTime();
-        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        const diffDays = calculateCivilDaysDiff(inv.due_date, now);
         return diffDays >= 0 && diffDays <= 5;
       }
       return false;
     });
 
     if (upcomingInvoice && upcomingInvoice.due_date) {
-      const dueDate = new Date(upcomingInvoice.due_date);
-      const diffMs = dueDate.getTime() - now.getTime();
-      const diffDays = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+      const diffDays = calculateCivilDaysDiff(upcomingInvoice.due_date, now);
 
       const valorFmt = upcomingInvoice.amount
         ? `R$ ${Number(upcomingInvoice.amount).toFixed(2).replace('.', ',')}`
@@ -185,7 +224,7 @@ export default function GlobalFinancialBanner() {
         severity: 'warning',
         title: 'Fatura Próxima do Vencimento',
         message: `Sua próxima fatura da plataforma ${msgDias}. Acesse as faturas para realizar o pagamento.`,
-        dueDateFormatted: dueDate.toLocaleDateString('pt-BR'),
+        dueDateFormatted: formatCivilDueDate(upcomingInvoice.due_date),
         amountFormatted: valorFmt,
         daysToDue: diffDays,
       };
