@@ -318,23 +318,74 @@ export async function gerarRelatorioGerencialEventoPDF(dados: DadosRelatorioEven
 
   curY += cardH + 3.5;
 
-  // Barra de Indicadores com denominadores explícitos
+  // Barra de Indicadores com denominadores explícitos distribuídos em 3 blocos
+  const indCols = 3;
+  const indGap = 2.5;
+  const indW = (contentWidth - indGap * (indCols - 1)) / indCols;
+  const indH = 12.5;
+
+  // 1. Taxa de Comparecimento
+  const ind1X = margin;
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(margin, curY, contentWidth, 8, 1, 1, 'FD');
+  doc.roundedRect(ind1X, curY, indW, indH, 1, 1, 'FD');
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.2);
+  doc.setFontSize(6.8);
+  doc.setTextColor(18, 59, 99);
+  doc.text('Taxa de Comparecimento', ind1X + 3.5, curY + 4.5);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
   doc.setTextColor(15, 23, 42);
-  const indComparecimento = `Taxa de Comparecimento: ${dados.taxaComparecimento} (${dados.totalPresentes} presentes sobre ${dados.totalConfirmados} confirmados)`;
-  const indCancelamento = `Taxa de Cancelamento: ${dados.taxaCancelamento} (${dados.totalCancelados} cancelados sobre ${dados.totalInscricoesValidas + dados.totalCancelados} solicitações)`;
-  const indComposicao = `Composição: ${dados.membrosQtd} Membro(s)  •  ${dados.externosQtd} Participante(s) Externo(s)`;
+  doc.text(
+    `${dados.taxaComparecimento}  •  ${dados.totalPresentes} de ${dados.totalConfirmados} confirmados`,
+    ind1X + 3.5,
+    curY + 9
+  );
 
-  doc.text(indComparecimento, margin + 4, curY + 5.2);
-  doc.text(indCancelamento, margin + 85, curY + 5.2);
-  doc.text(indComposicao, pageWidth - margin - 4, curY + 5.2, { align: 'right' });
+  // 2. Taxa de Cancelamento
+  const ind2X = margin + indW + indGap;
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(ind2X, curY, indW, indH, 1, 1, 'FD');
 
-  curY += 12;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.8);
+  doc.setTextColor(18, 59, 99);
+  doc.text('Taxa de Cancelamento', ind2X + 3.5, curY + 4.5);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.setTextColor(15, 23, 42);
+  const totalSolicitacoes = dados.totalInscricoesValidas + dados.totalCancelados;
+  doc.text(
+    `${dados.taxaCancelamento}  •  ${dados.totalCancelados} de ${totalSolicitacoes} solicitações`,
+    ind2X + 3.5,
+    curY + 9
+  );
+
+  // 3. Composição de Vínculo
+  const ind3X = margin + (indW + indGap) * 2;
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(ind3X, curY, indW, indH, 1, 1, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.8);
+  doc.setTextColor(18, 59, 99);
+  doc.text('Composição do Público', ind3X + 3.5, curY + 4.5);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text(
+    `${dados.membrosQtd} Membro(s)  •  ${dados.externosQtd} Externo(s)`,
+    ind3X + 3.5,
+    curY + 9
+  );
+
+  curY += indH + 4;
 
   // ─── 4. Bloco Financeiro e Operacional (Lado a Lado ou Seção) ───────────────
   doc.setFont('helvetica', 'bold');
@@ -462,7 +513,8 @@ export async function gerarRelatorioGerencialEventoPDF(dados: DadosRelatorioEven
     head: [colunasCong],
     body: linhasCong.length > 0 ? linhasCong : [['Nenhuma congregação registrada', '0', '0', '0', '0', '0%']],
     theme: 'grid',
-    margin: { left: margin, right: margin },
+    margin: { top: 30, bottom: 15, left: margin, right: margin },
+    rowPageBreak: 'avoid',
     styles: {
       fontSize: 6.8,
       cellPadding: 1.5,
@@ -523,7 +575,8 @@ export async function gerarRelatorioGerencialEventoPDF(dados: DadosRelatorioEven
     head: [colunasPart],
     body: linhasPart.length > 0 ? linhasPart : [['—', 'Nenhum participante inscrito', '—', '—', '—', '—', '—']],
     theme: 'grid',
-    margin: { left: margin, right: margin, bottom: 15 },
+    margin: { top: 30, left: margin, right: margin, bottom: 15 },
+    rowPageBreak: 'avoid',
     styles: {
       fontSize: 6.5,
       cellPadding: 1.6,

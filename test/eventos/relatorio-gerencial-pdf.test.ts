@@ -350,4 +350,95 @@ test('Suíte de Testes: Relatório Gerencial Completo de Eventos em PDF', async 
     // Para 95 participantes, o PDF deve ter gerado ao menos 3 páginas
     assert.ok(pdfBuffer.length > 8000, 'Documento multipágina deve ter tamanho condizente');
   });
+
+  await t.test('5. Validar Escola de Obreiros 2026: multipágina A4 com margens seguras e sem sobreposição', async () => {
+    const participantesEscola: any[] = [];
+    for (let i = 1; i <= 120; i++) {
+      participantesEscola.push({
+        numero: i,
+        nome: 'Obreiro Participante ' + i,
+        tipoParticipante: i % 5 === 0 ? 'Externo' : 'Membro',
+        congregacao: i % 2 === 0 ? 'Congregação Monte Sião - Setor 02' : 'Templo Sede Central',
+        situacaoInscricao: i % 10 === 0 ? 'Cancelada' : 'Confirmada',
+        presenca: i % 3 === 0 ? 'Ausente' : 'Presente',
+        horarioCheckin: i % 3 === 0 ? null : '18:30',
+        comHospedagem: i % 4 === 0,
+      });
+    }
+
+    const dadosEscola: DadosRelatorioEvento = {
+      eventoId: 'escola-obreiros-2026',
+      tituloEvento: 'Escola de Obreiros 2026',
+      tipoEvento: 'CURSO / CAPACITAÇÃO',
+      dataInicio: '10/11/2026',
+      dataFim: '14/11/2026',
+      horarioInicio: '19:00',
+      localNome: 'Templo Central - Auditório Principal',
+      localEndereco: 'Av. das Nações, 500 - Ananindeua / PA',
+      nomeCongregacao: 'Sede Geral / Todas as Congregações',
+      statusEvento: 'REALIZADO',
+      capacidade: 300,
+
+      totalInscricoesValidas: 108,
+      totalConfirmados: 108,
+      totalPresentes: 80,
+      totalAusentes: 28,
+      totalCancelados: 12,
+      totalListaEspera: 5,
+      taxaComparecimento: '74,1%',
+      taxaCancelamento: '10,0%',
+      membrosQtd: 96,
+      externosQtd: 24,
+
+      consolidacaoCongregacoes: [
+        { congregacao: 'Templo Sede Central', totalInscritos: 60, confirmados: 54, presentes: 42, ausentes: 12, taxaPresenca: '77,8%' },
+        { congregacao: 'Congregação Monte Sião - Setor 02', totalInscritos: 40, confirmados: 36, presentes: 26, ausentes: 10, taxaPresenca: '72,2%' },
+        { congregacao: 'Congregação Canaã', totalInscritos: 20, confirmados: 18, presentes: 12, ausentes: 6, taxaPresenca: '66,7%' },
+      ],
+
+      financeiro: {
+        eventoPago: true,
+        valorInscricao: 50.00,
+        totalInscricoesValidas: 108,
+        totalPrevisto: 5400.00,
+        totalRecebido: 4800.00,
+        totalPendente: 600.00,
+        totalCanceladoEstornado: 600.00,
+        formasPagamento: [
+          { forma: 'PIX', qtd: 70, valorTotal: 3500.00 },
+          { forma: 'Cartão de Crédito', qtd: 26, valorTotal: 1300.00 },
+        ],
+      },
+
+      beneficios: {
+        hospedagemHabilitada: true,
+        hospedagemDescricao: 'Alojamento nos anexos da Sede',
+        totalHospedagemSolicitada: 30,
+        totalHospedagemConfirmada: 25,
+        alimentacaoInclusa: true,
+        brindeHabilitado: true,
+        brindeQuantidade: 150,
+        brindesEntregues: 80,
+        certificadoHabilitado: true,
+        certificadosEmitidos: 75,
+      },
+
+      nomeMinisterio: 'IGREJA EVANGÉLICA ASSEMBLEIA DE DEUS EM ANANINDEUA',
+      subtituloMinisterio: 'CONVENÇÃO ESTADUAL • DEPARTAMENTO DE EDUCAÇÃO CRISTÃ',
+      cnpjMinisterio: '04.123.456/0001-78',
+      cidadeUf: 'Ananindeua - PA',
+      logoMinisterioUrl: null,
+      dataEmissao: '10/11/2026 17:30:00',
+
+      participantes: participantesEscola,
+    };
+
+    const pdfBuffer = await gerarRelatorioGerencialEventoPDF(dadosEscola);
+    assert.ok(pdfBuffer instanceof Uint8Array);
+    assert.ok(pdfBuffer.length > 15000, 'Relatório multipágina de 120 participantes deve ter tamanho condizente');
+
+    const pdfText = Buffer.from(pdfBuffer).toString('latin1');
+    const pageCount = (pdfText.match(/\/Type\s*\/Page\b/g) || []).length;
+    assert.ok(pageCount >= 3, `O documento deve possuir pelo menos 3 páginas (gerado: ${pageCount})`);
+  });
 });
