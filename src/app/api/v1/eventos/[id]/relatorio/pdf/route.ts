@@ -37,6 +37,8 @@ export async function GET(
 ) {
   try {
     const { id: eventoId } = await props.params;
+    const { searchParams } = new URL(request.url);
+    const tipo = searchParams.get('tipo') === 'resumido' ? 'resumido' : 'consolidado';
     const ctx = await resolveTenantAuth(request);
 
     if (!ctx.ministryId) {
@@ -370,10 +372,11 @@ export async function GET(
       participantes: participantesFormatados,
     };
 
-    const pdfBytes = await gerarRelatorioGerencialEventoPDF(dadosParaPdf);
+    const pdfBytes = await gerarRelatorioGerencialEventoPDF(dadosParaPdf, { tipo });
     const idCurto = evento.id.slice(0, 8);
     const dataRef = evento.data_inicio ? evento.data_inicio.slice(0, 10) : 'evento';
-    const filename = `Relatorio_Evento_${dataRef}_${idCurto}.pdf`;
+    const prefixo = tipo === 'resumido' ? 'Relatorio_Resumido_Evento' : 'Relatorio_Consolidado_Evento';
+    const filename = `${prefixo}_${dataRef}_${idCurto}.pdf`;
 
     return new NextResponse(pdfBytes as any, {
       status: 200,

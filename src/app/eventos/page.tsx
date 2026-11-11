@@ -877,6 +877,7 @@ export default function EventosPage() {
   // ── Modal Link Público de Check-in ────────────────────────────────────────
   const [showLinkCheckinModal, setShowLinkCheckinModal] = useState(false);
   const [gerandoRelatorioPdf, setGerandoRelatorioPdf] = useState(false);
+  const [gerandoRelatorioResumidoPdf, setGerandoRelatorioResumidoPdf] = useState(false);
   const [linkCheckinUrl, setLinkCheckinUrl] = useState('');
   const [linkCheckinExpiraEm, setLinkCheckinExpiraEm] = useState<string | null>(null);
   const [loadingLinkCheckin, setLoadingLinkCheckin] = useState(false);
@@ -6105,42 +6106,83 @@ export default function EventosPage() {
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-              <button
-                type="button"
-                disabled={gerandoRelatorioPdf}
-                onClick={async () => {
-                  if (!eventoSelecionado) return;
-                  setGerandoRelatorioPdf(true);
-                  try {
-                    const res = await fetch(`/api/v1/eventos/${eventoSelecionado.id}/relatorio/pdf`);
-                    if (!res.ok) {
-                      const errData = await res.json().catch(() => ({}));
-                      throw new Error(errData.error || `Erro ao gerar PDF (${res.status})`);
+              <div className="flex flex-wrap items-center gap-2.5">
+                {/* Botão 1: Relatório Resumido (Executivo sem lista nominal) */}
+                <button
+                  type="button"
+                  disabled={gerandoRelatorioResumidoPdf || gerandoRelatorioPdf}
+                  onClick={async () => {
+                    if (!eventoSelecionado) return;
+                    setGerandoRelatorioResumidoPdf(true);
+                    try {
+                      const res = await fetch(`/api/v1/eventos/${eventoSelecionado.id}/relatorio/pdf?tipo=resumido`);
+                      if (!res.ok) {
+                        const errData = await res.json().catch(() => ({}));
+                        throw new Error(errData.error || `Erro ao gerar PDF (${res.status})`);
+                      }
+                      const blob = await res.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      window.open(url, '_blank');
+                    } catch (err: any) {
+                      showModal('Erro ao gerar relatório', err?.message || 'Falha ao processar PDF resumido.', 'error');
+                    } finally {
+                      setGerandoRelatorioResumidoPdf(false);
                     }
-                    const blob = await res.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    window.open(url, '_blank');
-                  } catch (err: any) {
-                    showModal('Erro ao gerar relatório', err?.message || 'Falha ao processar PDF institucional.', 'error');
-                  } finally {
-                    setGerandoRelatorioPdf(false);
-                  }
-                }}
-                className="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-50"
-                title="Gerar e imprimir Relatório Gerencial completo do evento em PDF"
-              >
-                {gerandoRelatorioPdf ? (
-                  <>
-                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Gerando PDF Gerencial...</span>
-                  </>
-                ) : (
-                  <>
-                    <Printer className="w-4 h-4" />
-                    <span>Gerar Relatório PDF</span>
-                  </>
-                )}
-              </button>
+                  }}
+                  className="inline-flex items-center gap-2 bg-[#123b63] hover:bg-[#0d2a47] text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-50"
+                  title="Gerar Relatório Resumido com indicadores, congregações e financeiro (sem lista nominal)"
+                >
+                  {gerandoRelatorioResumidoPdf ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Gerando Resumido...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileBarChart2 className="w-4 h-4" />
+                      <span>Relatório Resumido</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Botão 2: Relatório Consolidado Geral (Completo com lista nominal) */}
+                <button
+                  type="button"
+                  disabled={gerandoRelatorioPdf || gerandoRelatorioResumidoPdf}
+                  onClick={async () => {
+                    if (!eventoSelecionado) return;
+                    setGerandoRelatorioPdf(true);
+                    try {
+                      const res = await fetch(`/api/v1/eventos/${eventoSelecionado.id}/relatorio/pdf?tipo=consolidado`);
+                      if (!res.ok) {
+                        const errData = await res.json().catch(() => ({}));
+                        throw new Error(errData.error || `Erro ao gerar PDF (${res.status})`);
+                      }
+                      const blob = await res.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      window.open(url, '_blank');
+                    } catch (err: any) {
+                      showModal('Erro ao gerar relatório', err?.message || 'Falha ao processar PDF institucional.', 'error');
+                    } finally {
+                      setGerandoRelatorioPdf(false);
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-50"
+                  title="Gerar e imprimir Relatório Consolidado Geral completo do evento em PDF (inclui participantes)"
+                >
+                  {gerandoRelatorioPdf ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Gerando Consolidado...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Printer className="w-4 h-4" />
+                      <span>Relatório Consolidado Geral</span>
+                    </>
+                  )}
+                </button>
+              </div>
 
               <button
                 onClick={() => exportarCSVInscricoes(inscricoes, eventoSelecionado.titulo)}

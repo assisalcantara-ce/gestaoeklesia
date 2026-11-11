@@ -136,10 +136,28 @@ function fmtBRL(val: number): string {
   return `R$ ${val.toFixed(2).replace('.', ',')}`;
 }
 
+export interface OpcoesRelatorioEventoPDF {
+  tipo?: 'consolidado' | 'resumido';
+}
+
 /**
- * Gera o documento institucional formal em PDF A4 do Relatório Gerencial do Evento
+ * Gera o documento institucional formal em PDF A4 do Relatório do Evento.
+ * Suporta dois modelos:
+ * - 'consolidado' (padrão): Relatório Consolidado Geral com lista nominal de participantes.
+ * - 'resumido': Relatório Resumido Executivo com indicadores, congregações e prestação de contas, sem listagem nominal.
  */
-export async function gerarRelatorioGerencialEventoPDF(dados: DadosRelatorioEvento): Promise<Uint8Array> {
+export async function gerarRelatorioGerencialEventoPDF(
+  dados: DadosRelatorioEvento,
+  opcoes?: OpcoesRelatorioEventoPDF
+): Promise<Uint8Array> {
+  const tipoRelatorio = opcoes?.tipo === 'resumido' ? 'resumido' : 'consolidado';
+  const tituloHeader = tipoRelatorio === 'resumido'
+    ? 'RELATÓRIO RESUMIDO DO EVENTO'
+    : 'RELATÓRIO CONSOLIDADO DO EVENTO';
+  const rodapeModulo = tipoRelatorio === 'resumido'
+    ? 'Relatório Resumido Executivo'
+    : 'Prestação de Contas do Evento';
+
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -221,7 +239,7 @@ export async function gerarRelatorioGerencialEventoPDF(dados: DadosRelatorioEven
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(18, 59, 99);
-    doc.text('RELATÓRIO GERENCIAL DO EVENTO', pageWidth - margin, headerTop + 3.8, { align: 'right' });
+    doc.text(tituloHeader, pageWidth - margin, headerTop + 3.8, { align: 'right' });
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
@@ -545,88 +563,90 @@ export async function gerarRelatorioGerencialEventoPDF(dados: DadosRelatorioEven
   const lastTableFinalY = (doc as any).lastAutoTable.finalY || curY + 20;
   curY = lastTableFinalY + 5;
 
-  // ─── 6. Relação Detalhada de Participantes (com quebra limpa e sem dados sensíveis) ───
-  // Se estiver muito perto do fim da página, força nova página para o início da lista
-  if (curY > pageHeight - 40) {
-    doc.addPage();
-    desenharCabecalho(doc.getNumberOfPages());
-    curY = 28;
+  // ─── 6. Relação Detalhada de Participantes (Exclusiva do Relatório Consolidado) ───
+  if (tipoRelatorio === 'consolidado') {
+    // Se estiver muito perto do fim da página, força nova página para o início da lista
+    if (curY > pageHeight - 40) {
+      doc.addPage();
+      desenharCabecalho(doc.getNumberOfPages());
+      curY = 28;
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(18, 59, 99);
+    doc.text('4. LISTAGEM OFICIAL DE PARTICIPANTES', margin, curY);
+    curY += 2;
+
+    const colunasPart = ['Nº', 'Nome do Participante', 'Vínculo', 'Congregação', 'Situação', 'Presença', 'Hospedagem'];
+    const linhasPart = dados.participantes.map(p => [
+      String(p.numero),
+      p.nome,
+      p.tipoParticipante,
+      p.congregacao,
+      p.situacaoInscricao,
+      p.presenca + (p.horarioCheckin ? ` (${p.horarioCheckin})` : ''),
+      p.comHospedagem ? 'Sim' : '—',
+    ]);
+
+    autoTable(doc, {
+      startY: curY,
+      head: [colunasPart],
+      body: linhasPart.length > 0 ? linhasPart : [['—', 'Nenhum participante inscrito', '—', '—', '—', '—', '—']],
+      theme: 'grid',
+      margin: { top: 30, left: margin, right: margin, bottom: 15 },
+      rowPageBreak: 'avoid',
+      styles: {
+        fontSize: 6.5,
+        cellPadding: 1.6,
+        textColor: [15, 23, 42],
+        lineColor: [226, 232, 240],
+        lineWidth: 0.2,
+        overflow: 'linebreak',
+      },
+      headStyles: {
+        fillColor: [18, 59, 99],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        halign: 'center',
+      },
+      columnStyles: {
+        0: { halign: 'center', cellWidth: 8 },
+        1: { halign: 'left', fontStyle: 'bold', cellWidth: 54 },
+        2: { halign: 'center', cellWidth: 18 },
+        3: { halign: 'left', cellWidth: 42 },
+        4: { halign: 'center', cellWidth: 24 },
+        5: { halign: 'center', fontStyle: 'bold', cellWidth: 22 },
+        6: { halign: 'center', cellWidth: 14 },
+      },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      didParseCell: (data) => {
+        if (data.section === 'body' && data.column.index === 5) {
+          const val = String(data.cell.raw).toLowerCase();
+          if (val.includes('presente')) {
+            data.cell.styles.textColor = [5, 150, 105]; // Emerald
+          } else {
+            data.cell.styles.textColor = [100, 116, 139]; // Slate
+          }
+        }
+        if (data.section === 'body' && data.column.index === 4) {
+          const val = String(data.cell.raw).toLowerCase();
+          if (val.includes('confirmad')) {
+            data.cell.styles.textColor = [37, 99, 235]; // Blue
+          } else if (val.includes('cancelad')) {
+            data.cell.styles.textColor = [225, 29, 72]; // Rose
+          } else if (val.includes('espera')) {
+            data.cell.styles.textColor = [217, 119, 6]; // Amber
+          }
+        }
+      },
+      didDrawPage: (hookData) => {
+        if (hookData.pageNumber > 1) {
+          desenharCabecalho(hookData.pageNumber);
+        }
+      },
+    });
   }
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(18, 59, 99);
-  doc.text('4. LISTAGEM OFICIAL DE PARTICIPANTES', margin, curY);
-  curY += 2;
-
-  const colunasPart = ['Nº', 'Nome do Participante', 'Vínculo', 'Congregação', 'Situação', 'Presença', 'Hospedagem'];
-  const linhasPart = dados.participantes.map(p => [
-    String(p.numero),
-    p.nome,
-    p.tipoParticipante,
-    p.congregacao,
-    p.situacaoInscricao,
-    p.presenca + (p.horarioCheckin ? ` (${p.horarioCheckin})` : ''),
-    p.comHospedagem ? 'Sim' : '—',
-  ]);
-
-  autoTable(doc, {
-    startY: curY,
-    head: [colunasPart],
-    body: linhasPart.length > 0 ? linhasPart : [['—', 'Nenhum participante inscrito', '—', '—', '—', '—', '—']],
-    theme: 'grid',
-    margin: { top: 30, left: margin, right: margin, bottom: 15 },
-    rowPageBreak: 'avoid',
-    styles: {
-      fontSize: 6.5,
-      cellPadding: 1.6,
-      textColor: [15, 23, 42],
-      lineColor: [226, 232, 240],
-      lineWidth: 0.2,
-      overflow: 'linebreak',
-    },
-    headStyles: {
-      fillColor: [18, 59, 99],
-      textColor: [255, 255, 255],
-      fontStyle: 'bold',
-      halign: 'center',
-    },
-    columnStyles: {
-      0: { halign: 'center', cellWidth: 8 },
-      1: { halign: 'left', fontStyle: 'bold', cellWidth: 54 },
-      2: { halign: 'center', cellWidth: 18 },
-      3: { halign: 'left', cellWidth: 42 },
-      4: { halign: 'center', cellWidth: 24 },
-      5: { halign: 'center', fontStyle: 'bold', cellWidth: 22 },
-      6: { halign: 'center', cellWidth: 14 },
-    },
-    alternateRowStyles: { fillColor: [248, 250, 252] },
-    didParseCell: (data) => {
-      if (data.section === 'body' && data.column.index === 5) {
-        const val = String(data.cell.raw).toLowerCase();
-        if (val.includes('presente')) {
-          data.cell.styles.textColor = [5, 150, 105]; // Emerald
-        } else {
-          data.cell.styles.textColor = [100, 116, 139]; // Slate
-        }
-      }
-      if (data.section === 'body' && data.column.index === 4) {
-        const val = String(data.cell.raw).toLowerCase();
-        if (val.includes('confirmad')) {
-          data.cell.styles.textColor = [37, 99, 235]; // Blue
-        } else if (val.includes('cancelad')) {
-          data.cell.styles.textColor = [225, 29, 72]; // Rose
-        } else if (val.includes('espera')) {
-          data.cell.styles.textColor = [217, 119, 6]; // Amber
-        }
-      }
-    },
-    didDrawPage: (hookData) => {
-      if (hookData.pageNumber > 1) {
-        desenharCabecalho(hookData.pageNumber);
-      }
-    },
-  });
 
   // ─── 7. Rodapé Institucional em Todas as Páginas ───────────────────────────
   const totalPaginas = (doc as any).internal.getNumberOfPages();
@@ -643,7 +663,7 @@ export async function gerarRelatorioGerencialEventoPDF(dados: DadosRelatorioEven
     doc.setFontSize(6.5);
     doc.setTextColor(100, 116, 139);
 
-    const rodapeEsquerda = `Gestão Eklésia • ${dados.nomeMinisterio || 'Ministério'} • Prestação de Contas do Evento`;
+    const rodapeEsquerda = `Gestão Eklésia • ${dados.nomeMinisterio || 'Ministério'} • ${rodapeModulo}`;
     doc.text(rodapeEsquerda, margin, footerY + 1.2);
 
     const rodapeDireita = `Página ${i} de ${totalPaginas}`;

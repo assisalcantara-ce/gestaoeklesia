@@ -441,4 +441,176 @@ test('Suíte de Testes: Relatório Gerencial Completo de Eventos em PDF', async 
     const pageCount = (pdfText.match(/\/Type\s*\/Page\b/g) || []).length;
     assert.ok(pageCount >= 3, `O documento deve possuir pelo menos 3 páginas (gerado: ${pageCount})`);
   });
+
+  await t.test('6. Validar Relatório Resumido: sem listagem nominal de participantes e com tabela de congregações', async () => {
+    const participantesLongos: any[] = [];
+    for (let i = 1; i <= 80; i++) {
+      participantesLongos.push({
+        numero: i,
+        nome: 'Participante ' + i,
+        tipoParticipante: 'Membro',
+        congregacao: 'Congregação Teste ' + (i % 5),
+        situacaoInscricao: 'Confirmada',
+        presenca: 'Presente',
+        horarioCheckin: '19:00',
+        comHospedagem: false,
+      });
+    }
+
+    const dadosEvento: DadosRelatorioEvento = {
+      eventoId: 'ev-resumido-01',
+      tituloEvento: 'Encontro de Líderes e Pastores 2026',
+      tipoEvento: 'SEMINÁRIO',
+      dataInicio: '12/11/2026',
+      dataFim: '13/11/2026',
+      horarioInicio: '19:30',
+      localNome: 'Auditório Nobre',
+      localEndereco: 'Rua Principal, 100',
+      nomeCongregacao: 'Sede Geral',
+      statusEvento: 'CONFIRMADO',
+      capacidade: 250,
+
+      totalInscricoesValidas: 80,
+      totalConfirmados: 80,
+      totalPresentes: 65,
+      totalAusentes: 15,
+      totalCancelados: 5,
+      totalListaEspera: 2,
+      taxaComparecimento: '81,25%',
+      taxaCancelamento: '5,88%',
+      membrosQtd: 70,
+      externosQtd: 10,
+
+      consolidacaoCongregacoes: [
+        { congregacao: 'Congregação Setor 1', totalInscritos: 30, confirmados: 30, presentes: 25, ausentes: 5, taxaPresenca: '83,3%' },
+        { congregacao: 'Congregação Setor 2', totalInscritos: 25, confirmados: 25, presentes: 20, ausentes: 5, taxaPresenca: '80,0%' },
+        { congregacao: 'Congregação Setor 3', totalInscritos: 25, confirmados: 25, presentes: 20, ausentes: 5, taxaPresenca: '80,0%' },
+      ],
+
+      financeiro: {
+        eventoPago: true,
+        valorInscricao: 30.00,
+        totalInscricoesValidas: 80,
+        totalPrevisto: 2400.00,
+        totalRecebido: 2100.00,
+        totalPendente: 300.00,
+        totalCanceladoEstornado: 150.00,
+        formasPagamento: [
+          { forma: 'PIX', qtd: 50, valorTotal: 1500.00 },
+          { forma: 'Boleto', qtd: 20, valorTotal: 600.00 },
+        ],
+      },
+
+      beneficios: {
+        hospedagemHabilitada: false,
+        totalHospedagemSolicitada: 0,
+        totalHospedagemConfirmada: 0,
+        alimentacaoInclusa: true,
+        brindeHabilitado: true,
+        brindeQuantidade: 100,
+        brindesEntregues: 65,
+        certificadoHabilitado: true,
+        certificadosEmitidos: 60,
+      },
+
+      nomeMinisterio: 'IGREJA EVANGÉLICA ASSEMBLEIA DE DEUS',
+      subtituloMinisterio: 'CONVENÇÃO MINISTERIAL',
+      cnpjMinisterio: '12.345.678/0001-90',
+      cidadeUf: 'Belém - PA',
+      logoMinisterioUrl: null,
+      dataEmissao: '10/11/2026 20:00:00',
+
+      participantes: participantesLongos,
+    };
+
+    // Gera o modelo Resumido
+    const pdfResumidoBuffer = await gerarRelatorioGerencialEventoPDF(dadosEvento, { tipo: 'resumido' });
+    assert.ok(pdfResumidoBuffer instanceof Uint8Array);
+
+    const pdfResumidoText = Buffer.from(pdfResumidoBuffer).toString('latin1');
+    const pageCountResumido = (pdfResumidoText.match(/\/Type\s*\/Page\b/g) || []).length;
+
+    // O relatório resumido NÃO deve possuir a listagem nominal (4. LISTAGEM OFICIAL DE PARTICIPANTES)
+    assert.equal(pdfResumidoText.includes('4. LISTAGEM OFICIAL DE PARTICIPANTES'), false, 'Não deve conter título da lista nominal');
+    assert.equal(pdfResumidoText.includes('Participante 1'), false, 'Não deve conter nomes de participantes');
+    assert.ok(pdfResumidoText.includes('RELATÓRIO RESUMIDO DO EVENTO'), 'Deve conter cabeçalho do relatório resumido');
+    assert.ok(pdfResumidoText.includes('3. CONSOLIDAÇÃO DE PARTICIPAÇÃO POR CONGREGAÇÃO'), 'Deve conter congregações');
+    assert.ok(pageCountResumido <= 2, `O relatório resumido de 3 congregações deve caber em 1 ou 2 páginas (gerado: ${pageCountResumido})`);
+
+    // Gera o modelo Consolidado Geral do mesmo evento para comparar
+    const pdfConsolidadoBuffer = await gerarRelatorioGerencialEventoPDF(dadosEvento, { tipo: 'consolidado' });
+    const pdfConsolidadoText = Buffer.from(pdfConsolidadoBuffer).toString('latin1');
+
+    assert.ok(pdfConsolidadoText.includes('4. LISTAGEM OFICIAL DE PARTICIPANTES'), 'O consolidado deve conter a listagem nominal');
+    assert.ok(pdfConsolidadoText.includes('Participante 1'), 'O consolidado deve conter nomes');
+  });
+
+  await t.test('7. Validar Relatório Resumido para Evento Gratuito com muitas congregações', async () => {
+    const muitasCongregacoes = [];
+    for (let i = 1; i <= 25; i++) {
+      muitasCongregacoes.push({
+        congregacao: `Congregação Setor ${i} - Região Metropolitana`,
+        totalInscritos: 15,
+        confirmados: 14,
+        presentes: 12,
+        ausentes: 2,
+        taxaPresenca: '85,7%',
+      });
+    }
+
+    const dadosGratuitoMuitasCongs: DadosRelatorioEvento = {
+      eventoId: 'ev-gratuito-muitas-congs',
+      tituloEvento: 'Cruzada Evangelística Geral 2026',
+      tipoEvento: 'CRUZADA',
+      dataInicio: '20/11/2026',
+      dataFim: '22/11/2026',
+      statusEvento: 'CONFIRMADO',
+      totalInscricoesValidas: 350,
+      totalConfirmados: 350,
+      totalPresentes: 300,
+      totalAusentes: 50,
+      totalCancelados: 10,
+      totalListaEspera: 0,
+      taxaComparecimento: '85,7%',
+      taxaCancelamento: '2,8%',
+      membrosQtd: 280,
+      externosQtd: 70,
+
+      consolidacaoCongregacoes: muitasCongregacoes,
+
+      financeiro: {
+        eventoPago: false,
+        valorInscricao: 0,
+        totalInscricoesValidas: 350,
+        totalPrevisto: 0,
+        totalRecebido: 0,
+        totalPendente: 0,
+        totalCanceladoEstornado: 0,
+        formasPagamento: [],
+      },
+
+      beneficios: {
+        hospedagemHabilitada: false,
+        totalHospedagemSolicitada: 0,
+        totalHospedagemConfirmada: 0,
+        alimentacaoInclusa: false,
+        brindeHabilitado: false,
+        brindesEntregues: 0,
+        certificadoHabilitado: false,
+        certificadosEmitidos: 0,
+      },
+
+      nomeMinisterio: 'IGREJA EVANGÉLICA ASSEMBLEIA DE DEUS',
+      dataEmissao: '10/11/2026 20:00:00',
+      participantes: [],
+    };
+
+    const pdfBuffer = await gerarRelatorioGerencialEventoPDF(dadosGratuitoMuitasCongs, { tipo: 'resumido' });
+    assert.ok(pdfBuffer instanceof Uint8Array);
+
+    const pdfText = Buffer.from(pdfBuffer).toString('latin1');
+    assert.ok(pdfText.includes('sem arrecada'), 'Deve indicar gratuidade explicitamente');
+    assert.ok(pdfText.includes('CONSOLIDA'), 'Deve incluir a tabela consolidada');
+    assert.equal(pdfText.includes('LISTAGEM OFICIAL DE PARTICIPANTES'), false, 'Não deve ter listagem');
+  });
 });
