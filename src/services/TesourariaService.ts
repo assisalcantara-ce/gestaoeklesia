@@ -26,8 +26,8 @@ export interface CriarLancamentoDTO {
 export class TesourariaService {
   private repository: TesourariaRepository;
 
-  constructor(supabase: any) {
-    this.repository = new TesourariaRepository(supabase);
+  constructor(supabase: any, repository?: TesourariaRepository) {
+    this.repository = repository || new TesourariaRepository(supabase);
   }
 
   async obterProximoCodigo(ministryId: string, dataLancamento?: string): Promise<string> {
@@ -68,6 +68,10 @@ export class TesourariaService {
 
     if (!dto.tipo_recebimento || dto.tipo_recebimento.trim().length === 0) {
       throw new Error('tipo_recebimento é obrigatório.');
+    }
+
+    if (dto.tipo_recebimento.trim().length > 30) {
+      throw new Error('tipo_recebimento não pode exceder 30 caracteres.');
     }
 
     if (typeof dto.valor !== 'number' || isNaN(dto.valor) || dto.valor <= 0) {
@@ -182,7 +186,12 @@ export class TesourariaService {
     const payload: Partial<LancamentoInsert> = {};
     if (dto.data_lancamento) payload.data_lancamento = dto.data_lancamento;
     if (dto.tipo_movimento) payload.tipo_movimento = dto.tipo_movimento;
-    if (dto.tipo_recebimento) payload.tipo_recebimento = dto.tipo_recebimento.trim();
+    if (dto.tipo_recebimento) {
+      if (dto.tipo_recebimento.trim().length > 30) {
+        throw new Error('tipo_recebimento não pode exceder 30 caracteres.');
+      }
+      payload.tipo_recebimento = dto.tipo_recebimento.trim();
+    }
     if (dto.valor !== undefined) payload.valor = dto.valor;
     if (dto.referencia !== undefined) payload.referencia = dto.referencia;
     if (dto.observacoes !== undefined) payload.observacoes = dto.observacoes;

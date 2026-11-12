@@ -79,6 +79,7 @@ export default function CategoriaFinanceiraModal({
               <input
                 type="text"
                 placeholder="Ex: 3.1"
+                maxLength={20}
                 value={formCat.codigo}
                 onChange={(e) => setFormCat((p: any) => ({ ...p, codigo: e.target.value }))}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"

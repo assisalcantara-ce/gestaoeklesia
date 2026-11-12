@@ -1081,6 +1081,16 @@ export function useTesouraria() {
         }
       }
 
+      // Validação defensiva de limite de caracteres do schema (varchar 30)
+      if (tipoRecebimentoFinal && tipoRecebimentoFinal.length > 30) {
+        showModal(
+          'Categoria com nome muito extenso',
+          `O identificador/código da categoria selecionada ("${tipoRecebimentoFinal}") excede o limite permitido pelo banco de dados (30 caracteres). Por favor, configure um código curto ou renomeie a categoria.`,
+          'error'
+        );
+        return;
+      }
+
       // Validação de duplicidade no frontend (mesma regra do backend: mesmo código, mesma congregação/caixa, mesmo mês/ano da data do lançamento)
       if (!options?.forcarDuplicidade && form.codigo_registro?.trim() && form.data_lancamento) {
         const codigoTrim = form.codigo_registro.trim().toLowerCase();
