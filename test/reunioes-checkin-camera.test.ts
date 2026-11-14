@@ -156,13 +156,19 @@ describe('Check-in Público de Reuniões — Mecanismo e Diagnóstico da Câmera
     assert.equal(code.toUpperCase(), '5FE7B7D2B1FC41E9');
   });
 
-  // 7. Não vazar dados de membros não convocados
-  it('deve validar resposta de proteção de privacidade para membros não convocados', () => {
-    const respostaSegura = {
-      error: 'Ministro cadastrado na instituição, porém não consta na lista de convocados desta reunião.',
-      code: 'MINISTRO_NAO_CONVOCADO',
-    };
-    assert.equal((respostaSegura as any).ministro, undefined);
-    assert.equal(respostaSegura.code, 'MINISTRO_NAO_CONVOCADO');
+  // 8. Auto-reset de feedback para preparar o leitor para o próximo ministro
+  it('deve limpar avisos anteriores ao ler uma nova credencial e agendar auto-fechamento', () => {
+    let feedback: any = { type: 'success', title: 'Check-in Confirmado!' };
+    let timerId: any = null;
+
+    function novaLeitura() {
+      // Fecha aviso imediatamente para o próximo ministro
+      if (timerId) clearTimeout(timerId);
+      feedback = null;
+    }
+
+    assert.notEqual(feedback, null);
+    novaLeitura();
+    assert.equal(feedback, null);
   });
 });

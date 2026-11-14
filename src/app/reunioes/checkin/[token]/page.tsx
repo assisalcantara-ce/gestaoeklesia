@@ -134,6 +134,7 @@ export default function CheckinPublicoPage() {
   const animFrameRef = useRef<number | null>(null);
   const cooldownRef = useRef(false);
   const lastScannedQrRef = useRef<string | null>(null);
+  const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Scanner óptico USB / Bluetooth
   const [manualQrInputValue, setManualQrInputValue] = useState('');
@@ -223,6 +224,10 @@ export default function CheckinPublicoPage() {
     setCameraState('idle');
     cooldownRef.current = false;
     lastScannedQrRef.current = null;
+    if (feedbackTimeoutRef.current) {
+      clearTimeout(feedbackTimeoutRef.current);
+      feedbackTimeoutRef.current = null;
+    }
   }, []);
 
   // Prevenção de gestos de pinça e duplo toque em dispositivos móveis (ex: Safari iOS)
@@ -342,6 +347,15 @@ export default function CheckinPublicoPage() {
         });
       } finally {
         setEnviando(false);
+
+        // Agendar fechamento automático dos avisos para preparar a tela para o próximo ministro
+        if (feedbackTimeoutRef.current) {
+          clearTimeout(feedbackTimeoutRef.current);
+        }
+        feedbackTimeoutRef.current = setTimeout(() => {
+          setFeedback(null);
+          feedbackTimeoutRef.current = null;
+        }, 3500);
       }
     },
     [token, enviando]
@@ -390,6 +404,13 @@ export default function CheckinPublicoPage() {
               if (!cooldownRef.current || lastScannedQrRef.current !== qrValue) {
                 cooldownRef.current = true;
                 lastScannedQrRef.current = qrValue;
+
+                // Fechar avisos/cards anteriores imediatamente para recepcionar a nova leitura
+                if (feedbackTimeoutRef.current) {
+                  clearTimeout(feedbackTimeoutRef.current);
+                  feedbackTimeoutRef.current = null;
+                }
+                setFeedback(null);
 
                 // Processar checkin sem desativar a câmera, permitindo leitura do próximo participante
                 processarCheckin({ qr_code: qrValue, metodo_leitura: 'qrcode_carteirinha' });
@@ -748,7 +769,13 @@ export default function CheckinPublicoPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setFeedback(null)}
+                onClick={() => {
+                  if (feedbackTimeoutRef.current) {
+                    clearTimeout(feedbackTimeoutRef.current);
+                    feedbackTimeoutRef.current = null;
+                  }
+                  setFeedback(null);
+                }}
                 className="text-slate-400 hover:text-slate-700 p-1 font-bold text-sm"
               >
                 ✕
