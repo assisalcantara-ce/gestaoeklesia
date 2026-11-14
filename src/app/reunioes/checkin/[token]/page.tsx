@@ -333,7 +333,7 @@ export default function CheckinPublicoPage() {
           } else {
             setFeedback({
               type: 'error',
-              title: 'Credencial Não Localizada',
+              title: data.code === 'ERRO_BANCO_DADOS' ? 'Erro no Sistema' : 'Credencial Não Localizada',
               message: data.error || 'Código ou carteirinha não localizado nesta reunião ministerial.',
             });
           }
@@ -348,14 +348,14 @@ export default function CheckinPublicoPage() {
       } finally {
         setEnviando(false);
 
-        // Agendar fechamento automático dos avisos para preparar a tela para o próximo ministro
+        // Agendar fechamento automático dos avisos após 2.5s para preparar a tela para o próximo ministro
         if (feedbackTimeoutRef.current) {
           clearTimeout(feedbackTimeoutRef.current);
         }
         feedbackTimeoutRef.current = setTimeout(() => {
           setFeedback(null);
           feedbackTimeoutRef.current = null;
-        }, 3500);
+        }, 2500);
       }
     },
     [token, enviando]

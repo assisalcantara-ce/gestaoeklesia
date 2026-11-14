@@ -437,9 +437,25 @@ export async function POST(
         metodo_leitura,
       })
       .select('id, data_hora_checkin')
-      .single();
+      .maybeSingle();
 
     if (insErr) {
+      // Se bateu na constraint UNIQUE (reuniao_id, member_id) por duplicidade simultânea
+      if (insErr.code === '23505') {
+        return NextResponse.json({
+          success: true,
+          ja_presente: true,
+          message: `Presença já confirmada anteriormente para ${participante.nome_ministro_snapshot}.`,
+          participante: {
+            id: participante.id,
+            nome: participante.nome_ministro_snapshot,
+            cargo: participante.cargo_snapshot,
+            congregacao: participante.nome_congregacao_snapshot,
+          },
+        });
+      }
+
+      console.error('[PublicCheckin] Erro ao inserir reunioes_checkins:', insErr);
       return NextResponse.json(
         { error: 'Erro ao registrar check-in no sistema.', detail: insErr.message },
         { status: 500 }
@@ -451,17 +467,22 @@ export async function POST(
       .from('reunioes_participantes')
       .update({
         status_presenca: 'presente',
-        data_hora_checkin: nowIso,
-        updated_at: nowIso,
       })
       .eq('id', participante.id);
 
-    // 8. Atualizar total de presentes da reunião
-    const novoTotalPresentes = (reuniao.total_presentes || 0) + 1;
+    // 8. Atualizar total de presentes da reunião de forma sincronizada
+    const { count: countPresentes } = await admin
+      .from('reunioes_participantes')
+      .select('*', { count: 'exact', head: true })
+      .eq('reuniao_id', reuniao.id)
+      .eq('status_presenca', 'presente');
+
+    const totalCalculado = countPresentes ?? ((reuniao.total_presentes || 0) + 1);
+
     await admin
       .from('reunioes')
       .update({
-        total_presentes: novoTotalPresentes,
+        total_presentes: totalCalculado,
         updated_at: nowIso,
       })
       .eq('id', reuniao.id);
@@ -477,9 +498,9 @@ export async function POST(
         congregacao: participante.nome_congregacao_snapshot,
       },
       checkin: {
-        id: checkinSalvo.id,
-        data_hora: checkinSalvo.data_hora_checkin,
-        total_presentes: novoTotalPresentes,
+        id: checkinSalvo?.id || participante.id,
+        data_hora: checkinSalvo?.data_hora_checkin || nowIso,
+        total_presentes: totalCalculado,
       },
     });
   } catch (err: any) {
