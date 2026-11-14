@@ -269,16 +269,21 @@ export async function POST(
       participante = pMem;
     } else if (unique_id) {
       const cleanUnique = extrairIdentificadorMinistroQrCode(String(unique_id));
-      const cleanLower = cleanUnique.toLowerCase();
-      const cleanUpper = cleanUnique.toUpperCase();
+      const isUuidUnique = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(cleanUnique);
 
-      const { data: pUni, error: pUniErr } = await admin
+      let queryUni = admin
         .from('reunioes_participantes')
         .select('*')
         .eq('reuniao_id', reuniao.id)
-        .eq('ministry_id', tokenRow.ministry_id)
-        .or(`unique_id_snapshot.eq.${cleanUnique},unique_id_snapshot.eq.${cleanLower},unique_id_snapshot.eq.${cleanUpper},carteirinha_numero_snapshot.eq.${cleanUnique},carteirinha_numero_snapshot.eq.${cleanLower},carteirinha_numero_snapshot.eq.${cleanUpper},member_id.eq.${cleanUnique}`)
-        .maybeSingle();
+        .eq('ministry_id', tokenRow.ministry_id);
+
+      if (isUuidUnique) {
+        queryUni = queryUni.or(`member_id.eq.${cleanUnique},unique_id_snapshot.eq.${cleanUnique}`);
+      } else {
+        queryUni = queryUni.or(`unique_id_snapshot.eq.${cleanUnique},carteirinha_numero_snapshot.eq.${cleanUnique}`);
+      }
+
+      const { data: pUni, error: pUniErr } = await queryUni.maybeSingle();
 
       if (pUniErr) {
         console.error('[PublicCheckin] Erro ao buscar participante por unique_id:', pUniErr);
@@ -290,18 +295,22 @@ export async function POST(
       participante = pUni;
     } else if (qr_code) {
       const parsedId = extrairIdentificadorMinistroQrCode(String(qr_code));
-      const parsedLower = parsedId.toLowerCase();
-      const parsedUpper = parsedId.toUpperCase();
       const rawTermo = String(qr_code).trim();
-      
-      // Tentar pelo identificador extraído (URL decodificada, unique_id ou uuid)
-      let { data: pQr, error: pQrErr } = await admin
+      const isUuidQr = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(parsedId);
+
+      let queryQr = admin
         .from('reunioes_participantes')
         .select('*')
         .eq('reuniao_id', reuniao.id)
-        .eq('ministry_id', tokenRow.ministry_id)
-        .or(`unique_id_snapshot.eq.${parsedId},unique_id_snapshot.eq.${parsedLower},unique_id_snapshot.eq.${parsedUpper},carteirinha_numero_snapshot.eq.${parsedId},carteirinha_numero_snapshot.eq.${parsedLower},carteirinha_numero_snapshot.eq.${parsedUpper},member_id.eq.${parsedId}`)
-        .maybeSingle();
+        .eq('ministry_id', tokenRow.ministry_id);
+
+      if (isUuidQr) {
+        queryQr = queryQr.or(`member_id.eq.${parsedId},unique_id_snapshot.eq.${parsedId}`);
+      } else {
+        queryQr = queryQr.or(`unique_id_snapshot.eq.${parsedId},carteirinha_numero_snapshot.eq.${parsedId}`);
+      }
+
+      let { data: pQr, error: pQrErr } = await queryQr.maybeSingle();
 
       if (pQrErr) {
         console.error('[PublicCheckin] Erro ao buscar participante por QR Code:', pQrErr);
@@ -347,8 +356,6 @@ export async function POST(
 
       if (termoBuscaCheck) {
         const isUuidCheck = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(termoBuscaCheck);
-        const termoLower = termoBuscaCheck.toLowerCase();
-        const termoUpper = termoBuscaCheck.toUpperCase();
 
         let memberCheckQuery = admin
           .from('members')
@@ -358,7 +365,7 @@ export async function POST(
         if (isUuidCheck) {
           memberCheckQuery = memberCheckQuery.or(`id.eq.${termoBuscaCheck},unique_id.eq.${termoBuscaCheck}`);
         } else {
-          memberCheckQuery = memberCheckQuery.or(`unique_id.eq.${termoBuscaCheck},unique_id.eq.${termoLower},unique_id.eq.${termoUpper},matricula.eq.${termoBuscaCheck},matricula.eq.${termoLower},matricula.eq.${termoUpper}`);
+          memberCheckQuery = memberCheckQuery.or(`unique_id.eq.${termoBuscaCheck},matricula.eq.${termoBuscaCheck}`);
         }
 
         const { data: memberFound, error: mErr } = await memberCheckQuery.maybeSingle();
