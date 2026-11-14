@@ -14,6 +14,7 @@ const SIDEBAR_PREFIXES = [
   '/tesouraria',
   '/secretaria',
   '/acolhimento',
+  '/celulas',
   '/ebd',
   '/comissao',
   '/reunioes',
@@ -34,6 +35,7 @@ const SIDEBAR_PREFIXES = [
 const STANDALONE_PUBLIC_PREFIXES = [
   '/pastor',
   '/reunioes/painel',
+  '/reunioes/checkin',
   '/eventos/check-in',
   '/eventos/e',
   '/ebd/chamada-rapida',

@@ -11,6 +11,7 @@ const SIDEBAR_PREFIXES = [
   '/tesouraria',
   '/secretaria',
   '/acolhimento',
+  '/celulas',
   '/ebd',
   '/comissao',
   '/reunioes',

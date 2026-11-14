@@ -31,6 +31,7 @@ import {
   Phone,
   MapPin,
   IdCard,
+  Lock,
 } from 'lucide-react';
 
 type EditableFields = Pick<
@@ -50,18 +51,34 @@ function ReadOnlyField({
   label,
   value,
   icon,
+  isEditMode = false,
 }: {
   label: string;
   value: string | null;
   icon?: React.ReactNode;
+  isEditMode?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
-        {icon}
-        {label}
-      </span>
-      <div className="text-xs text-slate-200 font-medium bg-[#172033] px-3.5 py-2.5 rounded-xl border border-slate-700/60 truncate">
+      <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
+        <span className="flex items-center gap-1.5 truncate">
+          {icon}
+          {label}
+        </span>
+        {isEditMode && (
+          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-400 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700/60 shrink-0 ml-1.5">
+            <Lock size={10} className="text-slate-400" />
+            Bloqueado
+          </span>
+        )}
+      </div>
+      <div
+        className={`text-xs font-medium px-3.5 py-2.5 rounded-xl border truncate transition-all ${
+          isEditMode
+            ? 'text-slate-400 bg-slate-800/40 border-slate-700/50 select-none cursor-not-allowed opacity-85'
+            : 'text-slate-200 bg-[#172033] border-slate-700/60'
+        }`}
+      >
         {value || '—'}
       </div>
     </div>
@@ -85,13 +102,16 @@ function EditableInput({
 }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-slate-300 mb-1.5">{label}</label>
+      <label className="block text-xs font-bold text-emerald-400 mb-1.5 flex items-center gap-1.5">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+        {label}
+      </label>
       <input
         type={type}
         value={value ?? ''}
         onChange={(e) => onChange(field, e.target.value)}
         placeholder={placeholder}
-        className="w-full px-3.5 py-2.5 bg-[#172033] border border-slate-700 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+        className="w-full px-3.5 py-2.5 bg-emerald-950/25 border-2 border-emerald-500/80 rounded-xl text-xs font-medium text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400 focus:bg-emerald-950/40 transition-all shadow-xs"
       />
     </div>
   );
@@ -287,20 +307,27 @@ export default function PerfilPage() {
 
           {/* Dados Cadastrais Fixos */}
           <div className="bg-[#111827] rounded-2xl border border-slate-800 shadow-md p-5 space-y-3.5">
-            <h3 className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
-              <IdCard size={14} />
-              Dados Cadastrais
-            </h3>
-            <ReadOnlyField label="CPF" value={member.cpf} />
-            <div className="grid grid-cols-2 gap-3">
-              <ReadOnlyField label="Matrícula" value={member.matricula} />
-              <ReadOnlyField label="Status" value={member.status} />
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                <IdCard size={14} />
+                Dados Cadastrais
+              </h3>
+              {editMode && (
+                <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
+                  <Lock size={11} className="text-slate-400" />
+                  Campos institucionais
+                </span>
+              )}
             </div>
-            <ReadOnlyField label="Congregação" value={member.congregacao_nome} />
-            <ReadOnlyField label="Tipo de Cadastro" value={member.tipo_cadastro} />
+            <ReadOnlyField label="CPF" value={member.cpf} isEditMode={editMode} />
+            <div className="grid grid-cols-2 gap-3">
+              <ReadOnlyField label="Matrícula" value={member.matricula} isEditMode={editMode} />
+              <ReadOnlyField label="Status" value={member.status} isEditMode={editMode} />
+            </div>
+            <ReadOnlyField label="Congregação" value={member.congregacao_nome} isEditMode={editMode} />
+            <ReadOnlyField label="Tipo de Cadastro" value={member.tipo_cadastro} isEditMode={editMode} />
           </div>
-
-          {/* Contato */}
+{/* Contato */}
           <div className="bg-[#111827] rounded-2xl border border-slate-800 shadow-md p-5 space-y-3.5">
             <h3 className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
               <Phone size={14} />

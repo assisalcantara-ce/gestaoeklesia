@@ -41,7 +41,7 @@ import {
   CalendarDays,
   Users,
   Heart,
-  MessageCircle,
+  FileText,
   Bell,
   ChevronRight,
   Loader2,
@@ -380,7 +380,7 @@ export default function InicioPage() {
             - Textos: 11–12px na cor #092344
             - Ordem exata:
                 Linha 1: 1. Mensagens | 2. Eventos | 3. Células
-                Linha 2: 4. Pedidos de Oração | 5. Contribuir | 6. Falar com o Pastor
+                Linha 2: 4. Pedidos de Oração | 5. Contribuir | 6. Solicitações
         ───────────────────────────────────────────────────────────── */}
         <section className="w-full mt-[18px]">
           <div className="grid grid-cols-3 gap-x-[8px] gap-y-[10px]">
@@ -440,14 +440,14 @@ export default function InicioPage() {
               </span>
             </button>
 
-            {/* 6. Falar com o Pastor */}
+            {/* 6. Solicitações */}
             <button
-              onClick={() => handleCardClick('pastor', '/app/cuidado-pastoral')}
+              onClick={() => handleCardClick('solicitacoes', '/app/solicitacoes')}
               className="w-full h-[94px] xs:h-[100px] sm:h-[104px] bg-[#FFFFFF] rounded-[12px] p-[8px] flex flex-col items-center justify-center text-center shadow-[0_4px_14px_rgba(0,0,0,0.12)] hover:bg-slate-50 active:scale-[0.97] transition-all cursor-pointer select-none"
             >
-              <MessageCircle size={28} strokeWidth={2} className="text-[#092B55] shrink-0" />
+              <FileText size={28} strokeWidth={2} className="text-[#092B55] shrink-0" />
               <span className="text-[11px] xs:text-[12px] font-semibold text-[#092344] leading-tight line-clamp-2 mt-[9px]">
-                Falar com<br />o Pastor
+                Solicitações
               </span>
             </button>
 

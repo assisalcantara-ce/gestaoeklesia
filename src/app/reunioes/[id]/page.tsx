@@ -102,6 +102,8 @@ export default function DetalhesReuniaoPage() {
 
   // Modais de Ação
   const [modalCheckinAberto, setModalCheckinAberto] = useState<boolean>(false);
+  const [carregandoTokenCheckin, setCarregandoTokenCheckin] = useState<boolean>(false);
+  const [urlCheckinPublica, setUrlCheckinPublica] = useState<string | null>(null);
   const [copiadoCheckin, setCopiadoCheckin] = useState<boolean>(false);
 
   const [modalPainelAberto, setModalPainelAberto] = useState<boolean>(false);
@@ -185,16 +187,41 @@ export default function DetalhesReuniaoPage() {
     return false;
   }, [reuniao]);
 
-  const urlCheckinTerminal = useMemo(() => {
-    if (typeof window !== 'undefined' && reuniao?.id) {
-      return `${window.location.origin}/reunioes/${reuniao.id}/checkin`;
+  // ─── 1.1 Ação: Abrir Modal / Obter Token de Check-in ───────────────────────
+  const abrirModalCheckin = async () => {
+    if (!reuniao) return;
+    setModalCheckinAberto(true);
+    setCarregandoTokenCheckin(true);
+    setCopiadoCheckin(false);
+
+    try {
+      let url: string | null = null;
+      const resGet = await fetchAutenticado(`/api/v1/reunioes/${reuniao.id}/checkin/token`);
+      const dataGet = await resGet.json();
+
+      if (dataGet.success && dataGet.status_efetivo === 'ativo' && dataGet.url_checkin) {
+        url = dataGet.url_checkin;
+      } else if (reuniao.status !== 'encerrada') {
+        const resPost = await fetchAutenticado(`/api/v1/reunioes/${reuniao.id}/checkin/token`, {
+          method: 'POST',
+        });
+        const dataPost = await resPost.json();
+        if (dataPost.success && dataPost.url_checkin) {
+          url = dataPost.url_checkin;
+        }
+      }
+
+      setUrlCheckinPublica(url);
+    } catch (err) {
+      console.warn('Erro ao obter token de check-in:', err);
+    } finally {
+      setCarregandoTokenCheckin(false);
     }
-    return '';
-  }, [reuniao?.id]);
+  };
 
   const copiarLinkCheckin = () => {
-    if (urlCheckinTerminal) {
-      navigator.clipboard.writeText(urlCheckinTerminal);
+    if (urlCheckinPublica) {
+      navigator.clipboard.writeText(urlCheckinPublica);
       setCopiadoCheckin(true);
       setTimeout(() => setCopiadoCheckin(false), 2500);
     }
@@ -213,23 +240,21 @@ export default function DetalhesReuniaoPage() {
       const resGet = await fetchAutenticado(`/api/v1/reunioes/${reuniao.id}/painel/token`);
       const dataGet = await resGet.json();
 
-      if (dataGet.success && dataGet.status_efetivo === 'ativo' && dataGet.token_info) {
+      if (dataGet.success && dataGet.status_efetivo === 'ativo' && dataGet.url_painel) {
         setTokenInfo({
-          url_painel: `${window.location.origin}/reunioes/painel/${dataGet.token_info.id}`,
+          url_painel: dataGet.url_painel,
         });
-      }
-
-      const resPost = await fetchAutenticado(`/api/v1/reunioes/${reuniao.id}/painel/token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ duracao_horas: 24 }),
-      });
-      const dataPost = await resPost.json();
-      if (dataPost.success) {
-        setTokenInfo({
-          url_painel: `${window.location.origin}/reunioes/painel/${dataPost.token}`,
-          token: dataPost.token,
+      } else {
+        const resPost = await fetchAutenticado(`/api/v1/reunioes/${reuniao.id}/painel/token`, {
+          method: 'POST',
         });
+        const dataPost = await resPost.json();
+        if (dataPost.success && dataPost.url_painel) {
+          setTokenInfo({
+            url_painel: dataPost.url_painel,
+            token: dataPost.token,
+          });
+        }
       }
     } catch (err) {
       console.warn('Erro ao obter token do painel:', err);
@@ -554,7 +579,7 @@ export default function DetalhesReuniaoPage() {
           ) : (
             <button
               type="button"
-              onClick={() => setModalCheckinAberto(true)}
+              onClick={abrirModalCheckin}
               className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl shadow transition"
             >
               <QrCode className="w-4 h-4" />
@@ -1111,31 +1136,34 @@ export default function DetalhesReuniaoPage() {
                 <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl text-center space-y-1">
                   <AlertTriangle className="w-6 h-6 text-amber-600 mx-auto" />
                   <p className="font-bold text-xs">Check-in encerrado.</p>
-                  <p className="text-[11px] text-amber-700">O horário limite foi atingido.</p>
+                  <p className="text-[11px] text-amber-700">O horário limite foi atingido ou a reunião foi encerrada.</p>
                 </div>
-              ) : (
+              ) : carregandoTokenCheckin ? (
+                <div className="p-6 text-center text-slate-400">
+                  <RefreshCw className="w-5 h-5 animate-spin mx-auto text-teal-600 mb-2" />
+                  <span>Obtendo link público de check-in...</span>
+                </div>
+              ) : urlCheckinPublica ? (
                 <>
                   <div className="flex flex-col items-center justify-center p-4 bg-slate-50 rounded-2xl border border-slate-200">
                     <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
-                      {/* QR Code gerado dinamicamente para o link do terminal */}
-                      {urlCheckinTerminal && (
-                        <img
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-                            urlCheckinTerminal
-                          )}&bgcolor=FFFFFF&color=0F172A`}
-                          alt="QR Code Terminal Check-in"
-                          className="w-40 h-40 object-contain rounded-lg"
-                        />
-                      )}
+                      {/* QR Code gerado dinamicamente para o link público do terminal */}
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+                          urlCheckinPublica
+                        )}&bgcolor=FFFFFF&color=0F172A`}
+                        alt="QR Code Terminal Check-in"
+                        className="w-40 h-40 object-contain rounded-lg"
+                      />
                     </div>
                     <span className="text-[10px] text-slate-500 font-semibold mt-2">
-                      Aponte a câmera do dispositivo ou leitor
+                      Aponte a câmera do celular ou leitor
                     </span>
                   </div>
 
                   {/* URL Box */}
                   <div className="p-3 bg-slate-900 text-teal-300 font-mono text-xs rounded-xl break-all border border-slate-800 flex items-center justify-between gap-2">
-                    <span className="truncate">{urlCheckinTerminal}</span>
+                    <span className="truncate">{urlCheckinPublica}</span>
                     <button
                       onClick={copiarLinkCheckin}
                       className="p-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition shrink-0"
@@ -1151,18 +1179,24 @@ export default function DetalhesReuniaoPage() {
                       className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition"
                     >
                       {copiadoCheckin ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiadoCheckin ? 'Link Copiado!' : 'Copiar Link'}</span>
+                      <span>{copiadoCheckin ? 'Link de check-in copiado!' : 'Copiar Link'}</span>
                     </button>
 
-                    <Link
-                      href={`/reunioes/${reuniao.id}/checkin`}
+                    <a
+                      href={urlCheckinPublica}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="flex-1 py-2 bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs rounded-xl shadow flex items-center justify-center gap-1.5 transition text-center"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                       <span>Abrir Check-in</span>
-                    </Link>
+                    </a>
                   </div>
                 </>
+              ) : (
+                <div className="p-3 bg-amber-50 text-amber-800 rounded-xl border border-amber-200 text-xs">
+                  Link de check-in indisponível no momento.
+                </div>
               )}
             </div>
 

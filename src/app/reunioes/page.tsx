@@ -6,7 +6,7 @@ import PageLayout from '@/components/PageLayout';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { createClient } from '@/lib/supabase-client';
-import { calcularStatusEfetivoReuniao, StatusReuniaoEfetivo } from '@/lib/reunioes-utils';
+import { calcularStatusEfetivoReuniao, StatusReuniaoEfetivo, ordenarReunioesMinisteriais } from '@/lib/reunioes-utils';
 import {
   Calendar,
   Clock,
@@ -24,8 +24,6 @@ import {
   Lock,
   Search,
   Check,
-  Copy,
-  ExternalLink,
   X,
   FileText,
   ArrowRight,
@@ -74,7 +72,6 @@ export default function ReunioesPage() {
 
   // Modais
   const [modalNovaAberto, setModalNovaAberto] = useState<boolean>(false);
-  const [modalPainelAberto, setModalPainelAberto] = useState<boolean>(false);
   const [modalEncerrarAberto, setModalEncerrarAberto] = useState<boolean>(false);
   const [reuniaoSelecionada, setReuniaoSelecionada] = useState<ReuniaoItem | null>(null);
 
@@ -88,10 +85,11 @@ export default function ReunioesPage() {
   const [salvandoNova, setSalvandoNova] = useState<boolean>(false);
   const [erroForm, setErroForm] = useState<string | null>(null);
 
-  // Estado do Painel TV
-  const [carregandoToken, setCarregandoToken] = useState<boolean>(false);
-  const [tokenInfo, setTokenInfo] = useState<{ url_painel?: string; token?: string; status_efetivo?: string } | null>(null);
-  const [copiado, setCopiado] = useState<boolean>(false);
+  // Estado de Cópia Rápida de Links
+  const [copiandoCheckinId, setCopiandoCheckinId] = useState<string | null>(null);
+  const [copiandoPainelId, setCopiandoPainelId] = useState<string | null>(null);
+  const [copiadoCheckinId, setCopiadoCheckinId] = useState<string | null>(null);
+  const [copiadoPainelId, setCopiadoPainelId] = useState<string | null>(null);
 
   // Estado de Encerramento
   const [encerrando, setEncerrando] = useState<boolean>(false);
@@ -130,13 +128,13 @@ export default function ReunioesPage() {
         throw new Error(data.error || 'Erro ao carregar lista de reuniões.');
       }
 
-      // Adicionar status_efetivo calculado para cada reunião
+      // Adicionar status_efetivo calculado para cada reunião e ordenar
       const listaTratada: ReuniaoItem[] = (data.reunioes || []).map((r: ReuniaoItem) => ({
         ...r,
         status_efetivo: calcularStatusEfetivoReuniao(r),
       }));
 
-      setReunioes(listaTratada);
+      setReunioes(ordenarReunioesMinisteriais(listaTratada));
     } catch (err: any) {
       setError(err?.message || 'Falha ao buscar reuniões do servidor.');
     } finally {
@@ -210,53 +208,74 @@ export default function ReunioesPage() {
     }
   };
 
-  // ─── 3. Gerar / Consultar Link do Painel TV ────────────────────────────────
-  const abrirPainelTv = async (reuniao: ReuniaoItem) => {
-    setReuniaoSelecionada(reuniao);
-    setModalPainelAberto(true);
-    setCarregandoToken(true);
-    setCopiado(false);
-
+  // ─── 3. Ações de Cópia de Links Públicos (Check-in e Painel TV) ────────────
+  const copiarLinkCheckin = async (reuniao: ReuniaoItem) => {
     try {
-      // 1. Consultar estado do token
-      const resGet = await fetchAutenticado(`/api/v1/reunioes/${reuniao.id}/painel/token`);
+      setCopiandoCheckinId(reuniao.id);
+
+      // Obter ou gerar token de check-in
+      let urlCheckin: string | null = null;
+      const resGet = await fetchAutenticado(`/api/v1/reunioes/${reuniao.id}/checkin/token`);
       const dataGet = await resGet.json();
 
-      if (dataGet.success && dataGet.status_efetivo === 'ativo' && dataGet.token_info) {
-        setTokenInfo({
-          status_efetivo: 'ativo',
-          url_painel: `${window.location.origin}/reunioes/painel/${dataGet.token_info.id}`,
-        });
-      }
-
-      // Se não há token ativo e a reunião não está encerrada, gerar novo token
-      if (reuniao.status !== 'encerrada') {
-        const resPost = await fetchAutenticado(`/api/v1/reunioes/${reuniao.id}/painel/token`, {
+      if (dataGet.success && dataGet.status_efetivo === 'ativo' && dataGet.url_checkin) {
+        urlCheckin = dataGet.url_checkin;
+      } else if (reuniao.status !== 'encerrada') {
+        const resPost = await fetchAutenticado(`/api/v1/reunioes/${reuniao.id}/checkin/token`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ duracao_horas: 24 }),
         });
         const dataPost = await resPost.json();
-        if (dataPost.success) {
-          setTokenInfo({
-            url_painel: `${window.location.origin}/reunioes/painel/${dataPost.token}`,
-            token: dataPost.token,
-            status_efetivo: 'ativo',
-          });
+        if (dataPost.success && dataPost.url_checkin) {
+          urlCheckin = dataPost.url_checkin;
         }
       }
-    } catch (err) {
-      console.warn('Erro ao obter token do painel:', err);
+
+      if (!urlCheckin) {
+        throw new Error('Não foi possível gerar ou obter o link de check-in desta reunião.');
+      }
+
+      // Copiar link completo para o clipboard
+      await navigator.clipboard.writeText(urlCheckin);
+      setCopiadoCheckinId(reuniao.id);
+      setTimeout(() => setCopiadoCheckinId((prev) => (prev === reuniao.id ? null : prev)), 3000);
+    } catch (err: any) {
+      alert(err?.message || 'Erro ao copiar link de check-in.');
     } finally {
-      setCarregandoToken(false);
+      setCopiandoCheckinId(null);
     }
   };
 
-  const copiarLinkPainel = () => {
-    if (tokenInfo?.url_painel) {
-      navigator.clipboard.writeText(tokenInfo.url_painel);
-      setCopiado(true);
-      setTimeout(() => setCopiado(false), 2500);
+  const copiarLinkPainelDireto = async (reuniao: ReuniaoItem) => {
+    try {
+      setCopiandoPainelId(reuniao.id);
+
+      let urlPainel: string | null = null;
+      const resGet = await fetchAutenticado(`/api/v1/reunioes/${reuniao.id}/painel/token`);
+      const dataGet = await resGet.json();
+
+      if (dataGet.success && dataGet.status_efetivo === 'ativo' && dataGet.url_painel) {
+        urlPainel = dataGet.url_painel;
+      } else if (reuniao.status !== 'encerrada') {
+        const resPost = await fetchAutenticado(`/api/v1/reunioes/${reuniao.id}/painel/token`, {
+          method: 'POST',
+        });
+        const dataPost = await resPost.json();
+        if (dataPost.success && dataPost.url_painel) {
+          urlPainel = dataPost.url_painel;
+        }
+      }
+
+      if (!urlPainel) {
+        throw new Error('Não foi possível gerar ou obter o link do Painel TV desta reunião.');
+      }
+
+      await navigator.clipboard.writeText(urlPainel);
+      setCopiadoPainelId(reuniao.id);
+      setTimeout(() => setCopiadoPainelId((prev) => (prev === reuniao.id ? null : prev)), 3000);
+    } catch (err: any) {
+      alert(err?.message || 'Erro ao copiar link do Painel TV.');
+    } finally {
+      setCopiandoPainelId(null);
     }
   };
 
@@ -303,9 +322,9 @@ export default function ReunioesPage() {
     [reunioes]
   );
 
-  // Filtro em memória por status efetivo e por texto de busca
+  // Filtro em memória por status efetivo e por texto de busca com ordenação garantida
   const reunioesFiltradas = useMemo(() => {
-    return reunioes.filter((r) => {
+    const filtradas = reunioes.filter((r) => {
       const stEfetivo = r.status_efetivo || r.status;
 
       // 1. Filtro de Status
@@ -326,6 +345,8 @@ export default function ReunioesPage() {
 
       return true;
     });
+
+    return ordenarReunioesMinisteriais(filtradas);
   }, [reunioes, filtroStatus, filtroBusca]);
 
   // ─── Verificação de Plano ──────────────────────────────────────────────────
@@ -738,27 +759,49 @@ export default function ReunioesPage() {
                     </div>
 
                     {/* ─── 3. EXTREMA DIREITA: AÇÕES AGRUPADAS ─── */}
-                    <div className="flex flex-wrap lg:flex-col items-stretch justify-center gap-2 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100 min-w-[130px]">
-                      {/* Botão Check-in (disponível quando não encerrada/cancelada) */}
+                    <div className="flex flex-wrap lg:flex-col items-stretch justify-center gap-2 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100 min-w-[150px]">
+                      {/* Botão Check-in: Copia link público exclusivo */}
                       {statusEfetivo !== 'encerrada' && statusEfetivo !== 'cancelada' && (
-                        <Link
-                          href={`/reunioes/${r.id}/checkin`}
-                          className="px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow transition flex items-center justify-center gap-1.5 active:scale-95"
-                          title="Abrir terminal de Check-in"
+                        <button
+                          onClick={() => copiarLinkCheckin(r)}
+                          disabled={copiandoCheckinId === r.id}
+                          className={`px-3.5 py-2.5 font-bold text-xs rounded-xl shadow-sm transition flex items-center justify-center gap-1.5 active:scale-95 ${
+                            copiadoCheckinId === r.id
+                              ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                              : 'bg-teal-600 hover:bg-teal-700 text-white'
+                          }`}
+                          title="Copiar link público exclusivo de Check-in"
                         >
-                          <QrCode className="w-4 h-4" />
-                          <span>Check-in</span>
-                        </Link>
+                          {copiandoCheckinId === r.id ? (
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                          ) : copiadoCheckinId === r.id ? (
+                            <Check className="w-4 h-4 text-emerald-200" />
+                          ) : (
+                            <QrCode className="w-4 h-4" />
+                          )}
+                          <span>{copiadoCheckinId === r.id ? 'Link de check-in copiado!' : 'Check-in'}</span>
+                        </button>
                       )}
 
-                      {/* Botão Painel TV */}
+                      {/* Botão Painel TV: Copia link público exclusivo */}
                       <button
-                        onClick={() => abrirPainelTv(r)}
-                        className="px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 border border-slate-200 shadow-sm hover:shadow active:scale-95"
-                        title="Exibir link do painel TV"
+                        onClick={() => copiarLinkPainelDireto(r)}
+                        disabled={copiandoPainelId === r.id}
+                        className={`px-3.5 py-2.5 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 border shadow-sm active:scale-95 ${
+                          copiadoPainelId === r.id
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                            : 'bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border-slate-200'
+                        }`}
+                        title="Copiar link público exclusivo do Painel TV"
                       >
-                        <Tv className="w-4 h-4 text-cyan-600" />
-                        <span>Painel TV</span>
+                        {copiandoPainelId === r.id ? (
+                          <RefreshCw className="w-4 h-4 animate-spin text-cyan-600" />
+                        ) : copiadoPainelId === r.id ? (
+                          <Check className="w-4 h-4 text-emerald-600" />
+                        ) : (
+                          <Tv className="w-4 h-4 text-cyan-600" />
+                        )}
+                        <span>{copiadoPainelId === r.id ? 'Link do Painel TV copiado!' : 'Painel TV'}</span>
                       </button>
 
                       {/* Botão Faltas da Reunião (quando encerrada) */}
@@ -924,88 +967,6 @@ export default function ReunioesPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* ─── MODAL: PAINEL TV PÚBLICO ─── */}
-      {modalPainelAberto && reuniaoSelecionada && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-cyan-50 text-cyan-700 flex items-center justify-center font-bold">
-                  <Tv className="w-4 h-4" />
-                </div>
-                <div>
-                  <h2 className="text-sm font-black text-slate-900">Painel Informativo TV</h2>
-                  <p className="text-[11px] text-slate-500">Exibição pública em projetor/TV</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setModalPainelAberto(false)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <p className="text-slate-600 font-medium leading-relaxed">
-                Este link seguro exibe apenas indicadores agregados e consolidados em tempo real, sem necessidade de login.
-              </p>
-
-              {carregandoToken ? (
-                <div className="p-6 text-center text-slate-400">
-                  <RefreshCw className="w-5 h-5 animate-spin mx-auto text-cyan-600 mb-2" />
-                  <span>Obtendo chave de exibição segura...</span>
-                </div>
-              ) : tokenInfo?.url_painel ? (
-                <div className="space-y-2">
-                  <div className="p-3 bg-slate-900 text-teal-300 font-mono text-xs rounded-xl break-all border border-slate-800 flex items-center justify-between gap-2">
-                    <span className="truncate">{tokenInfo.url_painel}</span>
-                    <button
-                      onClick={copiarLinkPainel}
-                      className="p-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition"
-                      title="Copiar link"
-                    >
-                      {copiado ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <button
-                      onClick={copiarLinkPainel}
-                      className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5"
-                    >
-                      {copiado ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiado ? 'Link Copiado!' : 'Copiar Link'}</span>
-                    </button>
-
-                    <a
-                      href={tokenInfo.url_painel}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-xl shadow flex items-center justify-center gap-1.5"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span>Abrir na TV</span>
-                    </a>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-3 bg-amber-50 text-amber-800 rounded-xl border border-amber-200 text-xs">
-                  Reunião encerrada ou painel inativo.
-                </div>
-              )}
-            </div>
-
-            <button
-              onClick={() => setModalPainelAberto(false)}
-              className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
-            >
-              Fechar
-            </button>
           </div>
         </div>
       )}

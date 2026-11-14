@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveTenantAuth } from '@/lib/tenant-auth';
 import { isFeatureAllowedForTenant } from '@/lib/plan-permissions';
-import { calcularLimiteCheckinTimestamp, validarHorariosReuniao } from '@/lib/reunioes-utils';
+import { calcularLimiteCheckinTimestamp, validarHorariosReuniao, ordenarReunioesMinisteriais } from '@/lib/reunioes-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -90,10 +90,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Ordenação canônica: reuniões agendadas/em andamento em ordem crescente (mais próxima no topo),
+    // seguidas das reuniões encerradas/canceladas
+    const reunioesOrdenadas = ordenarReunioesMinisteriais(reunioes || []);
+
     return NextResponse.json({
       success: true,
-      total: reunioes?.length || 0,
-      reunioes: reunioes || [],
+      total: reunioesOrdenadas.length,
+      reunioes: reunioesOrdenadas,
     });
   } catch (err: any) {
     if (err?.message === 'UNAUTHORIZED') {

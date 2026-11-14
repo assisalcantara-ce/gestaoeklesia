@@ -134,3 +134,61 @@ export function calcularStatusEfetivoReuniao(reuniao: {
   }
 }
 
+/**
+ * Calcula a expiração dos links públicos (Check-in e Painel TV) da reunião.
+ * Regra de negócio: expiram estritamente às 23:59:59 da data da reunião no fuso de Brasília (UTC-3).
+ * Exemplo: reunião em 2026-11-14 -> '2026-11-14T23:59:59-03:00' -> convertido para ISO UTC.
+ */
+export function calcularExpiracaoFimDoDiaReuniao(dataReuniaoStr: string): string {
+  const cleanData = (dataReuniaoStr || '').trim().split('T')[0];
+  if (!cleanData || !/^\d{4}-\d{2}-\d{2}$/.test(cleanData)) {
+    // Fallback: 24h a partir de agora se data for inválida
+    return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  }
+
+  // 23:59:59 no fuso de Brasília (-03:00)
+  const isoLocal = `${cleanData}T23:59:59-03:00`;
+  const dateObj = new Date(isoLocal);
+
+  if (isNaN(dateObj.getTime())) {
+    return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  }
+
+  return dateObj.toISOString();
+}
+
+/**
+ * Ordena reuniões ministeriais respeitando a prioridade de exibição:
+ * 1. Reuniões agendadas ou em andamento primeiro, ordenadas cronologicamente crescente (mais próxima no topo).
+ * 2. Reuniões encerradas e canceladas depois, ordenadas cronologicamente decrescente (mais recente no topo).
+ */
+export function ordenarReunioesMinisteriais<T extends { data_reuniao: string; horario_inicio?: string | null; status: string; status_efetivo?: string }>(
+  lista: T[]
+): T[] {
+  return [...lista].sort((a, b) => {
+    const stA = a.status_efetivo || a.status;
+    const stB = b.status_efetivo || b.status;
+
+    const isEncerradaOuCanceladaA = stA === 'encerrada' || stA === 'cancelada';
+    const isEncerradaOuCanceladaB = stB === 'encerrada' || stB === 'cancelada';
+
+    // Se uma é futura/em andamento e a outra é encerrada/cancelada, a futura fica no topo
+    if (!isEncerradaOuCanceladaA && isEncerradaOuCanceladaB) return -1;
+    if (isEncerradaOuCanceladaA && !isEncerradaOuCanceladaB) return 1;
+
+    // Se ambas são futuras / ativas: ordem cronológica crescente (mais próxima no topo)
+    // Ex: 14/11/2026 antes de 12/12/2026
+    if (!isEncerradaOuCanceladaA && !isEncerradaOuCanceladaB) {
+      const dataHoraA = `${a.data_reuniao} ${(a.horario_inicio || '00:00').slice(0, 5)}`;
+      const dataHoraB = `${b.data_reuniao} ${(b.horario_inicio || '00:00').slice(0, 5)}`;
+      return dataHoraA.localeCompare(dataHoraB);
+    }
+
+    // Se ambas são encerradas / canceladas: ordem cronológica decrescente (encerrada mais recente primeiro)
+    const dataHoraA = `${a.data_reuniao} ${(a.horario_inicio || '00:00').slice(0, 5)}`;
+    const dataHoraB = `${b.data_reuniao} ${(b.horario_inicio || '00:00').slice(0, 5)}`;
+    return dataHoraB.localeCompare(dataHoraA);
+  });
+}
+
+

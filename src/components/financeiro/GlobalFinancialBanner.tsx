@@ -94,7 +94,8 @@ export default function GlobalFinancialBanner() {
       pathname.startsWith('/eventos/check-in') ||
       pathname.startsWith('/eventos/e') ||
       pathname.startsWith('/ebd/chamada-rapida') ||
-      pathname.startsWith('/reunioes/painel')
+      pathname.startsWith('/reunioes/painel') ||
+      pathname.startsWith('/reunioes/checkin')
     ) return true;
     return false;
   }, [pathname]);

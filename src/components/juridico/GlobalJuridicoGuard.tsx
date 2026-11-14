@@ -19,6 +19,7 @@ const EXEMPT_PREFIXES = [
   '/formularios',
   '/validar',
   '/reunioes/painel',
+  '/reunioes/checkin',
   '/eventos/check-in',
   '/eventos/e',
   '/ebd/chamada-rapida',

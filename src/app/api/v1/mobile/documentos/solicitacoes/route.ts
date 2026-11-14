@@ -5,6 +5,7 @@
  * Segurança:
  * - Requer Bearer token de membro vinculado (resolveMobileMember)
  * - POST deriva member_id, ministry_id, solicitante_id, membro_nome, congregacao_id exclusivamente pelo servidor
+ * - Prevenção contra duplicidade de solicitações pendentes do mesmo tipo para o membro
  * - Rejeita payloads forjados do cliente
  */
 
@@ -14,6 +15,7 @@ import {
   resolveMobileMember,
   mobileMemberErrorResponse,
 } from '@/lib/mobile-member-auth';
+import { CartasService } from '@/services/cartas-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,20 +70,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const tipo_carta = (body.tipo_carta || '').trim().toLowerCase();
+    const rawTipo = (body.tipo_carta || '').trim().toLowerCase();
+    const normalTipo = CartasService.normalizarTipoCarta(rawTipo) as TipoCarta;
     const destino = (body.destino || '').trim();
     const observacoes = (body.observacoes || '').trim();
 
-    if (!tipo_carta || !TIPOS_VALIDOS.includes(tipo_carta as TipoCarta)) {
+    if (!normalTipo || !TIPOS_VALIDOS.includes(normalTipo)) {
       return NextResponse.json(
         {
-          error: `Tipo de documento inválido. Tipos aceitos: ${TIPOS_VALIDOS.join(', ')}`,
+          error: `Tipo de carta inválido. Tipos aceitos: ${TIPOS_VALIDOS.join(', ')}`,
         },
         { status: 400 }
       );
     }
 
-    // 1. Obter dados cadastrais oficiais do membro no banco para vincular
+    // 1. Obter dados cadastrais oficiais do membro no banco para vincular com garantia multi-tenant
     const { data: member, error: memberErr } = await admin
       .from('members')
       .select('id, name, cargo_ministerial, congregacao_id')
@@ -96,8 +99,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Regra oficial do sistema: Trânsito e Recomendação podem ser pré-autorizados ou tramitados de acordo com a política
-    // Por padrão do fluxo de solicitação mobile do membro, cria como 'pendente' para análise pela Secretaria/Pastor
+    // 2. Prevenção de duplicidade: verificar se já existe um pedido pendente para o mesmo membro e tipo de carta
+    const { data: pedidoPendente, error: pendenteErr } = await admin
+      .from('carta_pedidos')
+      .select('id, tipo_carta, status, created_at')
+      .eq('ministry_id', ctx.ministryId)
+      .eq('member_id', ctx.memberId)
+      .eq('tipo_carta', normalTipo)
+      .eq('status', 'pendente')
+      .limit(1)
+      .maybeSingle();
+
+    if (pendenteErr) {
+      console.error('[mobile/solicitacoes POST] Erro ao checar duplicidade:', pendenteErr);
+    }
+
+    if (pedidoPendente) {
+      return NextResponse.json(
+        {
+          error: 'Já existe uma solicitação pendente para este tipo de carta. Aguarde a análise da Secretaria.',
+          pedidoExistenteId: pedidoPendente.id,
+        },
+        { status: 409 }
+      );
+    }
+
+    // 3. Montar payload estritamente derivado da sessão autenticada (status: 'pendente' obrigatório)
     const payload = {
       ministry_id: ctx.ministryId,
       congregacao_id: member.congregacao_id || null,
@@ -106,7 +133,7 @@ export async function POST(request: NextRequest) {
       member_id: ctx.memberId,
       membro_nome: member.name,
       membro_cargo: member.cargo_ministerial || null,
-      tipo_carta,
+      tipo_carta: normalTipo,
       destino: destino || null,
       observacoes: observacoes || null,
       status: 'pendente',
@@ -119,22 +146,29 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertErr || !novoPedido) {
+      console.error('[mobile/solicitacoes POST] Erro ao inserir pedido:', insertErr);
       return NextResponse.json(
         { error: 'Erro ao registrar solicitação de documento.' },
         { status: 500 }
       );
     }
 
+    const exigePresidencia = CartasService.exigeAutorizacaoPresidencial(normalTipo);
+
     return NextResponse.json(
       {
-        message: 'Solicitação de documento enviada com sucesso.',
+        message: exigePresidencia
+          ? 'Solicitação enviada com sucesso e encaminhada à Presidência.'
+          : 'Solicitação enviada com sucesso para análise da Secretaria.',
         solicitacao: novoPedido,
+        exigePresidencia,
       },
       { status: 201 }
     );
   } catch (error) {
     const authResp = mobileMemberErrorResponse(error);
     if (authResp) return authResp;
+    console.error('[mobile/solicitacoes POST]', error);
     return NextResponse.json(
       { error: 'Erro interno ao criar solicitação de documento.' },
       { status: 500 }

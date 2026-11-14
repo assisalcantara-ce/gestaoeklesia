@@ -127,6 +127,7 @@ export const MODULOS_ACESSO: Record<NivelAcesso, string[]> = {
     'comissao',
     'gestao',
     'agenda',
+    'celulas',
   ],
   // LEGADO (Perfis 2.3): O perfil "financeiro" está em modo legado.
   // Preservado exclusivamente para compatibilidade de permissões de usuários já cadastrados.
@@ -150,6 +151,7 @@ export const MODULOS_ACESSO: Record<NivelAcesso, string[]> = {
     'ebd',
     'reunioes',
     'missoes',
+    'celulas',
   ],
   tesoureiro_geral: [
     'dashboard',
@@ -176,6 +178,7 @@ export const MODULOS_ACESSO: Record<NivelAcesso, string[]> = {
     'geolocalizacao',
     'gestao',
     'agenda',
+    'celulas',
   ],
   tesouraria_local: [
     'dashboard',
@@ -262,6 +265,7 @@ export const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
     'agenda',
     'comissao',
     'gestao',
+    'celulas',
   ],
   financeiro: [
     'tesouraria',
@@ -279,6 +283,7 @@ export const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
     'ebd',
     'reunioes',
     'missoes',
+    'celulas',
   ],
   tesoureiro_geral: [
     'tesouraria',
@@ -300,6 +305,7 @@ export const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
     'geolocalizacao',
     'gestao',
     'agenda',
+    'celulas',
   ],
   tesouraria_local: [
     'tesouraria',

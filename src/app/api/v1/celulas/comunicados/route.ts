@@ -1,0 +1,83 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { resolveTenantAuth } from '@/lib/tenant-auth';
+import { temAcesso, temAcessoEscrita } from '@/lib/access-control';
+import { CelulasService } from '@/services/celulas-service';
+
+export const dynamic = 'force-dynamic';
+
+export async function GET(request: NextRequest) {
+  let ctx: Awaited<ReturnType<typeof resolveTenantAuth>>;
+  try {
+    ctx = await resolveTenantAuth(request);
+  } catch (err: any) {
+    const isUnauth = err?.message === 'UNAUTHORIZED';
+    return NextResponse.json(
+      { error: isUnauth ? 'Não autenticado.' : 'Acesso negado: sem ministério associado.' },
+      { status: isUnauth ? 401 : 403 }
+    );
+  }
+
+  const { admin, ministryId, nivel, congregacaoId } = ctx;
+
+  if (!temAcesso(nivel, 'celulas') && !temAcesso(nivel, 'secretaria') && !temAcesso(nivel, 'secretaria_local')) {
+    return NextResponse.json({ error: 'Acesso negado ao módulo de células.' }, { status: 403 });
+  }
+
+  try {
+    const searchParams = request.nextUrl.searchParams;
+    const redeId = searchParams.get('rede_id');
+    const celulaId = searchParams.get('celula_id');
+    const status = searchParams.get('status');
+
+    let filterCongregacaoId = searchParams.get('congregacao_id');
+    if (congregacaoId) {
+      filterCongregacaoId = congregacaoId;
+    }
+
+    const service = new CelulasService(admin);
+    const comunicados = await service.listarComunicados(ministryId, {
+      congregacaoId: filterCongregacaoId,
+      redeId,
+      celulaId,
+      status,
+    });
+
+    return NextResponse.json({ data: comunicados });
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || 'Erro ao listar comunicados de células' }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  let ctx: Awaited<ReturnType<typeof resolveTenantAuth>>;
+  try {
+    ctx = await resolveTenantAuth(request);
+  } catch (err: any) {
+    const isUnauth = err?.message === 'UNAUTHORIZED';
+    return NextResponse.json(
+      { error: isUnauth ? 'Não autenticado.' : 'Acesso negado: sem ministério associado.' },
+      { status: isUnauth ? 401 : 403 }
+    );
+  }
+
+  const { admin, ministryId, nivel, congregacaoId, userId } = ctx;
+
+  if (!temAcessoEscrita(nivel, 'celulas') && !temAcessoEscrita(nivel, 'secretaria') && !temAcessoEscrita(nivel, 'secretaria_local')) {
+    return NextResponse.json({ error: 'Permissão de escrita negada para comunicados de células.' }, { status: 403 });
+  }
+
+  try {
+    const body = await request.json();
+
+    if (congregacaoId && body.congregacao_id && body.congregacao_id !== congregacaoId) {
+      return NextResponse.json({ error: 'Acesso restrito à sua congregação local.' }, { status: 403 });
+    }
+
+    const service = new CelulasService(admin);
+    const salvo = await service.salvarComunicado(ministryId, body, userId);
+
+    return NextResponse.json({ data: salvo });
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || 'Erro ao salvar comunicado' }, { status: 400 });
+  }
+}

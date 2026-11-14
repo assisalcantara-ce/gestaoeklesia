@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveTenantAuth } from '@/lib/tenant-auth';
 import { isFeatureAllowedForTenant } from '@/lib/plan-permissions';
-import { gerarTokenPainel, hashTokenPainel } from '@/lib/reunioes-utils';
+import { gerarTokenPainel, hashTokenPainel, calcularExpiracaoFimDoDiaReuniao } from '@/lib/reunioes-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -167,20 +167,15 @@ export async function POST(
       );
     }
 
-    let body: any = {};
-    try {
-      body = await request.json();
-    } catch {
-      // Body opcional
-    }
+      // Sem body obrigatório
 
-    // Duração customizada ou padrão de 24 horas (em horas, min 1h, max 72h)
-    const duracaoHoras = Number(body?.duracao_horas) > 0 && Number(body?.duracao_horas) <= 72
-      ? Number(body.duracao_horas)
-      : 24;
-
+    // Expiração automática às 23:59:59 da data da reunião no fuso do ministério (UTC-3)
     const agora = new Date();
-    const expiraEm = new Date(agora.getTime() + duracaoHoras * 60 * 60 * 1000);
+    const expiraEmIso = calcularExpiracaoFimDoDiaReuniao(reuniao.data_reuniao);
+    const expiraEm = new Date(expiraEmIso);
+
+    // Se a data calculada já expirou (ex: reunião de dias atrás), definir expiração imediata
+    const expiraEmFinal = expiraEm.getTime() < agora.getTime() ? agora : expiraEm;
 
     // 2. Gerar token criptográfico bruto e seu hash SHA-256
     const rawToken = gerarTokenPainel();
@@ -206,7 +201,7 @@ export async function POST(
         ministry_id: ctx.ministryId,
         token_hash: tokenHash,
         status: 'ativo',
-        expira_em: expiraEm.toISOString(),
+        expira_em: expiraEmFinal.toISOString(),
       })
       .select('id, status, expira_em, created_at')
       .single();
@@ -220,7 +215,7 @@ export async function POST(
 
     // 5. Construir a URL pública completa do painel
     const origin = request.nextUrl.origin || 'http://localhost:3000';
-    const urlPublica = `${origin}/painel/reuniao/${rawToken}`;
+    const urlPublica = `${origin}/reunioes/painel/${rawToken}`;
 
     // 6. Registrar auditoria administrativa
     try {
@@ -233,8 +228,7 @@ export async function POST(
         registro_id: tokenSalvo.id,
         estado_novo: {
           token_id: tokenSalvo.id,
-          expira_em: expiraEm.toISOString(),
-          duracao_horas: duracaoHoras,
+          expira_em: expiraEmFinal.toISOString(),
         },
       });
     } catch (auditErr) {
@@ -246,8 +240,7 @@ export async function POST(
       mensagem: 'Token do painel gerado com sucesso.',
       token: rawToken, // Retornado uma única vez para o administrador copiar
       url_painel: urlPublica,
-      expira_em: expiraEm.toISOString(),
-      duracao_horas: duracaoHoras,
+      expira_em: expiraEmFinal.toISOString(),
       status: 'ativo',
     });
   } catch (err: any) {
