@@ -219,11 +219,20 @@ export default function DetalhesReuniaoPage() {
     }
   };
 
-  const copiarLinkCheckin = () => {
-    if (urlCheckinPublica) {
-      navigator.clipboard.writeText(urlCheckinPublica);
+  const copiarLinkCheckin = async () => {
+    if (!urlCheckinPublica) return;
+    try {
+      await navigator.clipboard.writeText(urlCheckinPublica);
       setCopiadoCheckin(true);
       setTimeout(() => setCopiadoCheckin(false), 2500);
+    } catch {
+      const inputEl = document.getElementById('input-url-checkin-detalhes') as HTMLInputElement | null;
+      if (inputEl) {
+        inputEl.select();
+        document.execCommand('copy');
+        setCopiadoCheckin(true);
+        setTimeout(() => setCopiadoCheckin(false), 2500);
+      }
     }
   };
 
@@ -263,11 +272,20 @@ export default function DetalhesReuniaoPage() {
     }
   };
 
-  const copiarLinkPainel = () => {
-    if (tokenInfo?.url_painel) {
-      navigator.clipboard.writeText(tokenInfo.url_painel);
+  const copiarLinkPainel = async () => {
+    if (!tokenInfo?.url_painel) return;
+    try {
+      await navigator.clipboard.writeText(tokenInfo.url_painel);
       setCopiado(true);
       setTimeout(() => setCopiado(false), 2500);
+    } catch {
+      const inputEl = document.getElementById('input-url-painel-detalhes') as HTMLInputElement | null;
+      if (inputEl) {
+        inputEl.select();
+        document.execCommand('copy');
+        setCopiado(true);
+        setTimeout(() => setCopiado(false), 2500);
+      }
     }
   };
 
@@ -1161,9 +1179,16 @@ export default function DetalhesReuniaoPage() {
                     </span>
                   </div>
 
-                  {/* URL Box */}
-                  <div className="p-3 bg-slate-900 text-teal-300 font-mono text-xs rounded-xl break-all border border-slate-800 flex items-center justify-between gap-2">
-                    <span className="truncate">{urlCheckinPublica}</span>
+                  {/* URL Box com input selecionável e fallback de cópia */}
+                  <div className="p-3 bg-slate-900 text-teal-300 font-mono text-xs rounded-xl border border-slate-800 flex items-center justify-between gap-2">
+                    <input
+                      id="input-url-checkin-detalhes"
+                      type="text"
+                      readOnly
+                      value={urlCheckinPublica}
+                      onClick={(e) => (e.target as HTMLInputElement).select()}
+                      className="w-full bg-transparent text-teal-300 font-mono text-xs focus:outline-none select-all truncate"
+                    />
                     <button
                       onClick={copiarLinkCheckin}
                       className="p-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition shrink-0"
@@ -1250,11 +1275,18 @@ export default function DetalhesReuniaoPage() {
                     </div>
                   ) : tokenInfo?.url_painel ? (
                     <div className="space-y-2">
-                      <div className="p-3 bg-slate-900 text-teal-300 font-mono text-xs rounded-xl break-all border border-slate-800 flex items-center justify-between gap-2">
-                        <span className="truncate">{tokenInfo.url_painel}</span>
+                      <div className="p-3 bg-slate-900 text-teal-300 font-mono text-xs rounded-xl border border-slate-800 flex items-center justify-between gap-2">
+                        <input
+                          id="input-url-painel-detalhes"
+                          type="text"
+                          readOnly
+                          value={tokenInfo.url_painel}
+                          onClick={(e) => (e.target as HTMLInputElement).select()}
+                          className="w-full bg-transparent text-teal-300 font-mono text-xs focus:outline-none select-all truncate"
+                        />
                         <button
                           onClick={copiarLinkPainel}
-                          className="p-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition"
+                          className="p-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition shrink-0"
                           title="Copiar link"
                         >
                           {copiado ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}

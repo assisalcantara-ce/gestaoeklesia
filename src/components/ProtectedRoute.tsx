@@ -23,6 +23,7 @@ const PUBLIC_PREFIXES = [
   '/membro',
   '/validar',
   '/reunioes/painel',
+  '/reunioes/checkin',
   '/eventos/check-in',
   '/eventos/e',
   '/ebd/chamada-rapida',

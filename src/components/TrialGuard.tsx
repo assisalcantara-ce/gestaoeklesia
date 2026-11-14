@@ -25,6 +25,7 @@ const BYPASS_PATHS = [
   '/membro',
   '/validar',
   '/reunioes/painel',
+  '/reunioes/checkin',
   '/eventos/check-in',
   '/eventos/e',
   '/ebd/chamada-rapida',

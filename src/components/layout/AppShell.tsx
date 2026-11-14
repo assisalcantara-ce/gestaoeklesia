@@ -35,9 +35,12 @@ export default function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const showSidebar = SIDEBAR_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(prefix + '/'),
-  );
+  const showSidebar =
+    !pathname.startsWith('/reunioes/checkin') &&
+    !pathname.startsWith('/reunioes/painel') &&
+    SIDEBAR_PREFIXES.some(
+      (prefix) => pathname === prefix || pathname.startsWith(prefix + '/'),
+    );
 
   if (!showSidebar) {
     return <>{children}</>;

@@ -24,6 +24,8 @@ import {
   Lock,
   Search,
   Check,
+  Copy,
+  ExternalLink,
   X,
   FileText,
   ArrowRight,
@@ -73,6 +75,13 @@ export default function ReunioesPage() {
   // Modais
   const [modalNovaAberto, setModalNovaAberto] = useState<boolean>(false);
   const [modalEncerrarAberto, setModalEncerrarAberto] = useState<boolean>(false);
+  const [modalLinkAberto, setModalLinkAberto] = useState<boolean>(false);
+  const [modalLinkDados, setModalLinkDados] = useState<{
+    tipo: 'checkin' | 'painel';
+    tituloReuniao: string;
+    url: string;
+  } | null>(null);
+  const [modalLinkCopiado, setModalLinkCopiado] = useState<boolean>(false);
   const [reuniaoSelecionada, setReuniaoSelecionada] = useState<ReuniaoItem | null>(null);
 
   // Estado do formulário Nova Reunião
@@ -85,11 +94,9 @@ export default function ReunioesPage() {
   const [salvandoNova, setSalvandoNova] = useState<boolean>(false);
   const [erroForm, setErroForm] = useState<string | null>(null);
 
-  // Estado de Cópia Rápida de Links
+  // Estado de Carregamento de Links
   const [copiandoCheckinId, setCopiandoCheckinId] = useState<string | null>(null);
   const [copiandoPainelId, setCopiandoPainelId] = useState<string | null>(null);
-  const [copiadoCheckinId, setCopiadoCheckinId] = useState<string | null>(null);
-  const [copiadoPainelId, setCopiadoPainelId] = useState<string | null>(null);
 
   // Estado de Encerramento
   const [encerrando, setEncerrando] = useState<boolean>(false);
@@ -208,74 +215,70 @@ export default function ReunioesPage() {
     }
   };
 
-  // ─── 3. Ações de Cópia de Links Públicos (Check-in e Painel TV) ────────────
-  const copiarLinkCheckin = async (reuniao: ReuniaoItem) => {
+  // ─── 3. Ações de Links Públicos (Check-in e Painel TV) ───────────────────
+  const abrirModalLinkPublico = async (reuniao: ReuniaoItem, tipo: 'checkin' | 'painel') => {
     try {
-      setCopiandoCheckinId(reuniao.id);
+      if (tipo === 'checkin') {
+        setCopiandoCheckinId(reuniao.id);
+      } else {
+        setCopiandoPainelId(reuniao.id);
+      }
 
-      // Obter ou gerar token de check-in
-      let urlCheckin: string | null = null;
-      const resGet = await fetchAutenticado(`/api/v1/reunioes/${reuniao.id}/checkin/token`);
+      let urlFinal: string | null = null;
+      const endpoint = tipo === 'checkin' ? 'checkin' : 'painel';
+
+      const resGet = await fetchAutenticado(`/api/v1/reunioes/${reuniao.id}/${endpoint}/token`);
       const dataGet = await resGet.json();
 
-      if (dataGet.success && dataGet.status_efetivo === 'ativo' && dataGet.url_checkin) {
-        urlCheckin = dataGet.url_checkin;
+      const urlChave = tipo === 'checkin' ? dataGet.url_checkin : dataGet.url_painel;
+
+      if (dataGet.success && dataGet.status_efetivo === 'ativo' && urlChave) {
+        urlFinal = urlChave;
       } else if (reuniao.status !== 'encerrada') {
-        const resPost = await fetchAutenticado(`/api/v1/reunioes/${reuniao.id}/checkin/token`, {
+        const resPost = await fetchAutenticado(`/api/v1/reunioes/${reuniao.id}/${endpoint}/token`, {
           method: 'POST',
         });
         const dataPost = await resPost.json();
-        if (dataPost.success && dataPost.url_checkin) {
-          urlCheckin = dataPost.url_checkin;
+        const urlPost = tipo === 'checkin' ? dataPost.url_checkin : dataPost.url_painel;
+        if (dataPost.success && urlPost) {
+          urlFinal = urlPost;
         }
       }
 
-      if (!urlCheckin) {
-        throw new Error('Não foi possível gerar ou obter o link de check-in desta reunião.');
+      if (!urlFinal) {
+        throw new Error(`Não foi possível obter o link de ${tipo === 'checkin' ? 'check-in' : 'painel TV'}.`);
       }
 
-      // Copiar link completo para o clipboard
-      await navigator.clipboard.writeText(urlCheckin);
-      setCopiadoCheckinId(reuniao.id);
-      setTimeout(() => setCopiadoCheckinId((prev) => (prev === reuniao.id ? null : prev)), 3000);
+      setModalLinkDados({
+        tipo,
+        tituloReuniao: reuniao.titulo,
+        url: urlFinal,
+      });
+      setModalLinkCopiado(false);
+      setModalLinkAberto(true);
     } catch (err: any) {
-      alert(err?.message || 'Erro ao copiar link de check-in.');
+      alert(err?.message || 'Erro ao carregar link público.');
     } finally {
       setCopiandoCheckinId(null);
+      setCopiandoPainelId(null);
     }
   };
 
-  const copiarLinkPainelDireto = async (reuniao: ReuniaoItem) => {
+  const copiarLinkDoModal = async () => {
+    if (!modalLinkDados?.url) return;
     try {
-      setCopiandoPainelId(reuniao.id);
-
-      let urlPainel: string | null = null;
-      const resGet = await fetchAutenticado(`/api/v1/reunioes/${reuniao.id}/painel/token`);
-      const dataGet = await resGet.json();
-
-      if (dataGet.success && dataGet.status_efetivo === 'ativo' && dataGet.url_painel) {
-        urlPainel = dataGet.url_painel;
-      } else if (reuniao.status !== 'encerrada') {
-        const resPost = await fetchAutenticado(`/api/v1/reunioes/${reuniao.id}/painel/token`, {
-          method: 'POST',
-        });
-        const dataPost = await resPost.json();
-        if (dataPost.success && dataPost.url_painel) {
-          urlPainel = dataPost.url_painel;
-        }
+      await navigator.clipboard.writeText(modalLinkDados.url);
+      setModalLinkCopiado(true);
+      setTimeout(() => setModalLinkCopiado(false), 3000);
+    } catch {
+      // Fallback para seleção manual caso permissão seja bloqueada
+      const inputEl = document.getElementById('input-url-publica-reuniao') as HTMLInputElement | null;
+      if (inputEl) {
+        inputEl.select();
+        document.execCommand('copy');
+        setModalLinkCopiado(true);
+        setTimeout(() => setModalLinkCopiado(false), 3000);
       }
-
-      if (!urlPainel) {
-        throw new Error('Não foi possível gerar ou obter o link do Painel TV desta reunião.');
-      }
-
-      await navigator.clipboard.writeText(urlPainel);
-      setCopiadoPainelId(reuniao.id);
-      setTimeout(() => setCopiadoPainelId((prev) => (prev === reuniao.id ? null : prev)), 3000);
-    } catch (err: any) {
-      alert(err?.message || 'Erro ao copiar link do Painel TV.');
-    } finally {
-      setCopiandoPainelId(null);
     }
   };
 
@@ -760,48 +763,36 @@ export default function ReunioesPage() {
 
                     {/* ─── 3. EXTREMA DIREITA: AÇÕES AGRUPADAS ─── */}
                     <div className="flex flex-wrap lg:flex-col items-stretch justify-center gap-2 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100 min-w-[150px]">
-                      {/* Botão Check-in: Copia link público exclusivo */}
+                      {/* Botão Check-in: Abre modal com link e botão explícito de cópia */}
                       {statusEfetivo !== 'encerrada' && statusEfetivo !== 'cancelada' && (
                         <button
-                          onClick={() => copiarLinkCheckin(r)}
+                          onClick={() => abrirModalLinkPublico(r, 'checkin')}
                           disabled={copiandoCheckinId === r.id}
-                          className={`px-3.5 py-2.5 font-bold text-xs rounded-xl shadow-sm transition flex items-center justify-center gap-1.5 active:scale-95 ${
-                            copiadoCheckinId === r.id
-                              ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                              : 'bg-teal-600 hover:bg-teal-700 text-white'
-                          }`}
-                          title="Copiar link público exclusivo de Check-in"
+                          className="px-3.5 py-2.5 font-bold text-xs rounded-xl shadow-sm transition flex items-center justify-center gap-1.5 active:scale-95 bg-teal-600 hover:bg-teal-700 text-white"
+                          title="Gerar / Copiar link público exclusivo de Check-in"
                         >
                           {copiandoCheckinId === r.id ? (
                             <RefreshCw className="w-4 h-4 animate-spin" />
-                          ) : copiadoCheckinId === r.id ? (
-                            <Check className="w-4 h-4 text-emerald-200" />
                           ) : (
                             <QrCode className="w-4 h-4" />
                           )}
-                          <span>{copiadoCheckinId === r.id ? 'Link de check-in copiado!' : 'Check-in'}</span>
+                          <span>Check-in</span>
                         </button>
                       )}
 
-                      {/* Botão Painel TV: Copia link público exclusivo */}
+                      {/* Botão Painel TV: Abre modal com link e botão explícito de cópia */}
                       <button
-                        onClick={() => copiarLinkPainelDireto(r)}
+                        onClick={() => abrirModalLinkPublico(r, 'painel')}
                         disabled={copiandoPainelId === r.id}
-                        className={`px-3.5 py-2.5 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 border shadow-sm active:scale-95 ${
-                          copiadoPainelId === r.id
-                            ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                            : 'bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border-slate-200'
-                        }`}
-                        title="Copiar link público exclusivo do Painel TV"
+                        className="px-3.5 py-2.5 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 border shadow-sm active:scale-95 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border-slate-200"
+                        title="Gerar / Copiar link público exclusivo do Painel TV"
                       >
                         {copiandoPainelId === r.id ? (
                           <RefreshCw className="w-4 h-4 animate-spin text-cyan-600" />
-                        ) : copiadoPainelId === r.id ? (
-                          <Check className="w-4 h-4 text-emerald-600" />
                         ) : (
                           <Tv className="w-4 h-4 text-cyan-600" />
                         )}
-                        <span>{copiadoPainelId === r.id ? 'Link do Painel TV copiado!' : 'Painel TV'}</span>
+                        <span>Painel TV</span>
                       </button>
 
                       {/* Botão Faltas da Reunião (quando encerrada) */}
@@ -967,6 +958,127 @@ export default function ReunioesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL: LINK PÚBLICO SEGURO (CHECK-IN / PAINEL TV) ─── */}
+      {modalLinkAberto && modalLinkDados && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold ${
+                    modalLinkDados.tipo === 'checkin'
+                      ? 'bg-teal-50 text-teal-700'
+                      : 'bg-cyan-50 text-cyan-700'
+                  }`}
+                >
+                  {modalLinkDados.tipo === 'checkin' ? (
+                    <QrCode className="w-4 h-4" />
+                  ) : (
+                    <Tv className="w-4 h-4" />
+                  )}
+                </div>
+                <div>
+                  <h2 className="text-sm font-black text-slate-900">
+                    {modalLinkDados.tipo === 'checkin'
+                      ? 'Link do Terminal de Check-in'
+                      : 'Link do Painel TV'}
+                  </h2>
+                  <p className="text-[11px] text-slate-500 truncate max-w-[240px]">
+                    {modalLinkDados.tituloReuniao}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setModalLinkAberto(false)}
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <p className="text-slate-600 font-medium leading-relaxed">
+                {modalLinkDados.tipo === 'checkin'
+                  ? 'Envie este link seguro para o recepcionista via WhatsApp. Permite credenciamento de presença sem login no ERP.'
+                  : 'Abra este link em outro computador ou projetor/datashow. Exibição pública e atualização em tempo real sem login.'}
+              </p>
+
+              {/* Campo com Link Selecionável */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-slate-700">URL Pública Exclusiva:</label>
+                <div className="p-2.5 bg-slate-900 text-teal-300 font-mono text-xs rounded-xl border border-slate-800 flex items-center gap-2">
+                  <input
+                    id="input-url-publica-reuniao"
+                    type="text"
+                    readOnly
+                    value={modalLinkDados.url}
+                    onClick={(e) => (e.target as HTMLInputElement).select()}
+                    className="w-full bg-transparent text-teal-300 font-mono text-xs focus:outline-none select-all truncate"
+                  />
+                  <button
+                    onClick={copiarLinkDoModal}
+                    className="p-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition shrink-0"
+                    title="Copiar link"
+                  >
+                    {modalLinkCopiado ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Botões de Ação Explícita com Ativação do Usuário */}
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={copiarLinkDoModal}
+                  className={`flex-1 py-2.5 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm ${
+                    modalLinkCopiado
+                      ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                      : 'bg-teal-600 text-white hover:bg-teal-700'
+                  }`}
+                >
+                  {modalLinkCopiado ? (
+                    <Check className="w-4 h-4 text-emerald-200" />
+                  ) : (
+                    <Copy className="w-4 h-4" />
+                  )}
+                  <span>
+                    {modalLinkCopiado
+                      ? modalLinkDados.tipo === 'checkin'
+                        ? 'Link de check-in copiado!'
+                        : 'Link do Painel TV copiado!'
+                      : 'Copiar Link'}
+                  </span>
+                </button>
+
+                <a
+                  href={modalLinkDados.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  <span>Testar</span>
+                </a>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100 pt-3">
+              <button
+                type="button"
+                onClick={() => setModalLinkAberto(false)}
+                className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+              >
+                Fechar
+              </button>
+            </div>
           </div>
         </div>
       )}
