@@ -335,7 +335,13 @@ export default function CheckinPublicoPage() {
     try {
       // Parar stream anterior se existir
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current.getTracks().forEach((t) => {
+          try {
+            t.stop();
+          } catch {
+            // ignore
+          }
+        });
         streamRef.current = null;
       }
       if (animFrameRef.current) {
@@ -356,10 +362,12 @@ export default function CheckinPublicoPage() {
           audio: false,
         });
       } catch (errFirst: any) {
-        // Fallback: se restrição falhar, solicitar vídeo sem restrições
+        // Fallback: se restrição de facingMode ou resolução falhar (ex: OverconstrainedError), solicitar vídeo genérico
+        const errName = errFirst?.name || '';
         if (
-          errFirst?.name === 'OverconstrainedError' ||
-          errFirst?.name === 'ConstraintNotSatisfiedError'
+          errName === 'OverconstrainedError' ||
+          errName === 'ConstraintNotSatisfiedError' ||
+          errName === 'TypeError'
         ) {
           stream = await navigator.mediaDevices.getUserMedia({
             video: true,
@@ -374,7 +382,7 @@ export default function CheckinPublicoPage() {
 
       const video = videoRef.current;
       if (!video) {
-        throw new Error('Elemento de visualização não carregado.');
+        throw new Error('Elemento de visualização não carregado no DOM.');
       }
 
       video.srcObject = stream;
@@ -392,28 +400,43 @@ export default function CheckinPublicoPage() {
         }
       }
 
-      // Aguardar início da reprodução do vídeo
+      // Aguardar início real da reprodução do vídeo
       await video.play();
 
       setCameraState('ativa');
       iniciarScanningLoop();
     } catch (err: any) {
       console.warn('[CheckinReuniaoCamera] Erro ao iniciar câmera:', err);
+      // Garantir limpeza caso ocorra erro pós-getUserMedia (ex: play() rejeitado)
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => {
+          try {
+            t.stop();
+          } catch {
+            // ignore
+          }
+        });
+        streamRef.current = null;
+      }
       setCameraState('erro');
 
       const errName = err?.name || '';
       if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
         setCameraErroMensagem(
-          'Permissão de câmera negada. Permita o acesso à câmera nas configurações do seu navegador e clique em Tentar Novamente.'
+          'Permissão de câmera negada. Habilite o acesso à câmera nas configurações do navegador e clique em Tentar Novamente.'
         );
       } else if (errName === 'NotFoundError' || errName === 'DevicesNotFoundError') {
         setCameraErroMensagem('Nenhuma câmera conectada foi localizada neste dispositivo.');
       } else if (errName === 'NotReadableError' || errName === 'TrackStartError') {
         setCameraErroMensagem(
-          'A câmera pode estar em uso por outro aplicativo ou temporariamente travada. Reinicie o navegador.'
+          'A câmera está em uso por outro aplicativo ou temporariamente ocupada pelo sistema. Feche outros apps e tente novamente.'
         );
+      } else if (errName === 'SecurityError') {
+        setCameraErroMensagem('Acesso bloqueado por segurança: a câmera requer conexão segura HTTPS.');
       } else {
-        setCameraErroMensagem('Não foi possível inicializar a câmera. Utilize a busca nominal ou leitor USB.');
+        setCameraErroMensagem(
+          err?.message || 'Não foi possível inicializar a câmera. Utilize a busca nominal ou leitor USB.'
+        );
       }
     }
   }, [iniciarScanningLoop]);
@@ -688,69 +711,71 @@ export default function CheckinPublicoPage() {
               </div>
             </form>
 
-            {/* Visor da Câmera Responsivo com Retículo de Enquadramento */}
-            {cameraState === 'ativa' && (
-              <div className="w-full max-w-md flex flex-col items-center gap-3 animate-in fade-in zoom-in-95 duration-200">
-                <div className="relative w-full aspect-square sm:aspect-video bg-black rounded-3xl overflow-hidden border-2 border-teal-500 shadow-xl">
-                  {/* Elemento de Vídeo com suporte estrito a Safari / iOS */}
-                  <video
-                    ref={videoRef}
-                    playsInline
-                    autoPlay
-                    muted
-                    className="w-full h-full object-cover"
-                  />
+            {/* Container do Visor da Câmera Responsivo com Retículo de Enquadramento */}
+            <div
+              className={`w-full max-w-md flex flex-col items-center gap-3 animate-in fade-in zoom-in-95 duration-200 ${
+                cameraState === 'ativa' ? 'block' : 'hidden'
+              }`}
+            >
+              <div className="relative w-full aspect-square sm:aspect-video bg-black rounded-3xl overflow-hidden border-2 border-teal-500 shadow-xl">
+                {/* Elemento de Vídeo SEMPRE montado no DOM para evitar race condition na captura do stream */}
+                <video
+                  ref={videoRef}
+                  playsInline
+                  autoPlay
+                  muted
+                  className="w-full h-full object-cover"
+                />
 
-                  {/* Moldura de Mira / Retículo */}
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-8">
-                    <div className="relative w-48 h-48 sm:w-56 sm:h-56 border-2 border-dashed border-teal-300 rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
-                      <div className="absolute -top-1 -left-1 w-5 h-5 border-t-4 border-l-4 border-teal-400 rounded-tl-lg" />
-                      <div className="absolute -top-1 -right-1 w-5 h-5 border-t-4 border-r-4 border-teal-400 rounded-tr-lg" />
-                      <div className="absolute -bottom-1 -left-1 w-5 h-5 border-b-4 border-l-4 border-teal-400 rounded-bl-lg" />
-                      <div className="absolute -bottom-1 -right-1 w-5 h-5 border-b-4 border-r-4 border-teal-400 rounded-br-lg" />
-                      <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-teal-300 to-transparent absolute top-1/2 -translate-y-1/2 animate-pulse" />
-                    </div>
+                {/* Moldura de Mira / Retículo */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-8">
+                  <div className="relative w-48 h-48 sm:w-56 sm:h-56 border-2 border-dashed border-teal-300 rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+                    <div className="absolute -top-1 -left-1 w-5 h-5 border-t-4 border-l-4 border-teal-400 rounded-tl-lg" />
+                    <div className="absolute -top-1 -right-1 w-5 h-5 border-t-4 border-r-4 border-teal-400 rounded-tr-lg" />
+                    <div className="absolute -bottom-1 -left-1 w-5 h-5 border-b-4 border-l-4 border-teal-400 rounded-bl-lg" />
+                    <div className="absolute -bottom-1 -right-1 w-5 h-5 border-b-4 border-r-4 border-teal-400 rounded-br-lg" />
+                    <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-teal-300 to-transparent absolute top-1/2 -translate-y-1/2 animate-pulse" />
                   </div>
+                </div>
 
-                  {/* Controles Flutuantes da Câmera (Lanterna e Desligar) */}
-                  <div className="absolute top-3 right-3 flex items-center gap-2">
-                    {hasTorch && (
-                      <button
-                        type="button"
-                        onClick={alternarLanterna}
-                        className={`p-2 rounded-xl backdrop-blur-md text-xs font-bold transition shadow-sm ${
-                          torchOn ? 'bg-amber-500 text-white' : 'bg-black/60 text-white hover:bg-black/80'
-                        }`}
-                        title="Alternar lanterna"
-                      >
-                        {torchOn ? <Zap className="w-4 h-4" /> : <ZapOff className="w-4 h-4" />}
-                      </button>
-                    )}
+                {/* Controles Flutuantes da Câmera (Lanterna e Desligar) */}
+                <div className="absolute top-3 right-3 flex items-center gap-2">
+                  {hasTorch && (
                     <button
                       type="button"
-                      onClick={pararCamera}
-                      className="p-2 bg-black/60 hover:bg-black/80 text-white rounded-xl backdrop-blur-md text-xs font-bold transition shadow-sm"
-                      title="Desligar câmera"
+                      onClick={alternarLanterna}
+                      className={`p-2 rounded-xl backdrop-blur-md text-xs font-bold transition shadow-sm ${
+                        torchOn ? 'bg-amber-500 text-white' : 'bg-black/60 text-white hover:bg-black/80'
+                      }`}
+                      title="Alternar lanterna"
                     >
-                      <CameraOff className="w-4 h-4" />
+                      {torchOn ? <Zap className="w-4 h-4" /> : <ZapOff className="w-4 h-4" />}
                     </button>
-                  </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={pararCamera}
+                    className="p-2 bg-black/60 hover:bg-black/80 text-white rounded-xl backdrop-blur-md text-xs font-bold transition shadow-sm"
+                    title="Desligar câmera"
+                  >
+                    <CameraOff className="w-4 h-4" />
+                  </button>
                 </div>
-
-                <div className="flex items-center gap-2 text-xs font-bold text-teal-700 bg-teal-50 px-3 py-1.5 rounded-full border border-teal-200">
-                  <span className="w-2 h-2 rounded-full bg-teal-500 animate-ping" />
-                  <span>Câmera ativa • Aponte para o QR Code da carteirinha</span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={pararCamera}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition"
-                >
-                  Desligar Câmera
-                </button>
               </div>
-            )}
+
+              <div className="flex items-center gap-2 text-xs font-bold text-teal-700 bg-teal-50 px-3 py-1.5 rounded-full border border-teal-200">
+                <span className="w-2 h-2 rounded-full bg-teal-500 animate-ping" />
+                <span>Câmera ativa • Aponte para o QR Code da carteirinha</span>
+              </div>
+
+              <button
+                type="button"
+                onClick={pararCamera}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition"
+              >
+                Desligar Câmera
+              </button>
+            </div>
 
             {/* Estado de Carregamento da Câmera */}
             {cameraState === 'solicitando' && (
