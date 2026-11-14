@@ -250,46 +250,84 @@ export async function POST(
     let participante: any = null;
 
     if (member_id) {
-      const { data: pMem } = await admin
+      const cleanMemberId = String(member_id).trim();
+      const { data: pMem, error: pMemErr } = await admin
         .from('reunioes_participantes')
         .select('*')
         .eq('reuniao_id', reuniao.id)
         .eq('ministry_id', tokenRow.ministry_id)
-        .eq('member_id', member_id)
+        .eq('member_id', cleanMemberId)
         .maybeSingle();
+
+      if (pMemErr) {
+        console.error('[PublicCheckin] Erro ao buscar participante por member_id:', pMemErr);
+        return NextResponse.json(
+          { error: 'Falha de comunicação com a base de dados ao verificar convocação.', code: 'ERRO_BANCO_DADOS' },
+          { status: 500 }
+        );
+      }
       participante = pMem;
     } else if (unique_id) {
       const cleanUnique = extrairIdentificadorMinistroQrCode(String(unique_id));
-      const { data: pUni } = await admin
+      const cleanLower = cleanUnique.toLowerCase();
+      const cleanUpper = cleanUnique.toUpperCase();
+
+      const { data: pUni, error: pUniErr } = await admin
         .from('reunioes_participantes')
         .select('*')
         .eq('reuniao_id', reuniao.id)
         .eq('ministry_id', tokenRow.ministry_id)
-        .or(`unique_id_snapshot.eq.${cleanUnique},carteirinha_numero_snapshot.eq.${cleanUnique},member_id.eq.${cleanUnique}`)
+        .or(`unique_id_snapshot.eq.${cleanUnique},unique_id_snapshot.eq.${cleanLower},unique_id_snapshot.eq.${cleanUpper},carteirinha_numero_snapshot.eq.${cleanUnique},carteirinha_numero_snapshot.eq.${cleanLower},carteirinha_numero_snapshot.eq.${cleanUpper},member_id.eq.${cleanUnique}`)
         .maybeSingle();
+
+      if (pUniErr) {
+        console.error('[PublicCheckin] Erro ao buscar participante por unique_id:', pUniErr);
+        return NextResponse.json(
+          { error: 'Falha de comunicação com a base de dados ao verificar convocação.', code: 'ERRO_BANCO_DADOS' },
+          { status: 500 }
+        );
+      }
       participante = pUni;
     } else if (qr_code) {
       const parsedId = extrairIdentificadorMinistroQrCode(String(qr_code));
+      const parsedLower = parsedId.toLowerCase();
+      const parsedUpper = parsedId.toUpperCase();
       const rawTermo = String(qr_code).trim();
       
       // Tentar pelo identificador extraído (URL decodificada, unique_id ou uuid)
-      let { data: pQr } = await admin
+      let { data: pQr, error: pQrErr } = await admin
         .from('reunioes_participantes')
         .select('*')
         .eq('reuniao_id', reuniao.id)
         .eq('ministry_id', tokenRow.ministry_id)
-        .or(`unique_id_snapshot.eq.${parsedId},carteirinha_numero_snapshot.eq.${parsedId},member_id.eq.${parsedId}`)
+        .or(`unique_id_snapshot.eq.${parsedId},unique_id_snapshot.eq.${parsedLower},unique_id_snapshot.eq.${parsedUpper},carteirinha_numero_snapshot.eq.${parsedId},carteirinha_numero_snapshot.eq.${parsedLower},carteirinha_numero_snapshot.eq.${parsedUpper},member_id.eq.${parsedId}`)
         .maybeSingle();
+
+      if (pQrErr) {
+        console.error('[PublicCheckin] Erro ao buscar participante por QR Code:', pQrErr);
+        return NextResponse.json(
+          { error: 'Falha de comunicação com a base de dados ao verificar convocação.', code: 'ERRO_BANCO_DADOS' },
+          { status: 500 }
+        );
+      }
 
       // Fallback: se não encontrar e o termo bruto for diferente, buscar pelo termo original
       if (!pQr && rawTermo !== parsedId) {
-        const { data: pQrRaw } = await admin
+        const { data: pQrRaw, error: pQrRawErr } = await admin
           .from('reunioes_participantes')
           .select('*')
           .eq('reuniao_id', reuniao.id)
           .eq('ministry_id', tokenRow.ministry_id)
           .or(`unique_id_snapshot.eq.${rawTermo},carteirinha_numero_snapshot.eq.${rawTermo}`)
           .maybeSingle();
+
+        if (pQrRawErr) {
+          console.error('[PublicCheckin] Erro no fallback de busca por QR Code bruto:', pQrRawErr);
+          return NextResponse.json(
+            { error: 'Falha de comunicação com a base de dados ao verificar convocação.', code: 'ERRO_BANCO_DADOS' },
+            { status: 500 }
+          );
+        }
         pQr = pQrRaw;
       }
 
@@ -297,9 +335,58 @@ export async function POST(
     }
 
     if (!participante) {
+      // Diferenciação diagnóstica segura: checar se pertence ao ministério sem expor dados pessoais publicamente
+      let termoBuscaCheck = '';
+      if (member_id) {
+        termoBuscaCheck = String(member_id).trim();
+      } else if (unique_id) {
+        termoBuscaCheck = extrairIdentificadorMinistroQrCode(String(unique_id));
+      } else if (qr_code) {
+        termoBuscaCheck = extrairIdentificadorMinistroQrCode(String(qr_code));
+      }
+
+      if (termoBuscaCheck) {
+        const isUuidCheck = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(termoBuscaCheck);
+        const termoLower = termoBuscaCheck.toLowerCase();
+        const termoUpper = termoBuscaCheck.toUpperCase();
+
+        let memberCheckQuery = admin
+          .from('members')
+          .select('id, status')
+          .eq('ministry_id', tokenRow.ministry_id);
+
+        if (isUuidCheck) {
+          memberCheckQuery = memberCheckQuery.or(`id.eq.${termoBuscaCheck},unique_id.eq.${termoBuscaCheck}`);
+        } else {
+          memberCheckQuery = memberCheckQuery.or(`unique_id.eq.${termoBuscaCheck},unique_id.eq.${termoLower},unique_id.eq.${termoUpper},matricula.eq.${termoBuscaCheck},matricula.eq.${termoLower},matricula.eq.${termoUpper}`);
+        }
+
+        const { data: memberFound, error: mErr } = await memberCheckQuery.maybeSingle();
+
+        if (mErr) {
+          console.error('[PublicCheckin] Erro ao consultar tabela members:', mErr);
+          return NextResponse.json(
+            { error: 'Falha de comunicação com a base de dados.', code: 'ERRO_BANCO_DADOS' },
+            { status: 500 }
+          );
+        }
+
+        if (memberFound) {
+          // Ministro pertence à instituição, mas não consta na convocação desta reunião específica.
+          // Resposta genérica ao operador sem vazar dados pessoais ou nomes de pessoas não convocadas.
+          return NextResponse.json(
+            {
+              error: 'Ministro cadastrado na instituição, porém não consta na lista de convocados desta reunião.',
+              code: 'MINISTRO_NAO_CONVOCADO',
+            },
+            { status: 403 }
+          );
+        }
+      }
+
       return NextResponse.json(
         {
-          error: 'Ministro não localizado na lista de convocados desta reunião.',
+          error: 'Credencial ou carteirinha não localizada no cadastro deste ministério.',
           code: 'MINISTRO_NAO_ENCONTRADO',
         },
         { status: 404 }

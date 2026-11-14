@@ -313,10 +313,22 @@ export default function CheckinPublicoPage() {
               title: 'Horário Limite Atingido',
               message: data.error || 'O horário de tolerância para check-in foi ultrapassado.',
             });
+          } else if (data.code === 'MINISTRO_NAO_CONVOCADO') {
+            setFeedback({
+              type: 'warning',
+              title: 'Ministro Não Convocado',
+              message: data.error || 'Ministro localizado no cadastro, porém não consta na lista de convocados desta reunião.',
+            });
+          } else if (data.code === 'ERRO_BANCO_DADOS') {
+            setFeedback({
+              type: 'error',
+              title: 'Instabilidade de Conexão',
+              message: 'Não foi possível verificar a credencial no momento. Tente novamente em alguns instantes.',
+            });
           } else {
             setFeedback({
               type: 'error',
-              title: 'Não Identificado',
+              title: 'Credencial Não Localizada',
               message: data.error || 'Código ou carteirinha não localizado nesta reunião ministerial.',
             });
           }

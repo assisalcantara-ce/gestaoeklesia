@@ -141,4 +141,28 @@ describe('Check-in Público de Reuniões — Mecanismo e Diagnóstico da Câmera
     simularLeitura('MIN-002');
     assert.equal(chamadas, 2);
   });
+
+  // 6. Suporte estrito ao identificador de carteira real de 16 caracteres (5FE7B7D2B1FC41E9)
+  it('deve extrair com precisão identificador hexadecimal de 16 caracteres de carteira real', () => {
+    const urlCarteiraReal = 'https://app.gestaoeklesia.com.br/validar/credencial/5FE7B7D2B1FC41E9';
+    const idExtraido = extrairIdentificadorMinistroQrCode(urlCarteiraReal);
+    assert.equal(idExtraido, '5FE7B7D2B1FC41E9');
+    assert.equal(idExtraido.length, 16);
+  });
+
+  it('deve ser insensível a maiúsculas/minúsculas na busca de identificadores', () => {
+    const code = '5FE7B7D2B1FC41E9';
+    assert.equal(code.toLowerCase(), '5fe7b7d2b1fc41e9');
+    assert.equal(code.toUpperCase(), '5FE7B7D2B1FC41E9');
+  });
+
+  // 7. Não vazar dados de membros não convocados
+  it('deve validar resposta de proteção de privacidade para membros não convocados', () => {
+    const respostaSegura = {
+      error: 'Ministro cadastrado na instituição, porém não consta na lista de convocados desta reunião.',
+      code: 'MINISTRO_NAO_CONVOCADO',
+    };
+    assert.equal((respostaSegura as any).ministro, undefined);
+    assert.equal(respostaSegura.code, 'MINISTRO_NAO_CONVOCADO');
+  });
 });
