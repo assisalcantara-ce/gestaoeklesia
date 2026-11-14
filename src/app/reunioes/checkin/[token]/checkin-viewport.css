@@ -1,0 +1,40 @@
+/* ==========================================================================
+   Estilos de escopo exclusivo para o Terminal de Check-in Público (/reunioes/checkin/[token])
+   Fixa a viewport no celular, bloqueia rolagem horizontal e previne zoom por duplo toque/pinça.
+   ========================================================================== */
+
+/* Prevenção de overflow e zoom indesejado no escopo do checkin */
+html:has(.checkin-viewport-scope),
+body:has(.checkin-viewport-scope) {
+  width: 100% !important;
+  max-width: 100vw !important;
+  overflow-x: hidden !important;
+  touch-action: pan-y manipulation !important;
+  -webkit-text-size-adjust: 100% !important;
+  overscroll-behavior-x: none !important;
+}
+
+.checkin-viewport-scope {
+  width: 100%;
+  max-width: 100vw;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  touch-action: pan-y manipulation;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Evitar auto-zoom em inputs no Safari/iOS (requer fonte de no mínimo 16px) */
+.checkin-viewport-scope input,
+.checkin-viewport-scope select,
+.checkin-viewport-scope textarea {
+  font-size: max(16px, 1rem) !important;
+  touch-action: manipulation;
+}
+
+/* Botões com bloqueio de duplo toque para zoom e toque responsivo */
+.checkin-viewport-scope button,
+.checkin-viewport-scope a {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}

@@ -64,6 +64,46 @@ interface CheckinFeedback {
 
 export type CameraState = 'idle' | 'solicitando' | 'ativa' | 'erro';
 
+// Helper de feedback sonoro discreto para leituras de QR Code
+function emitirBipSonoro(tipo: 'sucesso' | 'aviso' | 'erro') {
+  if (typeof window === 'undefined') return;
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    if (tipo === 'sucesso') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime); // A5
+      osc.frequency.setValueAtTime(1174.66, ctx.currentTime + 0.08); // D6
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.25);
+    } else if (tipo === 'aviso') {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.2);
+    } else {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(220, ctx.currentTime);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.25);
+    }
+  } catch {
+    // Ignorar se áudio for bloqueado por política de autoplay do navegador
+  }
+}
+
 export default function CheckinPublicoPage() {
   const params = useParams();
   const token = typeof params?.token === 'string' ? params.token : '';
@@ -92,6 +132,8 @@ export default function CheckinPublicoPage() {
   const streamRef = useRef<MediaStream | null>(null);
   const isScanningRef = useRef(false);
   const animFrameRef = useRef<number | null>(null);
+  const cooldownRef = useRef(false);
+  const lastScannedQrRef = useRef<string | null>(null);
 
   // Scanner óptico USB / Bluetooth
   const [manualQrInputValue, setManualQrInputValue] = useState('');
@@ -179,6 +221,40 @@ export default function CheckinPublicoPage() {
     setTorchOn(false);
     setHasTorch(false);
     setCameraState('idle');
+    cooldownRef.current = false;
+    lastScannedQrRef.current = null;
+  }, []);
+
+  // Prevenção de gestos de pinça e duplo toque em dispositivos móveis (ex: Safari iOS)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // Previne zoom por gesto de pinça no Safari iOS através de eventos de gesture
+    const handleGesture = (e: Event) => {
+      e.preventDefault();
+    };
+
+    // Previne duplo toque para zoom no Safari e WebViews
+    let lastTouchEnd = 0;
+    const handleTouchEnd = (e: TouchEvent) => {
+      const now = Date.now();
+      if (now - lastTouchEnd <= 300) {
+        e.preventDefault();
+      }
+      lastTouchEnd = now;
+    };
+
+    document.addEventListener('gesturestart', handleGesture as any, { passive: false });
+    document.addEventListener('gesturechange', handleGesture as any, { passive: false });
+    document.addEventListener('gestureend', handleGesture as any, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+    return () => {
+      document.removeEventListener('gesturestart', handleGesture as any);
+      document.removeEventListener('gesturechange', handleGesture as any);
+      document.removeEventListener('gestureend', handleGesture as any);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
   }, []);
 
   // 3. Processar Check-in via API Pública
@@ -198,6 +274,7 @@ export default function CheckinPublicoPage() {
 
         if (res.ok) {
           if (data.ja_presente) {
+            emitirBipSonoro('aviso');
             setFeedback({
               type: 'warning',
               title: 'Presença Já Confirmada',
@@ -210,6 +287,7 @@ export default function CheckinPublicoPage() {
                 : undefined,
             });
           } else {
+            emitirBipSonoro('sucesso');
             setFeedback({
               type: 'success',
               title: 'Check-in Confirmado!',
@@ -228,6 +306,7 @@ export default function CheckinPublicoPage() {
             );
           }
         } else {
+          emitirBipSonoro('erro');
           if (data.code === 'CHECKIN_EXPIRADO') {
             setFeedback({
               type: 'expired',
@@ -243,6 +322,7 @@ export default function CheckinPublicoPage() {
           }
         }
       } catch (err: any) {
+        emitirBipSonoro('erro');
         setFeedback({
           type: 'error',
           title: 'Erro de Conexão',
@@ -271,27 +351,41 @@ export default function CheckinPublicoPage() {
         const videoWidth = video.videoWidth || 640;
         const videoHeight = video.videoHeight || 480;
 
-        if (canvas.width !== videoWidth || canvas.height !== videoHeight) {
-          canvas.width = videoWidth;
-          canvas.height = videoHeight;
+        // Limitar resolução de processamento para até 1280x720 para máxima performance no jsQR
+        const scale = Math.min(1, 1000 / Math.max(videoWidth, videoHeight));
+        const targetW = Math.round(videoWidth * scale);
+        const targetH = Math.round(videoHeight * scale);
+
+        if (canvas.width !== targetW || canvas.height !== targetH) {
+          canvas.width = targetW;
+          canvas.height = targetH;
         }
 
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         if (ctx) {
-          ctx.drawImage(video, 0, 0, videoWidth, videoHeight);
+          ctx.drawImage(video, 0, 0, targetW, targetH);
           try {
-            const imageData = ctx.getImageData(0, 0, videoWidth, videoHeight);
-            const qrCode = jsQR(imageData.data, imageData.width, imageData.height, {
-              inversionAttempts: 'dontInvert',
+            const imageData = ctx.getImageData(0, 0, targetW, targetH);
+            // Tentativa primária com inversão automática para suportar carteirinhas com fundos escuros/claros
+            let qrCode = jsQR(imageData.data, imageData.width, imageData.height, {
+              inversionAttempts: 'attemptBoth',
             });
 
             if (qrCode && qrCode.data && qrCode.data.trim()) {
               const qrValue = qrCode.data.trim();
-              if (isScanningRef.current) {
-                isScanningRef.current = false;
-                pararCamera();
+
+              // Prevenção de duplicidade por cooldown de leitura contínua (2.5s)
+              if (!cooldownRef.current || lastScannedQrRef.current !== qrValue) {
+                cooldownRef.current = true;
+                lastScannedQrRef.current = qrValue;
+
+                // Processar checkin sem desativar a câmera, permitindo leitura do próximo participante
                 processarCheckin({ qr_code: qrValue, metodo_leitura: 'qrcode_carteirinha' });
-                return;
+
+                // Liberar cooldown após 2.5 segundos
+                setTimeout(() => {
+                  cooldownRef.current = false;
+                }, 2500);
               }
             }
           } catch {
@@ -306,7 +400,7 @@ export default function CheckinPublicoPage() {
     };
 
     animFrameRef.current = requestAnimationFrame(scanFrame);
-  }, [pararCamera, processarCheckin]);
+  }, [processarCheckin]);
 
   // 5. Iniciar Câmera com suporte total a Safari/iOS e Chrome/Android
   const iniciarCamera = useCallback(async () => {

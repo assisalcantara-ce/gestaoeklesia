@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
-import { hashTokenPainel } from '@/lib/reunioes-utils';
+import { hashTokenPainel, extrairIdentificadorMinistroQrCode } from '@/lib/reunioes-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -259,24 +259,40 @@ export async function POST(
         .maybeSingle();
       participante = pMem;
     } else if (unique_id) {
-      const cleanUnique = String(unique_id).trim();
+      const cleanUnique = extrairIdentificadorMinistroQrCode(String(unique_id));
       const { data: pUni } = await admin
         .from('reunioes_participantes')
         .select('*')
         .eq('reuniao_id', reuniao.id)
         .eq('ministry_id', tokenRow.ministry_id)
-        .or(`unique_id_snapshot.eq.${cleanUnique},carteirinha_numero_snapshot.eq.${cleanUnique}`)
+        .or(`unique_id_snapshot.eq.${cleanUnique},carteirinha_numero_snapshot.eq.${cleanUnique},member_id.eq.${cleanUnique}`)
         .maybeSingle();
       participante = pUni;
     } else if (qr_code) {
-      const termoBusca = String(qr_code).trim();
-      const { data: pQr } = await admin
+      const parsedId = extrairIdentificadorMinistroQrCode(String(qr_code));
+      const rawTermo = String(qr_code).trim();
+      
+      // Tentar pelo identificador extraído (URL decodificada, unique_id ou uuid)
+      let { data: pQr } = await admin
         .from('reunioes_participantes')
         .select('*')
         .eq('reuniao_id', reuniao.id)
         .eq('ministry_id', tokenRow.ministry_id)
-        .or(`unique_id_snapshot.eq.${termoBusca},carteirinha_numero_snapshot.eq.${termoBusca}`)
+        .or(`unique_id_snapshot.eq.${parsedId},carteirinha_numero_snapshot.eq.${parsedId},member_id.eq.${parsedId}`)
         .maybeSingle();
+
+      // Fallback: se não encontrar e o termo bruto for diferente, buscar pelo termo original
+      if (!pQr && rawTermo !== parsedId) {
+        const { data: pQrRaw } = await admin
+          .from('reunioes_participantes')
+          .select('*')
+          .eq('reuniao_id', reuniao.id)
+          .eq('ministry_id', tokenRow.ministry_id)
+          .or(`unique_id_snapshot.eq.${rawTermo},carteirinha_numero_snapshot.eq.${rawTermo}`)
+          .maybeSingle();
+        pQr = pQrRaw;
+      }
+
       participante = pQr;
     }
 

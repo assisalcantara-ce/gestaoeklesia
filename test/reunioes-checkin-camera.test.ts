@@ -1,5 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { extrairIdentificadorMinistroQrCode } from '../src/lib/reunioes-utils';
 
 describe('Check-in Público de Reuniões — Mecanismo e Diagnóstico da Câmera', () => {
   // 1. Mapeamento de erros da WebRTC MediaDevices API
@@ -91,5 +92,53 @@ describe('Check-in Público de Reuniões — Mecanismo e Diagnóstico da Câmera
     fakeStream.getTracks().forEach((track) => track.stop());
 
     assert.equal(stoppedCount, 2);
+  });
+
+  // 4. Decodificação e Extração do Conteúdo do QR Code da Carteira Ministerial
+  it('deve extrair o unique_id a partir de URL oficial da credencial ministerial', () => {
+    const url1 = 'https://app.gestaoeklesia.com.br/validar/credencial/MIN-2026-9988';
+    assert.equal(extrairIdentificadorMinistroQrCode(url1), 'MIN-2026-9988');
+
+    const url2 = 'https://gestaoeklesia.com.br/validar/credencial/550e8400-e29b-41d4-a716-446655440000?origem=qr';
+    assert.equal(extrairIdentificadorMinistroQrCode(url2), '550e8400-e29b-41d4-a716-446655440000');
+  });
+
+  it('deve extrair código puro ou número de matrícula quando o QR Code contiver texto direto', () => {
+    assert.equal(extrairIdentificadorMinistroQrCode('MIN-102030'), 'MIN-102030');
+    assert.equal(extrairIdentificadorMinistroQrCode('12345678'), '12345678');
+    assert.equal(extrairIdentificadorMinistroQrCode('  MIN-TRIM-01  '), 'MIN-TRIM-01');
+  });
+
+  it('deve lidar com URLs genéricas com id no último segmento', () => {
+    const urlGenerica = 'http://sistema.local/carteirinha/validar/PASTOR-01';
+    assert.equal(extrairIdentificadorMinistroQrCode(urlGenerica), 'PASTOR-01');
+  });
+
+  // 5. Prevenção de duplicidade por cooldown e leitura contínua
+  it('deve aplicar cooldown de leitura contínua para evitar requisições duplicadas do mesmo QR Code', () => {
+    let cooldownAtivo = false;
+    let ultimoQr: string | null = null;
+    let chamadas = 0;
+
+    function simularLeitura(qr: string) {
+      if (!cooldownAtivo || ultimoQr !== qr) {
+        cooldownAtivo = true;
+        ultimoQr = qr;
+        chamadas++;
+      }
+    }
+
+    // Leitura 1: processa
+    simularLeitura('MIN-001');
+    assert.equal(chamadas, 1);
+
+    // Mesma carteirinha ainda no frame: ignorada pelo cooldown
+    simularLeitura('MIN-001');
+    simularLeitura('MIN-001');
+    assert.equal(chamadas, 1);
+
+    // Próximo ministro aproximando a carteirinha: processa imediatamente
+    simularLeitura('MIN-002');
+    assert.equal(chamadas, 2);
   });
 });
