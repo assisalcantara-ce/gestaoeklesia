@@ -191,4 +191,86 @@ export function ordenarReunioesMinisteriais<T extends { data_reuniao: string; ho
   });
 }
 
+/**
+ * Retorna os limites (data de início e fim no formato YYYY-MM-DD) do mês corrente
+ * ou de uma referência de data no fuso de Brasília.
+ */
+export function getLimitesMesCorrente(referencia?: Date): {
+  mesAnoStr: string; // Ex: '2026-11'
+  dataInicioMes: string; // Ex: '2026-11-01'
+  dataFimMes: string; // Ex: '2026-11-30'
+  nomeMesAno: string; // Ex: 'Novembro de 2026'
+} {
+  const agora = referencia || new Date();
+  const ano = agora.getFullYear();
+  const mesIndex = agora.getMonth(); // 0 a 11
+  const mesNum = mesIndex + 1;
+  const mesPadded = String(mesNum).padStart(2, '0');
+
+  const mesAnoStr = `${ano}-${mesPadded}`;
+  const dataInicioMes = `${mesAnoStr}-01`;
+
+  // Último dia do mês: dia 0 do mês seguinte
+  const ultimoDia = new Date(ano, mesNum, 0).getDate();
+  const dataFimMes = `${mesAnoStr}-${String(ultimoDia).padStart(2, '0')}`;
+
+  const nomesMeses = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+  const nomeMesAno = `${nomesMeses[mesIndex]} de ${ano}`;
+
+  return {
+    mesAnoStr,
+    dataInicioMes,
+    dataFimMes,
+    nomeMesAno,
+  };
+}
+
+/**
+ * Identifica se um evento da Agenda Oficial é estruturalmente classificado como Reunião Ministerial.
+ * Regras estritas baseadas em dados estruturados do banco (agenda_tipos e agenda_eventos):
+ * 1. Código de tipo cadastrado em agenda_tipos:
+ *    - 'reuniao_ministerial' (Reunião Ministerial)
+ *    - 'reuniao_obreiros' (Reunião de Obreiros)
+ *    - 'reuniao_diretoria' (Reunião de Diretoria)
+ *    - 'assembleia_geral' (Assembleia Geral)
+ * 2. Categoria estruturada 'reuniao' com tipo raiz 'reuniao'
+ * Não utiliza buscas heurísticas livres em títulos arbitrários.
+ */
+export function isEventoReuniaoMinisterial(evento: {
+  tipo?: string | null;
+  agenda_tipos?: {
+    codigo?: string | null;
+    categoria?: string | null;
+  } | null;
+}): boolean {
+  if (!evento) return false;
+
+  const tipo = (evento.tipo || '').toLowerCase().trim();
+  const tipoCodigo = (evento.agenda_tipos?.codigo || '').toLowerCase().trim();
+  const tipoCategoria = (evento.agenda_tipos?.categoria || '').toLowerCase().trim();
+
+  // 1. Códigos estruturados oficiais do seed/cadastro da agenda
+  const codigosOficiaisMinisteriais = [
+    'reuniao_ministerial',
+    'reuniao_obreiros',
+    'reuniao_diretoria',
+    'assembleia_geral',
+  ];
+
+  if (tipoCodigo && codigosOficiaisMinisteriais.includes(tipoCodigo)) {
+    return true;
+  }
+
+  // 2. Classificação combinada por categoria estruturada 'reuniao' e tipo 'reuniao'
+  if (tipo === 'reuniao' && tipoCategoria === 'reuniao') {
+    return true;
+  }
+
+  return false;
+}
+
+
 

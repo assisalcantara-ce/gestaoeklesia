@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveTenantAuth } from '@/lib/tenant-auth';
 import { isFeatureAllowedForTenant } from '@/lib/plan-permissions';
-import { calcularLimiteCheckinTimestamp, validarHorariosReuniao, ordenarReunioesMinisteriais } from '@/lib/reunioes-utils';
+import {
+  calcularLimiteCheckinTimestamp,
+  validarHorariosReuniao,
+  ordenarReunioesMinisteriais,
+  getLimitesMesCorrente,
+} from '@/lib/reunioes-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +18,10 @@ const REUNIOES_RESTRICTED_RESPONSE = {
 
 /**
  * GET /api/v1/reunioes
+ * Rota estritamente de LEITURA (pure GET, sem mutação, sem inserções em banco).
  * Lista reuniões ministeriais do tenant autenticado com filtros de status e período.
+ * Por padrão (quando mes_corrente=true ou quando não especificado período global),
+ * retorna estritamente as reuniões do mês corrente.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -36,7 +44,27 @@ export async function GET(request: NextRequest) {
     const dataInicioParam = searchParams.get('data_inicio');
     const dataFimParam = searchParams.get('data_fim');
     const congregacaoIdParam = searchParams.get('congregacao_id');
+    const mesParam = searchParams.get('mes'); // YYYY-MM opcional
+    const mesCorrenteParam = searchParams.get('mes_corrente'); // 'true' | 'false'
 
+    // Definir período efetivo: se mesParam fornecido ou mes_corrente !== 'false'
+    let dataInicioEfetiva: string | null = dataInicioParam;
+    let dataFimEfetiva: string | null = dataFimParam;
+    let limitesMes = getLimitesMesCorrente();
+
+    if (mesParam && /^\d{4}-\d{2}$/.test(mesParam)) {
+      const [anoStr, mesStr] = mesParam.split('-');
+      const anoNum = parseInt(anoStr, 10);
+      const mesNum = parseInt(mesStr, 10);
+      limitesMes = getLimitesMesCorrente(new Date(anoNum, mesNum - 1, 15));
+      dataInicioEfetiva = limitesMes.dataInicioMes;
+      dataFimEfetiva = limitesMes.dataFimMes;
+    } else if (mesCorrenteParam === 'true' || (!dataInicioParam && !dataFimParam)) {
+      dataInicioEfetiva = limitesMes.dataInicioMes;
+      dataFimEfetiva = limitesMes.dataFimMes;
+    }
+
+    // ─── Consulta Oficial de Reuniões (Exclusivamente Leitura) ──────────────────
     let query = ctx.admin
       .from('reunioes')
       .select(`
@@ -67,12 +95,12 @@ export async function GET(request: NextRequest) {
       query = query.eq('status', statusParam);
     }
 
-    if (dataInicioParam && /^\d{4}-\d{2}-\d{2}$/.test(dataInicioParam)) {
-      query = query.gte('data_reuniao', dataInicioParam);
+    if (dataInicioEfetiva && /^\d{4}-\d{2}-\d{2}$/.test(dataInicioEfetiva)) {
+      query = query.gte('data_reuniao', dataInicioEfetiva);
     }
 
-    if (dataFimParam && /^\d{4}-\d{2}-\d{2}$/.test(dataFimParam)) {
-      query = query.lte('data_reuniao', dataFimParam);
+    if (dataFimEfetiva && /^\d{4}-\d{2}-\d{2}$/.test(dataFimEfetiva)) {
+      query = query.lte('data_reuniao', dataFimEfetiva);
     }
 
     if (congregacaoIdParam) {
@@ -97,6 +125,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       total: reunioesOrdenadas.length,
+      mes_referencia: limitesMes.mesAnoStr,
+      nome_mes: limitesMes.nomeMesAno,
       reunioes: reunioesOrdenadas,
     });
   } catch (err: any) {

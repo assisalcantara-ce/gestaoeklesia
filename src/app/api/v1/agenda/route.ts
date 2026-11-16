@@ -4,6 +4,7 @@ import { isFeatureAllowedForTenant } from '@/lib/plan-permissions';
 import { PlanningConflictService } from '@/lib/planning-conflict-service';
 import { normalizarTipoAgendaEvento } from '@/lib/agenda-recorrencia-service';
 import { temAcessoEscrita } from '@/lib/access-control';
+import { sincronizarEventoAgendaComReunioes } from '@/lib/reunioes-agenda-sync-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -264,6 +265,21 @@ export async function POST(request: NextRequest) {
       await ctx.admin.from('agenda_eventos').insert(filhasPayload);
     }
 
+    // ─── Sincronização Server-Side Automática com Reuniões Ministeriais ───────
+    if (novoEvento) {
+      try {
+        await sincronizarEventoAgendaComReunioes({
+          admin: ctx.admin,
+          ministryId: ctx.ministryId,
+          eventoId: novoEvento.id,
+          operacao: 'create',
+          usuarioId: ctx.userId,
+        });
+      } catch (syncReuniaoErr: any) {
+        console.error('[AgendaRoute] Aviso na sincronização com Reuniões Ministeriais:', syncReuniaoErr?.message);
+      }
+    }
+
     return NextResponse.json({ data: novoEvento }, { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Erro interno no servidor.' }, { status: 500 });
@@ -437,6 +453,21 @@ export async function PUT(request: NextRequest) {
 
     if (updateError) {
       return NextResponse.json({ error: 'Erro ao atualizar compromisso.', detail: updateError.message }, { status: 500 });
+    }
+
+    // ─── Sincronização Server-Side Automática com Reuniões Ministeriais ───────
+    if (updatedEvento) {
+      try {
+        await sincronizarEventoAgendaComReunioes({
+          admin: ctx.admin,
+          ministryId: ctx.ministryId,
+          eventoId: updatedEvento.id,
+          operacao: updatedEvento.status === 'cancelado' ? 'cancel' : 'update',
+          usuarioId: ctx.userId,
+        });
+      } catch (syncReuniaoErr: any) {
+        console.error('[AgendaRoute] Aviso na sincronização com Reuniões Ministeriais (update):', syncReuniaoErr?.message);
+      }
     }
 
     return NextResponse.json({ data: updatedEvento });
@@ -654,6 +685,22 @@ export async function DELETE(request: NextRequest) {
         .in('id', cultoIds)
         .eq('ministry_id', ctx.ministryId)
         .in('status', ['Aberto', 'Programado']);
+    }
+
+    // Sincronização estrita com Reuniões Ministeriais:
+    // Trata cancelamento seguro de reuniões vinculadas preservando 100% dos dados históricos e quórum.
+    for (const idExcluido of idsToDelete) {
+      try {
+        await sincronizarEventoAgendaComReunioes({
+          admin: ctx.admin,
+          ministryId: ctx.ministryId,
+          eventoId: idExcluido,
+          operacao: 'delete',
+          usuarioId: ctx.userId,
+        });
+      } catch (syncDelErr: any) {
+        console.error('[AgendaRoute] Aviso na sincronização com Reuniões Ministeriais (delete):', syncDelErr?.message);
+      }
     }
 
     const { error: deleteError } = await ctx.admin

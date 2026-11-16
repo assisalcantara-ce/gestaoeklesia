@@ -6,7 +6,7 @@ import PageLayout from '@/components/PageLayout';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { createClient } from '@/lib/supabase-client';
-import { calcularStatusEfetivoReuniao, StatusReuniaoEfetivo, ordenarReunioesMinisteriais } from '@/lib/reunioes-utils';
+import { calcularStatusEfetivoReuniao, StatusReuniaoEfetivo, ordenarReunioesMinisteriais, getLimitesMesCorrente } from '@/lib/reunioes-utils';
 import {
   Calendar,
   Clock,
@@ -17,7 +17,6 @@ import {
   Tv,
   FileCheck2,
   AlertTriangle,
-  Plus,
   RefreshCw,
   Eye,
   CheckCircle2,
@@ -65,6 +64,7 @@ export default function ReunioesPage() {
 
   // Estados de dados
   const [reunioes, setReunioes] = useState<ReuniaoItem[]>([]);
+  const [nomeMesAno, setNomeMesAno] = useState<string>(() => getLimitesMesCorrente().nomeMesAno);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,7 +73,6 @@ export default function ReunioesPage() {
   const [filtroBusca, setFiltroBusca] = useState<string>('');
 
   // Modais
-  const [modalNovaAberto, setModalNovaAberto] = useState<boolean>(false);
   const [modalEncerrarAberto, setModalEncerrarAberto] = useState<boolean>(false);
   const [modalLinkAberto, setModalLinkAberto] = useState<boolean>(false);
   const [modalLinkDados, setModalLinkDados] = useState<{
@@ -83,16 +82,6 @@ export default function ReunioesPage() {
   } | null>(null);
   const [modalLinkCopiado, setModalLinkCopiado] = useState<boolean>(false);
   const [reuniaoSelecionada, setReuniaoSelecionada] = useState<ReuniaoItem | null>(null);
-
-  // Estado do formulário Nova Reunião
-  const [formTitulo, setFormTitulo] = useState<string>('');
-  const [formPauta, setFormPauta] = useState<string>('');
-  const [formLocal, setFormLocal] = useState<string>('Templo Central');
-  const [formData, setFormData] = useState<string>('');
-  const [formHorarioInicio, setFormHorarioInicio] = useState<string>('19:00');
-  const [formHorarioLimite, setFormHorarioLimite] = useState<string>('19:30');
-  const [salvandoNova, setSalvandoNova] = useState<boolean>(false);
-  const [erroForm, setErroForm] = useState<string | null>(null);
 
   // Estado de Carregamento de Links
   const [copiandoCheckinId, setCopiandoCheckinId] = useState<string | null>(null);
@@ -119,13 +108,13 @@ export default function ReunioesPage() {
     });
   }, []);
 
-  // ─── 1. Carregar Reuniões do Tenant ────────────────────────────────────────
+  // ─── 1. Carregar Reuniões do Mês Corrente (Integradas com a Agenda) ───────────
   const carregarReunioes = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const res = await fetchAutenticado('/api/v1/reunioes', {
+      const res = await fetchAutenticado('/api/v1/reunioes?mes_corrente=true', {
         cache: 'no-store',
       });
 
@@ -133,6 +122,10 @@ export default function ReunioesPage() {
 
       if (!res.ok) {
         throw new Error(data.error || 'Erro ao carregar lista de reuniões.');
+      }
+
+      if (data.nome_mes) {
+        setNomeMesAno(data.nome_mes);
       }
 
       // Adicionar status_efetivo calculado para cada reunião e ordenar
@@ -154,66 +147,6 @@ export default function ReunioesPage() {
       carregarReunioes();
     }
   }, [bloqueado, planFeatures, carregarReunioes]);
-
-  // ─── 2. Criar Nova Reunião ─────────────────────────────────────────────────
-  const handleCriarReuniao = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErroForm(null);
-
-    if (!formTitulo.trim()) {
-      setErroForm('O título da reunião é obrigatório.');
-      return;
-    }
-    if (!formData) {
-      setErroForm('A data da reunião é obrigatória.');
-      return;
-    }
-    if (!formHorarioInicio || !formHorarioLimite) {
-      setErroForm('Informe o horário de início e o limite para check-in.');
-      return;
-    }
-
-    try {
-      setSalvandoNova(true);
-
-      const payload = {
-        titulo: formTitulo.trim(),
-        pauta: formPauta.trim() || undefined,
-        local: formLocal.trim() || 'Templo Central',
-        data_reuniao: formData,
-        horario_inicio: formHorarioInicio,
-        horario_limite_entrada: formHorarioLimite,
-      };
-
-      const res = await fetchAutenticado('/api/v1/reunioes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const json = await res.json();
-
-      if (!res.ok) {
-        throw new Error(json.error || 'Erro ao cadastrar reunião.');
-      }
-
-      // Limpar formulário e fechar modal
-      setFormTitulo('');
-      setFormPauta('');
-      setFormLocal('Templo Central');
-      setFormData('');
-      setFormHorarioInicio('19:00');
-      setFormHorarioLimite('19:30');
-      setModalNovaAberto(false);
-
-      // Recarregar dados
-      await carregarReunioes();
-    } catch (err: any) {
-      setErroForm(err?.message || 'Falha ao criar reunião.');
-    } finally {
-      setSalvandoNova(false);
-    }
-  };
 
   // ─── 3. Ações de Links Públicos (Check-in e Painel TV) ───────────────────
   const abrirModalLinkPublico = async (reuniao: ReuniaoItem, tipo: 'checkin' | 'painel') => {
@@ -432,15 +365,6 @@ export default function ReunioesPage() {
               </span>
             )}
           </Link>
-
-          {/* CTA Principal: Nova Reunião */}
-          <button
-            onClick={() => setModalNovaAberto(true)}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-teal-600 via-teal-600 to-teal-700 hover:from-teal-500 hover:to-teal-600 text-white text-xs font-black rounded-xl shadow-md hover:shadow-lg transition-all duration-150 active:scale-95 border border-teal-500/30"
-          >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>Nova Reunião</span>
-          </button>
         </div>
       }
     >
@@ -611,17 +535,19 @@ export default function ReunioesPage() {
                 <h3 className="text-base font-bold text-slate-800">Nenhuma reunião encontrada</h3>
                 <p className="text-xs text-slate-500 mt-1">
                   {filtroBusca || filtroStatus !== 'todas'
-                    ? 'Nenhum registro corresponde aos filtros selecionados.'
-                    : 'Cadastre a primeira convocação ministerial para iniciar o controle.'}
+                    ? 'Nenhum registro corresponde aos filtros selecionados neste mês.'
+                    : `Não há reuniões ministeriais programadas na Agenda para ${nomeMesAno}.`}
                 </p>
               </div>
-              <button
-                onClick={() => setModalNovaAberto(true)}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-[#123b63] hover:bg-[#0f2a45] text-white text-xs font-bold rounded-xl shadow-md transition active:scale-95"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Cadastrar Convocação</span>
-              </button>
+              <div className="pt-2">
+                <Link
+                  href="/agenda"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#123b63] hover:bg-[#0f2a45] text-white text-xs font-bold rounded-xl shadow-md transition active:scale-95"
+                >
+                  <Calendar className="w-4 h-4" />
+                  <span>Acessar Agenda Ministerial</span>
+                </Link>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
@@ -839,128 +765,6 @@ export default function ReunioesPage() {
           )}
         </section>
       </div>
-
-      {/* ─── 6. MODAL: NOVA REUNIÃO MINISTERIAL ─── */}
-      {modalNovaAberto && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h2 className="text-base font-black text-slate-900">Cadastrar Nova Reunião</h2>
-                <p className="text-xs text-slate-500">
-                  O snapshot de ministros ativos será congelado automaticamente.
-                </p>
-              </div>
-              <button
-                onClick={() => setModalNovaAberto(false)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-bold p-1"
-              >
-                ✕
-              </button>
-            </div>
-
-            {erroForm && (
-              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-semibold">
-                {erroForm}
-              </div>
-            )}
-
-            <form onSubmit={handleCriarReuniao} className="space-y-3.5 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Título da Reunião *</label>
-                <input
-                  type="text"
-                  required
-                  value={formTitulo}
-                  onChange={(e) => setFormTitulo(e.target.value)}
-                  placeholder="Ex: Assembleia Geral de Ministros - Trimestre 4"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-teal-600 font-medium"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Local do Evento *</label>
-                <input
-                  type="text"
-                  required
-                  value={formLocal}
-                  onChange={(e) => setFormLocal(e.target.value)}
-                  placeholder="Ex: Templo Central / Auditório Nobre"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-teal-600 font-medium"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Data *</label>
-                  <input
-                    type="date"
-                    required
-                    value={formData}
-                    onChange={(e) => setFormData(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-teal-600 font-medium"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Início *</label>
-                  <input
-                    type="time"
-                    required
-                    value={formHorarioInicio}
-                    onChange={(e) => setFormHorarioInicio(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-teal-600 font-medium"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Limite Entrada *</label>
-                  <input
-                    type="time"
-                    required
-                    value={formHorarioLimite}
-                    onChange={(e) => setFormHorarioLimite(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-teal-600 font-medium"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Pauta / Observações (Opcional)</label>
-                <textarea
-                  rows={2}
-                  value={formPauta}
-                  onChange={(e) => setFormPauta(e.target.value)}
-                  placeholder="Tópicos que serão abordados na reunião ministerial..."
-                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-teal-600 font-medium"
-                />
-              </div>
-
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-500 leading-relaxed">
-                Ao cadastrar, o sistema vinculará <strong>somente ministros ativos</strong> ao snapshot da reunião para o controle de presença por carteirinha/QR Code.
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setModalNovaAberto(false)}
-                  disabled={salvandoNova}
-                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={salvandoNova}
-                  className="flex-1 py-2.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow transition"
-                >
-                  {salvandoNova ? 'Cadastrando e Gerando Snapshot...' : 'Salvar e Conectar Ministros'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* ─── MODAL: LINK PÚBLICO SEGURO (CHECK-IN / PAINEL TV) ─── */}
       {modalLinkAberto && modalLinkDados && (
