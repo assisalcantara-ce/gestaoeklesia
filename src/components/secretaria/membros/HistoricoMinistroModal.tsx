@@ -209,12 +209,16 @@ export default function HistoricoMinistroModal({
                   ${ev.descricao || '-'}
                 </div>
 
-                ${(ev.comissao_nome || ev.pastor_solicitante || ev.local || ev.local_origem || ev.responsavel) ? `
+                ${(ev.comissao_nome || ev.pastor_solicitante || ev.local || ev.local_origem || ev.responsavel || ev.advertencia_protocolo || ev.metodo_leitura || ev.motivo_abono || ev.motivo_justificativa) ? `
                   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 10px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 10px; margin-top: 6px;">
                     ${ev.comissao_nome ? `<div><strong>Comissão:</strong> ${ev.comissao_nome}</div>` : ''}
                     ${ev.pastor_solicitante ? `<div><strong>Indicação:</strong> ${ev.pastor_solicitante}</div>` : ''}
                     ${ev.local ? `<div><strong>Local:</strong> ${ev.local}</div>` : ''}
                     ${ev.responsavel ? `<div><strong>Homologado por:</strong> ${ev.responsavel}</div>` : ''}
+                    ${ev.advertencia_protocolo ? `<div><strong>Protocolo Notificação:</strong> ${ev.advertencia_protocolo}</div>` : ''}
+                    ${ev.metodo_leitura ? `<div><strong>Método:</strong> ${ev.metodo_leitura === 'qrcode_carteirinha' ? 'Leitor QR Code' : ev.metodo_leitura === 'busca_nome' ? 'Busca Nominal' : ev.metodo_leitura}</div>` : ''}
+                    ${ev.motivo_justificativa ? `<div style="grid-column: 1 / -1;"><strong>Justificativa:</strong> ${ev.motivo_justificativa}</div>` : ''}
+                    ${ev.motivo_abono ? `<div style="grid-column: 1 / -1;"><strong>Abono:</strong> ${ev.motivo_abono}</div>` : ''}
                   </div>
                 ` : ''}
 
@@ -608,8 +612,8 @@ export default function HistoricoMinistroModal({
                         </p>
                       )}
 
-                      {/* Metadados adicionais: Comissão, Solicitante, Local, Responsável, Protocolo */}
-                      {(ev.comissao_nome || ev.pastor_solicitante || ev.local || ev.local_origem || ev.responsavel || ev.advertencia_protocolo || ev.metodo_leitura) && (
+                      {/* Metadados adicionais: Comissão, Solicitante, Local, Responsável, Protocolo, Método, Justificativa, Abono */}
+                      {(ev.comissao_nome || ev.pastor_solicitante || ev.local || ev.local_origem || ev.responsavel || ev.advertencia_protocolo || ev.metodo_leitura || ev.motivo_abono || ev.motivo_justificativa) && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-slate-600">
                           {ev.comissao_nome && (
                             <div>
@@ -644,7 +648,23 @@ export default function HistoricoMinistroModal({
                           {ev.metodo_leitura && (
                             <div>
                               <span className="font-semibold text-slate-700">Método de Presença:</span>{' '}
-                              {ev.metodo_leitura === 'qrcode_carteirinha' ? 'Leitor QR Code' : ev.metodo_leitura === 'busca_nome' ? 'Busca Nominal' : ev.metodo_leitura}
+                              {ev.metodo_leitura === 'qrcode_carteirinha'
+                                ? 'Leitor QR Code'
+                                : ev.metodo_leitura === 'busca_nome'
+                                ? 'Busca Nominal'
+                                : ev.metodo_leitura === 'manual_secretaria'
+                                ? 'Manual Secretaria'
+                                : ev.metodo_leitura}
+                            </div>
+                          )}
+                          {ev.motivo_justificativa && (
+                            <div className="sm:col-span-2">
+                              <span className="font-semibold text-slate-700">Motivo da Justificativa:</span> {ev.motivo_justificativa}
+                            </div>
+                          )}
+                          {ev.motivo_abono && (
+                            <div className="sm:col-span-2">
+                              <span className="font-semibold text-slate-700">Motivo do Abono:</span> {ev.motivo_abono}
                             </div>
                           )}
                         </div>

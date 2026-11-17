@@ -180,25 +180,170 @@ describe('Histórico Ministerial Unificado — Agregação e Linha do Tempo', ()
     assert.equal(ordenados[3].id, '4'); // 2015-01-15
   });
 
-  it('deve tratar a situação da falta (abonada, justificada e registrada) sem dados conflitantes', async () => {
+  it('deve tratar a situação da falta (abonada, justificada e registrada) com rastreabilidade histórica e eventos distintos', async () => {
     const mockSupabaseAbonada = createMockSupabase({
+      reunioes_participantes: [
+        {
+          id: 'part-01',
+          reuniao_id: 'reuniao-01',
+          status_presenca: 'falta',
+          created_at: '2026-10-01T10:00:00Z',
+          reuniao: {
+            id: 'reuniao-01',
+            titulo: 'Reunião de Outubro',
+            data_reuniao: '2026-10-10',
+            horario_inicio: '19:00',
+          },
+        },
+      ],
       reunioes_faltas: [
         {
           id: 'falta-abonada-01',
           reuniao_id: 'reuniao-01',
-          data_geracao_falta: '2026-10-10T10:00:00Z',
+          data_geracao_falta: '2026-10-10T20:00:00Z',
           situacao: 'abonada',
           motivo_abono: 'Em missão oficial da igreja',
+          abonada_em: '2026-10-12T14:30:00Z',
           reuniao: { id: 'reuniao-01', titulo: 'Reunião de Outubro', data_reuniao: '2026-10-10' },
+          justificativa: {
+            id: 'just-01',
+            tipo_justificativa: 'viagem',
+            motivo: 'Viagem pastoral de missão',
+            registrado_em: '2026-10-11T09:00:00Z',
+          },
+        },
+      ],
+      reunioes_advertencias: [
+        {
+          id: 'adv-01',
+          falta_id: 'falta-abonada-01',
+          reuniao_id: 'reuniao-01',
+          numero_protocolo: 'ADV-2026/0001-MIN',
+          status_envio: 'gerada',
+          created_at: '2026-10-10T21:00:00Z',
         },
       ],
     });
 
     const res = await service.obterHistoricoCompleto('danico-uuid-001', 'm-01', mockSupabaseAbonada as any);
-    const ev = res.eventos.find((e) => e.tipo_evento === 'falta_abonada');
-    assert.ok(ev, 'Deve gerar evento de falta abonada');
-    assert.equal(ev?.situacao_falta, 'abonada');
-    assert.equal(ev?.motivo_abono, 'Em missão oficial da igreja');
-    assert.match(ev?.descricao || '', /abonada formalmente/);
+
+    // 1. Convocação oficial gerada
+    const evConvocacao = res.eventos.find((e) => e.tipo_evento === 'convocacao_reuniao');
+    assert.ok(evConvocacao, 'Deve conter a convocação oficial da reunião');
+
+    // 2. Falta registrada mantendo a rastreabilidade
+    const evFalta = res.eventos.find((e) => e.tipo_evento === 'falta_registrada');
+    assert.ok(evFalta, 'Deve manter o evento de falta registrada original');
+    assert.equal(evFalta?.situacao_falta, 'abonada');
+
+    // 3. Justificativa apresentada
+    const evJust = res.eventos.find((e) => e.tipo_evento === 'justificativa_apresentada');
+    assert.ok(evJust, 'Deve conter o evento de justificativa apresentada');
+    assert.equal(evJust?.motivo_justificativa, 'Viagem pastoral de missão');
+
+    // 4. Abono concedido
+    const evAbono = res.eventos.find((e) => e.tipo_evento === 'abono_falta');
+    assert.ok(evAbono, 'Deve gerar evento de falta abonada');
+    assert.equal(evAbono?.motivo_abono, 'Em missão oficial da igreja');
+    assert.match(evAbono?.descricao || '', /abonada formalmente/);
+
+    // 5. Advertência formal expedida
+    const evAdv = res.eventos.find((e) => e.tipo_evento === 'advertencia_expedida');
+    assert.ok(evAdv, 'Deve conter a advertência formal');
+    assert.equal(evAdv?.advertencia_protocolo, 'ADV-2026/0001-MIN');
+  });
+
+  it('deve garantir unicidade de convocação por reunião sem duplicatas quando há múltiplos snapshots da mesma reunião', async () => {
+    const mockSupabaseDuplicata = createMockSupabase({
+      reunioes_participantes: [
+        {
+          id: 'part-01',
+          reuniao_id: 'reuniao-14-11',
+          status_presenca: 'pendente',
+          created_at: '2026-11-01T10:00:00Z',
+          reuniao: {
+            id: 'reuniao-14-11',
+            titulo: 'REUNIÃO MINISTERIAL COM SANTA CEIA',
+            data_reuniao: '2026-11-14',
+            horario_inicio: '19:00:00',
+          },
+        },
+        {
+          id: 'part-02-duplicado',
+          reuniao_id: 'reuniao-14-11',
+          status_presenca: 'pendente',
+          created_at: '2026-11-02T10:00:00Z',
+          reuniao: {
+            id: 'reuniao-14-11',
+            titulo: 'REUNIÃO MINISTERIAL COM SANTA CEIA',
+            data_reuniao: '2026-11-14',
+            horario_inicio: '19:00:00',
+          },
+        },
+        {
+          id: 'part-03-dezembro',
+          reuniao_id: 'reuniao-12-12',
+          status_presenca: 'pendente',
+          created_at: '2026-11-01T10:00:00Z',
+          reuniao: {
+            id: 'reuniao-12-12',
+            titulo: 'REUNIÃO MINISTERIAL COM SANTA CEIA',
+            data_reuniao: '2026-12-12',
+            horario_inicio: '18:30:00',
+          },
+        },
+      ],
+    });
+
+    const res = await service.obterHistoricoCompleto('danico-uuid-001', 'm-01', mockSupabaseDuplicata as any);
+    const convs = res.eventos.filter((e) => e.tipo_evento === 'convocacao_reuniao');
+
+    // Deve ter apenas 2 convocações (uma para 14/11 e uma para 12/12), sem duplicar a de 14/11
+    assert.equal(convs.length, 2, 'Deve ter exatamente 2 convocações para as 2 reuniões distintas');
+    const datas = convs.map((c) => c.data).sort();
+    assert.deepEqual(datas, ['2026-11-14', '2026-12-12']);
+  });
+
+  it('deve registrar separadamente convocação e check-in confirmado com método e horário', async () => {
+    const mockSupabaseCheckin = createMockSupabase({
+      reunioes_participantes: [
+        {
+          id: 'part-checkin',
+          reuniao_id: 'reuniao-checkin-id',
+          status_presenca: 'presente',
+          created_at: '2026-11-01T10:00:00Z',
+          reuniao: {
+            id: 'reuniao-checkin-id',
+            titulo: 'Reunião Pastoral Presencial',
+            data_reuniao: '2026-11-14',
+            horario_inicio: '19:00',
+          },
+        },
+      ],
+      reunioes_checkins: [
+        {
+          id: 'checkin-uuid-123',
+          reuniao_id: 'reuniao-checkin-id',
+          data_hora_checkin: '2026-11-14T18:45:00-03:00',
+          metodo_leitura: 'qrcode_carteirinha',
+          reuniao: {
+            id: 'reuniao-checkin-id',
+            titulo: 'Reunião Pastoral Presencial',
+            data_reuniao: '2026-11-14',
+          },
+        },
+      ],
+    });
+
+    const res = await service.obterHistoricoCompleto('danico-uuid-001', 'm-01', mockSupabaseCheckin as any);
+
+    const conv = res.eventos.find((e) => e.tipo_evento === 'convocacao_reuniao');
+    assert.ok(conv, 'Deve conter convocação oficial');
+
+    const checkin = res.eventos.find((e) => e.tipo_evento === 'presenca_reuniao');
+    assert.ok(checkin, 'Deve conter check-in confirmado');
+    assert.equal(checkin?.metodo_leitura, 'qrcode_carteirinha');
+    assert.match(checkin?.badge.label || '', /Check-in Confirmado/);
+    assert.match(checkin?.descricao || '', /Leitor QR Code/);
   });
 });

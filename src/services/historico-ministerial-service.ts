@@ -44,6 +44,7 @@ export interface EventoHistoricoMinisterial {
   situacao_falta?: string | null;
   metodo_leitura?: string | null;
   motivo_justificativa?: string | null;
+  tipo_justificativa?: string | null;
   motivo_abono?: string | null;
   advertencia_protocolo?: string | null;
   tipo_designacao?: string | null;
@@ -179,6 +180,7 @@ export class HistoricoMinisterialService {
         .from('reunioes_participantes')
         .select(`
           id,
+          reuniao_id,
           status_presenca,
           cargo_snapshot,
           nome_congregacao_snapshot,
@@ -487,11 +489,9 @@ export class HistoricoMinisterialService {
     }
 
     // ───────────────────────────────────────────────────────────────────────────
-    // 6. Normalização: Reuniões Ministeriais (Presenças, Faltas, Abonos, Advertências)
+    // 6. Normalização: Reuniões Ministeriais (Presenças, Faltas, Justificativas, Abonos, Advertências, Convocações)
     // ───────────────────────────────────────────────────────────────────────────
-    const reunioesProcessadasMap = new Set<string>();
-
-    // 6.1. Advertências Formais
+    // 6.1. Advertências Formais por Falta
     const advertenciasPorFaltaId = new Map<string, any>();
     if (reunioesAdvertenciasResult.status === 'fulfilled' && reunioesAdvertenciasResult.value?.data) {
       reunioesAdvertenciasResult.value.data.forEach((adv: any) => {
@@ -501,14 +501,55 @@ export class HistoricoMinisterialService {
       });
     }
 
-    // 6.2. Presenças confirmadas via check-in
+    // 6.2. Convocações Oficiais Únicas por Combinação (member_id + reuniao_id)
+    // Regra: Uma convocação oficial por reunião onde o ministro foi escalado/convocado.
+    const reunioesConvocadasMap = new Map<string, any>();
+    if (reunioesParticipantesResult.status === 'fulfilled' && reunioesParticipantesResult.value?.data) {
+      reunioesParticipantesResult.value.data.forEach((p: any) => {
+        const reuniaoId = p.reuniao_id || p.reuniao?.id;
+        if (!reuniaoId || !p.reuniao) return;
+
+        // Se já existe registro para esta mesma reunião, preserva o primeiro ou o com data de convocação válida
+        if (!reunioesConvocadasMap.has(reuniaoId)) {
+          reunioesConvocadasMap.set(reuniaoId, p);
+        }
+      });
+    }
+
+    // Emitir os eventos de Convocação Oficial para cada reunião distinta
+    for (const [reuniaoId, p] of reunioesConvocadasMap.entries()) {
+      const reuniao = p.reuniao;
+      const dataIso = this.extrairDataIso(reuniao.data_reuniao || p.created_at);
+      const idConvocacao = `reuniao_convocacao_${reuniaoId}_${memberId}`;
+
+      mapaEventos.set(idConvocacao, {
+        id: idConvocacao,
+        origem: 'reuniao',
+        categoria: 'frequencia',
+        tipo_evento: 'convocacao_reuniao',
+        data: dataIso,
+        titulo: 'Convocação para Reunião Ministerial',
+        subtitulo: reuniao.titulo,
+        descricao: `Convocado oficialmente para a ${reuniao.titulo} agendada para ${dataIso}${reuniao.horario_inicio ? ` às ${reuniao.horario_inicio}` : ''}.`,
+        badge: {
+          label: 'Convocado',
+          bg: 'bg-slate-100 text-slate-700 border-slate-300',
+          dot: 'bg-slate-500',
+          icon: '📅',
+        },
+        reuniao_titulo: reuniao.titulo,
+        status_presenca: p.status_presenca || 'pendente',
+        criado_em: p.created_at || reuniao.created_at || dataIso,
+      });
+    }
+
+    // 6.3. Check-in Confirmado de Presença (data, hora e método)
     if (reunioesCheckinsResult.status === 'fulfilled' && reunioesCheckinsResult.value?.data) {
       reunioesCheckinsResult.value.data.forEach((ck: any) => {
         const reuniaoTitulo = ck.reuniao?.titulo || 'Reunião Ministerial';
-        const dataReuniao = ck.reuniao?.data_reuniao || ck.data_hora_checkin;
-        const dataIso = this.extrairDataIso(dataReuniao);
+        const dataCheckin = ck.data_hora_checkin || ck.reuniao?.data_reuniao;
+        const dataIso = this.extrairDataIso(dataCheckin);
         const idCheckin = `reuniao_checkin_${ck.id}`;
-        reunioesProcessadasMap.add(ck.reuniao_id);
 
         const hora = ck.data_hora_checkin
           ? new Date(ck.data_hora_checkin).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
@@ -519,6 +560,8 @@ export class HistoricoMinisterialService {
             ? 'Leitor QR Code'
             : ck.metodo_leitura === 'busca_nome'
             ? 'Busca Nominal'
+            : ck.metodo_leitura === 'manual_secretaria'
+            ? 'Manual Secretaria'
             : 'Recepção';
 
         mapaEventos.set(idCheckin, {
@@ -529,9 +572,9 @@ export class HistoricoMinisterialService {
           data: dataIso,
           titulo: 'Presença Confirmada em Reunião',
           subtitulo: reuniaoTitulo,
-          descricao: `Presença registrada na ${reuniaoTitulo}${hora ? ` às ${hora}` : ''} (${metodoLabel}).`,
+          descricao: `Presença confirmada na ${reuniaoTitulo}${hora ? ` às ${hora}` : ''} (${metodoLabel}).`,
           badge: {
-            label: 'Presença Confirmada',
+            label: 'Check-in Confirmado',
             bg: 'bg-emerald-100 text-emerald-800 border-emerald-300',
             dot: 'bg-emerald-600',
             icon: '✔️',
@@ -539,32 +582,115 @@ export class HistoricoMinisterialService {
           reuniao_titulo: reuniaoTitulo,
           status_presenca: 'presente',
           metodo_leitura: ck.metodo_leitura,
-          criado_em: ck.data_hora_checkin,
+          criado_em: ck.data_hora_checkin || dataIso,
         });
       });
     }
 
-    // 6.3. Faltas Registradas, Justificadas e Abonadas
+    // 6.4. Faltas Registradas, Justificativas Apresentadas e Abonos Concedidos
     if (reunioesFaltasResult.status === 'fulfilled' && reunioesFaltasResult.value?.data) {
       reunioesFaltasResult.value.data.forEach((falta: any) => {
         const reuniaoTitulo = falta.reuniao?.titulo || 'Reunião Ministerial';
-        const dataReuniao = falta.reuniao?.data_reuniao || falta.data_geracao_falta;
-        const dataIso = this.extrairDataIso(dataReuniao);
+        const dataFalta = falta.data_geracao_falta || falta.reuniao?.data_reuniao;
+        const dataIsoFalta = this.extrairDataIso(dataFalta);
         const idFalta = `reuniao_falta_${falta.id}`;
-        reunioesProcessadasMap.add(falta.reuniao_id);
+
+        const horaFalta = falta.data_geracao_falta
+          ? new Date(falta.data_geracao_falta).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+          : null;
 
         const adv = advertenciasPorFaltaId.get(falta.id);
 
-        if (falta.situacao === 'abonada') {
-          mapaEventos.set(idFalta, {
-            id: idFalta,
+        // Subtítulo e status atual da falta
+        const situacaoLabel =
+          falta.situacao === 'abonada'
+            ? 'Falta Registrada (Posteriormente Abonada)'
+            : falta.situacao === 'justificada'
+            ? 'Falta Registrada (Posteriormente Justificada)'
+            : 'Falta Registrada';
+
+        // Evento 1: A falta oficial registrada
+        mapaEventos.set(idFalta, {
+          id: idFalta,
+          origem: 'reuniao',
+          categoria: 'frequencia',
+          tipo_evento: 'falta_registrada',
+          data: dataIsoFalta,
+          titulo: 'Falta Registrada em Reunião',
+          subtitulo: reuniaoTitulo,
+          descricao: `Ausência constatada e falta registrada oficialmente na ${reuniaoTitulo}${horaFalta ? ` às ${horaFalta}` : ''}. Situação atual: ${falta.situacao.toUpperCase()}.`,
+          badge: {
+            label: situacaoLabel,
+            bg: falta.situacao === 'abonada'
+              ? 'bg-blue-100 text-blue-800 border-blue-300'
+              : falta.situacao === 'justificada'
+              ? 'bg-teal-100 text-teal-800 border-teal-300'
+              : 'bg-rose-100 text-rose-800 border-rose-300',
+            dot: falta.situacao === 'abonada' ? 'bg-blue-600' : falta.situacao === 'justificada' ? 'bg-teal-600' : 'bg-rose-600',
+            icon: falta.situacao === 'abonada' ? '🤝' : falta.situacao === 'justificada' ? '📋' : '⚠️',
+          },
+          reuniao_titulo: reuniaoTitulo,
+          situacao_falta: falta.situacao,
+          criado_em: falta.data_geracao_falta || dataIsoFalta,
+        });
+
+        // Evento 2: Justificativa apresentada (se existir)
+        const just = Array.isArray(falta.justificativa)
+          ? falta.justificativa[0]
+          : falta.justificativa;
+
+        if (just) {
+          const dataJustIso = this.extrairDataIso(just.registrado_em || falta.data_geracao_falta);
+          const idJust = `reuniao_justificativa_${just.id || falta.id}`;
+
+          const tipoDesc =
+            just.tipo_justificativa === 'atestado_medico'
+              ? 'Atestado Médico'
+              : just.tipo_justificativa === 'trabalho'
+              ? 'Compromisso de Trabalho'
+              : just.tipo_justificativa === 'viagem'
+              ? 'Viagem Ministerial/Pessoal'
+              : just.tipo_justificativa === 'antecipada'
+              ? 'Justificativa Antecipada'
+              : 'Justificativa Formal';
+
+          mapaEventos.set(idJust, {
+            id: idJust,
             origem: 'reuniao',
             categoria: 'frequencia',
-            tipo_evento: 'falta_abonada',
-            data: dataIso,
-            titulo: 'Falta Abonada pela Diretoria',
+            tipo_evento: 'justificativa_apresentada',
+            data: dataJustIso,
+            titulo: 'Justificativa de Ausência Apresentada',
             subtitulo: reuniaoTitulo,
-            descricao: `Falta na ${reuniaoTitulo} abonada formalmente${falta.motivo_abono ? `. Motivo do abono: ${falta.motivo_abono}` : ''}.`,
+            descricao: `Justificativa protocolada (${tipoDesc}) referente à ausência na ${reuniaoTitulo}.${just.motivo ? ` Motivo: "${just.motivo}".` : ''} Situação: ${falta.situacao === 'justificada' ? 'Aprovada / Deferida' : falta.situacao === 'abonada' ? 'Abonada' : 'Em análise'}.`,
+            badge: {
+              label: falta.situacao === 'justificada' ? 'Justificativa Deferida' : 'Justificativa Apresentada',
+              bg: 'bg-teal-100 text-teal-800 border-teal-300',
+              dot: 'bg-teal-600',
+              icon: '📋',
+            },
+            reuniao_titulo: reuniaoTitulo,
+            situacao_falta: falta.situacao,
+            motivo_justificativa: just.motivo,
+            tipo_justificativa: just.tipo_justificativa,
+            criado_em: just.registrado_em || falta.data_geracao_falta,
+          });
+        }
+
+        // Evento 3: Abono ou anulação administrativa (se falta foi abonada)
+        if (falta.situacao === 'abonada') {
+          const dataAbonoIso = this.extrairDataIso(falta.abonada_em || falta.updated_at || falta.data_geracao_falta);
+          const idAbono = `reuniao_abono_${falta.id}`;
+
+          mapaEventos.set(idAbono, {
+            id: idAbono,
+            origem: 'reuniao',
+            categoria: 'frequencia',
+            tipo_evento: 'abono_falta',
+            data: dataAbonoIso,
+            titulo: 'Abono / Anulação de Falta pela Diretoria',
+            subtitulo: reuniaoTitulo,
+            descricao: `Falta na ${reuniaoTitulo} abonada formalmente pela Secretaria Geral e Mesa Diretora.${falta.motivo_abono ? ` Motivo do abono: "${falta.motivo_abono}".` : ''}`,
             badge: {
               label: 'Falta Abonada',
               bg: 'bg-blue-100 text-blue-800 border-blue-300',
@@ -574,57 +700,14 @@ export class HistoricoMinisterialService {
             reuniao_titulo: reuniaoTitulo,
             situacao_falta: 'abonada',
             motivo_abono: falta.motivo_abono,
-            criado_em: falta.abonada_em || falta.data_geracao_falta,
-          });
-        } else if (falta.situacao === 'justificada') {
-          const just = Array.isArray(falta.justificativa) ? falta.justificativa[0] : falta.justificativa;
-          mapaEventos.set(idFalta, {
-            id: idFalta,
-            origem: 'reuniao',
-            categoria: 'frequencia',
-            tipo_evento: 'falta_justificada',
-            data: dataIso,
-            titulo: 'Falta Justificada Deferida',
-            subtitulo: reuniaoTitulo,
-            descricao: `Justificativa de ausência acolhida para a ${reuniaoTitulo}${just?.motivo ? `. Motivo: ${just.motivo}` : ''}.`,
-            badge: {
-              label: 'Falta Justificada',
-              bg: 'bg-teal-100 text-teal-800 border-teal-300',
-              dot: 'bg-teal-600',
-              icon: '📋',
-            },
-            reuniao_titulo: reuniaoTitulo,
-            situacao_falta: 'justificada',
-            motivo_justificativa: just?.motivo,
-            criado_em: just?.registrado_em || falta.data_geracao_falta,
-          });
-        } else {
-          // Falta registrada não justificada
-          mapaEventos.set(idFalta, {
-            id: idFalta,
-            origem: 'reuniao',
-            categoria: 'frequencia',
-            tipo_evento: 'falta_registrada',
-            data: dataIso,
-            titulo: 'Falta Registrada em Reunião',
-            subtitulo: reuniaoTitulo,
-            descricao: `Ausência constatada na ${reuniaoTitulo} (${dataIso}).`,
-            badge: {
-              label: 'Falta Registrada',
-              bg: 'bg-rose-100 text-rose-800 border-rose-300',
-              dot: 'bg-rose-600',
-              icon: '⚠️',
-            },
-            reuniao_titulo: reuniaoTitulo,
-            situacao_falta: 'registrada',
-            criado_em: falta.data_geracao_falta,
+            criado_em: falta.abonada_em || falta.updated_at || falta.data_geracao_falta,
           });
         }
 
-        // Se houver advertência formal expedida para essa falta
+        // Evento 4: Advertência formal expedida (se existir)
         if (adv) {
           const idAdv = `reuniao_advertencia_${adv.id}`;
-          const advDataIso = this.extrairDataIso(adv.created_at || dataReuniao);
+          const advDataIso = this.extrairDataIso(adv.created_at || dataFalta);
           mapaEventos.set(idAdv, {
             id: idAdv,
             origem: 'reuniao',
@@ -642,45 +725,9 @@ export class HistoricoMinisterialService {
             },
             reuniao_titulo: reuniaoTitulo,
             advertencia_protocolo: adv.numero_protocolo,
-            criado_em: adv.created_at,
+            criado_em: adv.created_at || dataFalta,
           });
         }
-      });
-    }
-
-    // 6.4. Convocações de reuniões pendentes/futuras (onde o ministro consta na lista)
-    if (reunioesParticipantesResult.status === 'fulfilled' && reunioesParticipantesResult.value?.data) {
-      reunioesParticipantesResult.value.data.forEach((p: any) => {
-        // Se a reunião já gerou evento de presença ou falta, não duplicar
-        if (p.reuniao_id && reunioesProcessadasMap.has(p.reuniao_id)) {
-          return;
-        }
-
-        const reuniao = p.reuniao;
-        if (!reuniao) return;
-
-        const dataIso = this.extrairDataIso(reuniao.data_reuniao || p.created_at);
-        const idConvocacao = `reuniao_convocacao_${p.id}`;
-
-        mapaEventos.set(idConvocacao, {
-          id: idConvocacao,
-          origem: 'reuniao',
-          categoria: 'frequencia',
-          tipo_evento: 'convocacao_reuniao',
-          data: dataIso,
-          titulo: 'Convocação para Reunião Ministerial',
-          subtitulo: reuniao.titulo,
-          descricao: `Convocado oficialmente para a ${reuniao.titulo} agendada para ${dataIso}${reuniao.horario_inicio ? ` às ${reuniao.horario_inicio}` : ''}.`,
-          badge: {
-            label: 'Convocado',
-            bg: 'bg-slate-100 text-slate-700 border-slate-300',
-            dot: 'bg-slate-500',
-            icon: '📅',
-          },
-          reuniao_titulo: reuniao.titulo,
-          status_presenca: p.status_presenca || 'pendente',
-          criado_em: p.created_at,
-        });
       });
     }
 
