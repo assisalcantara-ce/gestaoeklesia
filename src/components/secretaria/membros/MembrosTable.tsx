@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 
 export interface MembroData {
   id: string;
@@ -78,6 +79,93 @@ export default function MembrosTable({
   setItemsPerPage,
 }: MembrosTableProps) {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [activeMenuMembro, setActiveMenuMembro] = useState<any | null>(null);
+  const [menuCoords, setMenuCoords] = useState<{
+    top: number;
+    left: number;
+    openUpwards: boolean;
+    maxHeight: number;
+  } | null>(null);
+
+  const fecharMenuAcoes = useCallback(() => {
+    setActiveMenuId(null);
+    setActiveMenuMembro(null);
+    setMenuCoords(null);
+  }, []);
+
+  const toggleMenuAcoes = useCallback((membro: any, btnElement: HTMLElement) => {
+    if (activeMenuId === membro.id) {
+      fecharMenuAcoes();
+      return;
+    }
+
+    const btnRect = btnElement.getBoundingClientRect();
+    const menuWidth = 192; // w-48 = 192px
+
+    // Estima a altura do menu conforme itens visíveis:
+    // Itens: Documentos (40px) + Histórico (40px) + Inativar/Reativar (40px) + padding (12px) = ~132px
+    let estimatedHeight = 52; // Documentos base + padding
+    if (abrirHistoricoMembro) estimatedHeight += 40;
+    if (!isSupervisor && !isAuxiliar) estimatedHeight += 40;
+
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const spaceBelow = viewportHeight - btnRect.bottom;
+    const spaceAbove = btnRect.top;
+
+    // Abre para cima quando não houver espaço suficiente abaixo e acima houver mais espaço
+    const openUpwards = spaceBelow < (estimatedHeight + 12) && spaceAbove > spaceBelow;
+
+    let top: number;
+    let availableHeight: number;
+    if (openUpwards) {
+      availableHeight = Math.max(120, spaceAbove - 16);
+      top = Math.max(8, btnRect.top - Math.min(estimatedHeight, availableHeight) - 6);
+    } else {
+      availableHeight = Math.max(120, spaceBelow - 16);
+      top = Math.min(viewportHeight - 8, btnRect.bottom + 6);
+    }
+
+    const idealLeft = btnRect.right - menuWidth;
+    const left = Math.max(8, Math.min(viewportWidth - menuWidth - 8, idealLeft));
+
+    setMenuCoords({
+      top,
+      left,
+      openUpwards,
+      maxHeight: Math.min(estimatedHeight + 10, availableHeight),
+    });
+    setActiveMenuMembro(membro);
+    setActiveMenuId(membro.id);
+  }, [activeMenuId, abrirHistoricoMembro, isSupervisor, isAuxiliar, fecharMenuAcoes]);
+
+  useEffect(() => {
+    if (!activeMenuId) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        fecharMenuAcoes();
+      }
+    };
+
+    const handleScrollOrResize = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (target && target.closest?.('[data-menu-portal]')) {
+        return;
+      }
+      fecharMenuAcoes();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [activeMenuId, fecharMenuAcoes]);
 
   const getCargoExibicao = (membro: any) => {
     const tipo = (membro?.tipoCadastro || '').toLowerCase().trim();
@@ -474,94 +562,21 @@ export default function MembrosTable({
                       )}
 
                       {/* Menu ⋮ (Mais opções) */}
-                      <div className="relative inline-block text-left">
-                        <button
-                          onClick={() => setActiveMenuId(isMenuOpen ? null : membro.id)}
-                          className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-200/60 rounded-lg transition cursor-pointer"
-                          title="Mais opções"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                          </svg>
-                        </button>
-
-                        {isMenuOpen && (
-                          <>
-                            <div
-                              className="fixed inset-0 z-20"
-                              onClick={() => setActiveMenuId(null)}
-                            />
-                            <div className="absolute right-0 mt-1 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-30 animate-in fade-in zoom-in-95 text-left">
-                              {/* Documentos */}
-                              <button
-                                onClick={() => {
-                                  setActiveMenuId(null);
-                                  void abrirDocumentosMembro(membro);
-                                }}
-                                className="w-full px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-teal-50 hover:text-teal-800 flex items-center gap-2 cursor-pointer"
-                              >
-                                <svg className="w-4 h-4 text-teal-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                                <span>Documentos</span>
-                              </button>
-
-                              {/* Histórico do Ministro */}
-                              {abrirHistoricoMembro && (
-                                <button
-                                  onClick={() => {
-                                    setActiveMenuId(null);
-                                    abrirHistoricoMembro(membro);
-                                  }}
-                                  className="w-full px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-800 flex items-center gap-2 cursor-pointer"
-                                >
-                                  <svg className="w-4 h-4 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                                  </svg>
-                                  <span>Histórico Completo</span>
-                                </button>
-                              )}
-
-                              {/* Inativar / Reativar Membro */}
-                              {!isSupervisor && !isAuxiliar && (
-                                (membro.status === 'ativo' || membro.status === 'active') ? (
-                                  <button
-                                    onClick={() => {
-                                      setActiveMenuId(null);
-                                      if (abrirConfirmacaoInativar) {
-                                        abrirConfirmacaoInativar(membro);
-                                      } else {
-                                        abrirConfirmacaoDeletar(membro);
-                                      }
-                                    }}
-                                    className="w-full px-3.5 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50 hover:text-amber-800 flex items-center gap-2 cursor-pointer border-t border-slate-100 transition"
-                                    title="Inativar membro (preserva histórico e vínculos)"
-                                  >
-                                    <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                                    </svg>
-                                    <span>Inativar Membro</span>
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() => {
-                                      setActiveMenuId(null);
-                                      abrirConfirmacaoReativar?.(membro);
-                                    }}
-                                    className="w-full px-3.5 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 flex items-center gap-2 cursor-pointer border-t border-slate-100 transition"
-                                    title="Reativar membro no rol de membros ativos"
-                                  >
-                                    <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    <span>Reativar Membro</span>
-                                  </button>
-                                )
-                              )}
-                            </div>
-                          </>
-                        )}
-                      </div>
+                      <button
+                        onClick={(e) => toggleMenuAcoes(membro, e.currentTarget)}
+                        className={`p-1.5 rounded-lg transition cursor-pointer ${
+                          isMenuOpen
+                            ? 'text-slate-900 bg-slate-200/80 shadow-xs'
+                            : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/60'
+                        }`}
+                        title="Mais opções"
+                        aria-label="Mais opções"
+                        aria-expanded={isMenuOpen}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                        </svg>
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -570,6 +585,108 @@ export default function MembrosTable({
           </tbody>
         </table>
       </div>
+
+      {/* ── Menu de Ações (Portal para evitar recorte por overflow da tabela) ── */}
+      {activeMenuId && activeMenuMembro && menuCoords && typeof document !== 'undefined' && createPortal(
+        <div data-menu-portal="true">
+          {/* Overlay invisível para capturar clique fora */}
+          <div
+            className="fixed inset-0 z-[99998] bg-transparent"
+            onClick={fecharMenuAcoes}
+            aria-hidden="true"
+          />
+
+          {/* Menu flutuante sobreposto posicionado com precisão */}
+          <div
+            role="menu"
+            aria-orientation="vertical"
+            style={{
+              position: 'fixed',
+              top: `${menuCoords.top}px`,
+              left: `${menuCoords.left}px`,
+              zIndex: 99999,
+              maxHeight: `${menuCoords.maxHeight}px`,
+            }}
+            className="w-48 bg-white rounded-xl shadow-2xl border border-slate-200 py-1.5 text-left overflow-y-auto animate-in fade-in zoom-in-95 duration-100 focus:outline-none"
+          >
+            {/* Documentos */}
+            <button
+              role="menuitem"
+              onClick={() => {
+                const membroAlvo = activeMenuMembro;
+                fecharMenuAcoes();
+                void abrirDocumentosMembro(membroAlvo);
+              }}
+              className="w-full px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-teal-50 hover:text-teal-800 flex items-center gap-2 cursor-pointer transition text-left"
+            >
+              <svg className="w-4 h-4 text-teal-700 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>Documentos</span>
+            </button>
+
+            {/* Histórico do Ministro */}
+            {abrirHistoricoMembro && (
+              <button
+                role="menuitem"
+                onClick={() => {
+                  const membroAlvo = activeMenuMembro;
+                  fecharMenuAcoes();
+                  abrirHistoricoMembro(membroAlvo);
+                }}
+                className="w-full px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-800 flex items-center gap-2 cursor-pointer transition text-left"
+              >
+                <svg className="w-4 h-4 text-amber-700 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+                <span>Histórico Completo</span>
+              </button>
+            )}
+
+            {/* Inativar / Reativar Membro */}
+            {!isSupervisor && !isAuxiliar && (
+              (activeMenuMembro.status === 'ativo' || activeMenuMembro.status === 'active') ? (
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    const membroAlvo = activeMenuMembro;
+                    fecharMenuAcoes();
+                    if (abrirConfirmacaoInativar) {
+                      abrirConfirmacaoInativar(membroAlvo);
+                    } else {
+                      abrirConfirmacaoDeletar(membroAlvo);
+                    }
+                  }}
+                  className="w-full px-3.5 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50 hover:text-amber-800 flex items-center gap-2 cursor-pointer border-t border-slate-100 transition text-left"
+                  title="Inativar membro (preserva histórico e vínculos)"
+                >
+                  <svg className="w-4 h-4 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                  </svg>
+                  <span>Inativar Membro</span>
+                </button>
+              ) : (
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    const membroAlvo = activeMenuMembro;
+                    fecharMenuAcoes();
+                    abrirConfirmacaoReativar?.(membroAlvo);
+                  }}
+                  className="w-full px-3.5 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 flex items-center gap-2 cursor-pointer border-t border-slate-100 transition text-left"
+                  title="Reativar membro no rol de membros ativos"
+                >
+                  <svg className="w-4 h-4 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>Reativar Membro</span>
+                </button>
+              )
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* RODAPÉ DA TABELA / PAGINAÇÃO */}
       <div className="p-4 bg-white border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
