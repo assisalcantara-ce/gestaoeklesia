@@ -709,7 +709,8 @@ export const consacracaoService = {
    */
   async obterHistoricoCompletoMinistro(
     memberId: string,
-    ministryId: string
+    ministryId: string,
+    customClient?: any
   ): Promise<{
     ministro: {
       id: string;
@@ -723,7 +724,7 @@ export const consacracaoService = {
     };
     eventos: HistoricoProcessoItem[];
   }> {
-    const supabase = createClient();
+    const supabase = customClient || createClient();
 
     // 1. Buscar dados do membro
     const { data: member, error: memErr } = await supabase
