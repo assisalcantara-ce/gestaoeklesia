@@ -135,6 +135,13 @@ export default function CheckinPublicoPage() {
   const cooldownRef = useRef(false);
   const lastScannedQrRef = useRef<string | null>(null);
   const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const iniciarScanningLoopRef = useRef<() => void>(() => {});
+
+  const modoRef = useRef(modo);
+  modoRef.current = modo;
+
+  const cameraStateRef = useRef(cameraState);
+  cameraStateRef.current = cameraState;
 
   // Scanner óptico USB / Bluetooth
   const [manualQrInputValue, setManualQrInputValue] = useState('');
@@ -324,17 +331,23 @@ export default function CheckinPublicoPage() {
               title: 'Ministro Não Convocado',
               message: data.error || 'Ministro localizado no cadastro, porém não consta na lista de convocados desta reunião.',
             });
+          } else if (data.code === 'CREDENTIAL_NOT_FOUND') {
+            setFeedback({
+              type: 'error',
+              title: 'Credencial Não Localizada',
+              message: data.error || 'Nenhum ministro convocado foi localizado com este QR Code ou identificador.',
+            });
           } else if (data.code === 'ERRO_BANCO_DADOS') {
             setFeedback({
               type: 'error',
-              title: 'Instabilidade de Conexão',
-              message: 'Não foi possível verificar a credencial no momento. Tente novamente em alguns instantes.',
+              title: 'Erro no Sistema',
+              message: data.detail ? `${data.error || 'Falha de comunicação com o banco.'} (${data.detail})` : (data.error || 'Não foi possível verificar a credencial no momento. Tente novamente em alguns instantes.'),
             });
           } else {
             setFeedback({
               type: 'error',
-              title: data.code === 'ERRO_BANCO_DADOS' ? 'Erro no Sistema' : 'Credencial Não Localizada',
-              message: data.error || 'Código ou carteirinha não localizado nesta reunião ministerial.',
+              title: 'Erro ao Registrar Presença',
+              message: data.detail ? `${data.error || 'Falha ao registrar check-in.'} (${data.detail})` : (data.error || 'Código ou carteirinha não localizado nesta reunião ministerial.'),
             });
           }
         }
@@ -348,13 +361,20 @@ export default function CheckinPublicoPage() {
       } finally {
         setEnviando(false);
 
-        // Agendar fechamento automático dos avisos após 2.5s para preparar a tela para o próximo ministro
+        // Agendar fechamento automático dos avisos após 2.5s para preparar a tela e a câmera para o próximo ministro
         if (feedbackTimeoutRef.current) {
           clearTimeout(feedbackTimeoutRef.current);
         }
         feedbackTimeoutRef.current = setTimeout(() => {
           setFeedback(null);
           feedbackTimeoutRef.current = null;
+          lastScannedQrRef.current = null;
+          cooldownRef.current = false;
+
+          // Se a câmera estiver ativa e o operador permanecer no modo câmera, reativa o scanner para o próximo ministro
+          if (modoRef.current === 'camera' && cameraStateRef.current === 'ativa') {
+            iniciarScanningLoopRef.current();
+          }
         }, 2500);
       }
     },
@@ -400,10 +420,17 @@ export default function CheckinPublicoPage() {
             if (qrCode && qrCode.data && qrCode.data.trim()) {
               const qrValue = qrCode.data.trim();
 
-              // Prevenção de duplicidade por cooldown de leitura contínua (2.5s)
-              if (!cooldownRef.current || lastScannedQrRef.current !== qrValue) {
+              // Ao ler, pausa imediatamente o loop de leitura para não piscar a tela
+              if (!cooldownRef.current) {
                 cooldownRef.current = true;
                 lastScannedQrRef.current = qrValue;
+
+                // Pausar o ciclo de frames ópticos enquanto exibe a identificação do ministro
+                isScanningRef.current = false;
+                if (animFrameRef.current) {
+                  cancelAnimationFrame(animFrameRef.current);
+                  animFrameRef.current = null;
+                }
 
                 // Fechar avisos/cards anteriores imediatamente para recepcionar a nova leitura
                 if (feedbackTimeoutRef.current) {
@@ -412,13 +439,8 @@ export default function CheckinPublicoPage() {
                 }
                 setFeedback(null);
 
-                // Processar checkin sem desativar a câmera, permitindo leitura do próximo participante
+                // Processar identificação e check-in
                 processarCheckin({ qr_code: qrValue, metodo_leitura: 'qrcode_carteirinha' });
-
-                // Liberar cooldown após 2.5 segundos
-                setTimeout(() => {
-                  cooldownRef.current = false;
-                }, 2500);
               }
             }
           } catch {
@@ -434,6 +456,11 @@ export default function CheckinPublicoPage() {
 
     animFrameRef.current = requestAnimationFrame(scanFrame);
   }, [processarCheckin]);
+
+  // Manter ref sincronizado para permitir reativação limpa sem dependência cíclica
+  useEffect(() => {
+    iniciarScanningLoopRef.current = iniciarScanningLoop;
+  }, [iniciarScanningLoop]);
 
   // 5. Iniciar Câmera com suporte total a Safari/iOS e Chrome/Android
   const iniciarCamera = useCallback(async () => {

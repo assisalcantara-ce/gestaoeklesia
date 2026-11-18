@@ -336,8 +336,16 @@ export default function ReunioesPage() {
 
   return (
     <PageLayout
-      title="Reuniões Ministeriais"
-      description="Painel de convocações, presença em tempo real e acompanhamento de quórum"
+      title={
+        <div className="flex flex-wrap items-center gap-3">
+          <span>Reuniões Ministeriais</span>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-800 text-xs sm:text-sm font-black rounded-xl border border-teal-200/80 shadow-xs">
+            <Calendar className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+            <span>{nomeMesAno}</span>
+          </span>
+        </div>
+      }
+      description={`Painel de convocações, quórum em tempo real e presença do mês de ${nomeMesAno}`}
       activeMenu="reunioes"
       headerExtra={
         <div className="flex flex-wrap items-center gap-3">
@@ -371,10 +379,10 @@ export default function ReunioesPage() {
       <div className="space-y-6">
         {/* ─── 1. CARDS DE INDICADORES EXECUTIVOS (KPIS) ─── */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* KPI 1: Próximas Reuniões (Sky/Institucional) */}
+          {/* KPI 1: Agendadas no Mês (Sky/Institucional) */}
           <div className="bg-gradient-to-br from-white to-sky-50/40 p-5 rounded-2xl border border-sky-200/80 shadow-sm hover:shadow-md hover:border-sky-300 transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between group">
             <div className="flex items-center justify-between">
-              <span className="text-sky-900 text-xs font-bold uppercase tracking-wider">Próximas Reuniões</span>
+              <span className="text-sky-900 text-xs font-bold uppercase tracking-wider">Agendadas no Mês</span>
               <div className="w-11 h-11 rounded-2xl bg-sky-100/80 text-sky-700 border border-sky-200 flex items-center justify-center shadow-inner group-hover:scale-105 transition">
                 <Calendar className="w-5 h-5" />
               </div>
@@ -384,7 +392,7 @@ export default function ReunioesPage() {
               <div className="mt-2.5">
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-sky-100/70 text-sky-800 text-[11px] font-bold border border-sky-200/60">
                   <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
-                  Agendadas no calendário
+                  Agendadas em {nomeMesAno}
                 </span>
               </div>
             </div>
@@ -406,7 +414,7 @@ export default function ReunioesPage() {
               <div className="mt-2.5">
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100/90 text-emerald-900 text-[11px] font-bold border border-emerald-200/80">
                   <span className={`w-1.5 h-1.5 rounded-full bg-emerald-500 ${totalEmAndamento > 0 ? 'animate-ping' : ''}`} />
-                  Check-in ativo em tempo real
+                  Check-in do mês em tempo real
                 </span>
               </div>
             </div>
@@ -415,7 +423,7 @@ export default function ReunioesPage() {
           {/* KPI 3: Reuniões Encerradas (Indigo/Arquivo) */}
           <div className="bg-gradient-to-br from-white to-indigo-50/40 p-5 rounded-2xl border border-indigo-200/80 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between group">
             <div className="flex items-center justify-between">
-              <span className="text-indigo-900 text-xs font-bold uppercase tracking-wider">Reuniões Encerradas</span>
+              <span className="text-indigo-900 text-xs font-bold uppercase tracking-wider">Encerradas no Mês</span>
               <div className="w-11 h-11 rounded-2xl bg-indigo-100/80 text-indigo-700 border border-indigo-200 flex items-center justify-center shadow-inner group-hover:scale-105 transition">
                 <CheckCircle2 className="w-5 h-5" />
               </div>
@@ -425,7 +433,7 @@ export default function ReunioesPage() {
               <div className="mt-2.5">
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-100/70 text-indigo-800 text-[11px] font-bold border border-indigo-200/60">
                   <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                  Atas e quóruns finalizados
+                  Atas e quóruns finalizados no mês
                 </span>
               </div>
             </div>
@@ -550,7 +558,20 @@ export default function ReunioesPage() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4">
+            <div className="space-y-3">
+              {/* Título discreto do mês da listagem */}
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xs sm:text-sm font-extrabold text-slate-800 tracking-tight">
+                    Reuniões de {nomeMesAno}
+                  </h2>
+                  <span className="text-[11px] font-semibold text-slate-500">
+                    ({reunioesFiltradas.length} {reunioesFiltradas.length === 1 ? 'encontro' : 'encontros'})
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
               {reunioesFiltradas.map((r) => {
                 const dataFormatada = r.data_reuniao
                   ? new Date(r.data_reuniao + 'T00:00:00').toLocaleDateString('pt-BR', {
@@ -761,6 +782,7 @@ export default function ReunioesPage() {
                   </div>
                 );
               })}
+              </div>
             </div>
           )}
         </section>

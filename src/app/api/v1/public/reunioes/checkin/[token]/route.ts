@@ -457,7 +457,11 @@ export async function POST(
 
       console.error('[PublicCheckin] Erro ao inserir reunioes_checkins:', insErr);
       return NextResponse.json(
-        { error: 'Erro ao registrar check-in no sistema.', detail: insErr.message },
+        {
+          error: 'Erro ao registrar check-in no sistema.',
+          code: 'ERRO_BANCO_DADOS',
+          detail: insErr.message,
+        },
         { status: 500 }
       );
     }

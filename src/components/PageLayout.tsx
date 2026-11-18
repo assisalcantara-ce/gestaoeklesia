@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
 interface PageLayoutProps {
-  title: string;
+  title: ReactNode;
   description: string;
   children: ReactNode;
   activeMenu?: string;
