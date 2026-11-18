@@ -225,6 +225,14 @@ export default function ArrecadacaoDigitalContent({
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
+  // Estado de Paginação Backend para Extrato PIX
+  const [extratoPage, setExtratoPage] = useState(1);
+  const extratoPageSize = 25;
+  const [extratoTotalCount, setExtratoTotalCount] = useState(0);
+  const [extratoTotalPages, setExtratoTotalPages] = useState(1);
+  const [exportingReport, setExportingReport] = useState(false);
+  const [reportDataToPrint, setReportDataToPrint] = useState<FinCobrancaCharge[] | null>(null);
+
   const handleStatusFiltroChange = (novoStatus: 'ativo' | 'inativo') => {
     setStatusFiltro(novoStatus);
     setPage(1);
@@ -343,6 +351,7 @@ export default function ArrecadacaoDigitalContent({
   // Handler para troca de congregação no Extrato com reset de destino inconsistente
   const handleExtratoCongChange = (novaCong: string) => {
     setExtratoCong(novaCong);
+    setExtratoPage(1);
     if (extratoDestino) {
       const destAtual = allDestinos.find((d) => d.id === extratoDestino);
       if (destAtual) {
@@ -355,19 +364,25 @@ export default function ArrecadacaoDigitalContent({
     }
   };
 
+  // Helper para construir os parâmetros de query do Extrato
+  const buildExtratoParams = useCallback((pPage: number, pPageSize: number) => {
+    const params = new URLSearchParams();
+    params.set('page', String(pPage));
+    params.set('pageSize', String(pPageSize));
+    if (extratoDataInicio) params.set('data_inicio', extratoDataInicio);
+    if (extratoDataFim) params.set('data_fim', extratoDataFim);
+    if (!extratoDataInicio && !extratoDataFim && extratoMes) params.set('mes', extratoMes);
+    if (extratoCong) params.set('congregacao_id', extratoCong);
+    if (extratoDestino) params.set('destination_id', extratoDestino);
+    if (buscaExtrato.trim()) params.set('q', buscaExtrato.trim());
+    return params;
+  }, [extratoDataInicio, extratoDataFim, extratoMes, extratoCong, extratoDestino, buscaExtrato]);
+
   // 3. Carregar Cobranças / Extrato PIX via API autenticada segura
   const loadCobrancas = useCallback(async () => {
     try {
       setLoadingCobrancas(true);
-      const params = new URLSearchParams();
-      params.set('pageSize', '100');
-      if (extratoDataInicio) params.set('data_inicio', extratoDataInicio);
-      if (extratoDataFim) params.set('data_fim', extratoDataFim);
-      if (!extratoDataInicio && !extratoDataFim && extratoMes) params.set('mes', extratoMes);
-      if (extratoCong) params.set('congregacao_id', extratoCong);
-      if (extratoDestino) params.set('destination_id', extratoDestino);
-
-      if (buscaExtrato.trim()) params.set('q', buscaExtrato.trim());
+      const params = buildExtratoParams(extratoPage, extratoPageSize);
 
       const res = await authenticatedFetch(`/api/v1/ministry/payment-charges?${params.toString()}`);
       if (!res.ok) throw new Error('Erro ao carregar extrato de ofertas.');
@@ -379,6 +394,10 @@ export default function ArrecadacaoDigitalContent({
       });
 
       setCobrancas(validCobrancas);
+      if (json.meta) {
+        setExtratoTotalCount(json.meta.totalCount ?? 0);
+        setExtratoTotalPages(json.meta.totalPages ?? 1);
+      }
       if (json.summary) {
         setSummary({
           totalArrecadado: Number(json.summary.totalArrecadado ?? 0),
@@ -392,7 +411,39 @@ export default function ArrecadacaoDigitalContent({
     } finally {
       setLoadingCobrancas(false);
     }
-  }, [extratoMes, extratoCong, extratoDestino, extratoDataInicio, extratoDataFim, buscaExtrato]);
+  }, [buildExtratoParams, extratoPage, extratoPageSize]);
+
+  // Função para buscar TODOS os registros filtrados para impressão ou exportação CSV (sem truncamento)
+  const fetchAllFilteredCobrancas = async (): Promise<FinCobrancaCharge[]> => {
+    const allRecords: FinCobrancaCharge[] = [];
+    let currentPage = 1;
+    const fetchPageSize = 100;
+    let hasMore = true;
+
+    while (hasMore) {
+      const params = buildExtratoParams(currentPage, fetchPageSize);
+      const res = await authenticatedFetch(`/api/v1/ministry/payment-charges?${params.toString()}`);
+      if (!res.ok) {
+        throw new Error('Falha ao obter base completa de transações.');
+      }
+      const json = await res.json();
+      const items = (json.data ?? []).filter((c: any) => {
+        const st = String(c.status || '').toLowerCase().trim();
+        return st !== 'canceled' && st !== 'cancelado' && st !== 'cancelled' && st !== 'cancelada';
+      });
+
+      allRecords.push(...items);
+
+      const totalPages = json.meta?.totalPages ?? 1;
+      if (currentPage >= totalPages || items.length === 0) {
+        hasMore = false;
+      } else {
+        currentPage++;
+      }
+    }
+
+    return allRecords;
+  };
 
   useEffect(() => {
     loadDestinos();
@@ -511,7 +562,7 @@ export default function ArrecadacaoDigitalContent({
   });
 
   // Métricas Computadas
-  // Quando estamos na subAba 'extrato', os cards refletem estritamente o conjunto filtrado pelo extrato PIX
+  // Quando estamos na subAba 'extrato', os cards refletem a agregação oficial do backend (ou filtro local se ativo)
   const isExtrato = subAba === 'extrato';
 
   // Cálculos no conjunto filtrado de cobranças
@@ -520,7 +571,7 @@ export default function ArrecadacaoDigitalContent({
     return st === 'pago' || st === 'paid' || st === 'concluida' || st === 'received' || st === 'confirmed';
   });
 
-  const totalArrecadadoExtrato = cobrancasPagasFiltradas.reduce(
+  const totalArrecadadoExtratoLocal = cobrancasPagasFiltradas.reduce(
     (acc, c) => acc + Number(c.valor_pago ?? c.valor_solicitado ?? 0),
     0
   );
@@ -529,64 +580,139 @@ export default function ArrecadacaoDigitalContent({
     cobrancasFiltradas.map((c) => c.destination_id).filter(Boolean)
   ).size;
 
+  // Se houver busca textual ativa no frontend (ou tipo de movimento não tratado no backend), respeita os itens em tela
+  const hasLocalFilters = Boolean(buscaExtrato.trim() || extratoTipoMovimento === 'saidas');
+
   const totalArrecadadoCalculado = isExtrato
-    ? totalArrecadadoExtrato
-    : Math.max(
-        summary.totalArrecadado,
-        destinos.reduce((acc, d) => acc + (d.total_arrecadado ?? 0), 0)
-      );
+    ? (hasLocalFilters
+        ? totalArrecadadoExtratoLocal
+        : (summary.totalArrecadado !== undefined && summary.totalArrecadado !== null
+            ? summary.totalArrecadado
+            : totalArrecadadoExtratoLocal))
+    : (summary.totalArrecadado !== undefined && summary.totalArrecadado !== null
+        ? summary.totalArrecadado
+        : destinos.reduce((acc, d) => acc + (d.total_arrecadado ?? 0), 0));
 
   const destinosAtivosCount = isExtrato
-    ? distinctDestinosExtrato
+    ? (hasLocalFilters ? distinctDestinosExtrato : (summary.destinosDistintos ?? distinctDestinosExtrato))
     : destinos.filter((d) => d.is_ativo).length;
 
   const transacoesPagasCount = isExtrato
-    ? cobrancasPagasFiltradas.length
-    : Math.max(
-        summary.transacoesPagas,
-        cobrancas.filter((c) => {
-          const st = String(c.status || '').toLowerCase().trim();
-          return st === 'pago' || st === 'paid' || st === 'concluida' || st === 'received' || st === 'confirmed';
-        }).length
-      );
+    ? (hasLocalFilters
+        ? cobrancasPagasFiltradas.length
+        : (summary.transacoesPagas !== undefined && summary.transacoesPagas !== null
+            ? summary.transacoesPagas
+            : cobrancasPagasFiltradas.length))
+    : (summary.transacoesPagas !== undefined && summary.transacoesPagas !== null
+        ? summary.transacoesPagas
+        : cobrancas.filter((c) => {
+            const st = String(c.status || '').toLowerCase().trim();
+            return st === 'pago' || st === 'paid' || st === 'concluida' || st === 'received' || st === 'confirmed';
+          }).length);
 
-  // Exportar Extrato para CSV
-  const handleExportarExtratoCSV = () => {
-    if (exportarCSV) {
-      const csvData = cobrancasFiltradas.map((c) => ({
-        'Data / Hora': fmtDate(c.created_at),
-        'Destino PIX': c.fin_payment_destinations?.label ?? 'Destino Indefinido',
-        'Congregação': c.fin_payment_destinations?.congregacoes?.nome ?? 'Sede / Todas',
-        'Pagador / Doador': c.payer_name || 'Anônimo / Não identificado',
-        'Documento': c.payer_document || '—',
-        'Valor (R$)': Number(c.valor_pago ?? c.valor_solicitado ?? 0).toFixed(2),
-        'Status': (STATUS_BADGES[c.status]?.label ?? c.status).toUpperCase(),
-        'Conciliado Caixa': c.tesouraria_lancamento_id ? 'SIM' : 'NÃO',
-        'ID Transação Gateway': c.gateway_charge_id || '—',
-      }));
-      exportarCSV(csvData, `extrato_ofertas_pix_${extratoMes}`);
-    } else {
-      // Fallback CSV download nativo
-      if (cobrancasFiltradas.length === 0) return;
-      const headers = ['Data', 'Destino', 'Congregação', 'Pagador', 'Documento', 'Valor', 'Status', 'Conciliado'];
-      const rows = cobrancasFiltradas.map((c) => [
-        fmtDate(c.created_at),
-        `"${(c.fin_payment_destinations?.label ?? '').replace(/"/g, '""')}"`,
-        `"${(c.fin_payment_destinations?.congregacoes?.nome ?? 'Sede / Todas').replace(/"/g, '""')}"`,
-        `"${(c.payer_name || 'Anônimo').replace(/"/g, '""')}"`,
-        c.payer_document || '',
-        Number(c.valor_pago ?? c.valor_solicitado ?? 0).toFixed(2),
-        STATUS_BADGES[c.status]?.label ?? c.status,
-        c.tesouraria_lancamento_id ? 'Sim' : 'Não',
-      ]);
-      const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\n');
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement('a');
-      link.setAttribute('href', encodedUri);
-      link.setAttribute('download', `extrato_ofertas_pix_${extratoMes}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+  // Exportar Extrato para CSV (com recuperação integral sem truncamento)
+  const handleExportarExtratoCSV = async () => {
+    try {
+      setExportingReport(true);
+      const dataset = await fetchAllFilteredCobrancas();
+      const datasetFiltrado = dataset.filter((c) => {
+        if (extratoTipoMovimento === 'saidas') return false;
+        const chargeDate = c.paid_at ? c.paid_at.split('T')[0] : c.created_at ? c.created_at.split('T')[0] : '';
+        if (extratoDataInicio && chargeDate && chargeDate < extratoDataInicio) return false;
+        if (extratoDataFim && chargeDate && chargeDate > extratoDataFim) return false;
+        if (!buscaExtrato.trim()) return true;
+        const term = buscaExtrato.toLowerCase();
+        const pagador = (c.payer_name ?? '').toLowerCase();
+        const dest = (c.fin_payment_destinations?.label ?? '').toLowerCase();
+        const doc = (c.payer_document ?? '').toLowerCase();
+        const gwId = (c.gateway_charge_id ?? '').toLowerCase();
+        const cong = (c.fin_payment_destinations?.congregacoes?.nome ?? '').toLowerCase();
+        return (
+          pagador.includes(term) ||
+          dest.includes(term) ||
+          doc.includes(term) ||
+          gwId.includes(term) ||
+          cong.includes(term)
+        );
+      });
+
+      if (exportarCSV) {
+        const csvData = datasetFiltrado.map((c) => ({
+          'Data / Hora': fmtDate(c.created_at),
+          'Destino PIX': c.fin_payment_destinations?.label ?? 'Destino Indefinido',
+          'Congregação': c.fin_payment_destinations?.congregacoes?.nome ?? 'Sede / Todas',
+          'Pagador / Doador': c.payer_name || 'Anônimo / Não identificado',
+          'Documento': c.payer_document || '—',
+          'Valor (R$)': Number(c.valor_pago ?? c.valor_solicitado ?? 0).toFixed(2),
+          'Status': (STATUS_BADGES[c.status]?.label ?? c.status).toUpperCase(),
+          'Conciliado Caixa': c.tesouraria_lancamento_id ? 'SIM' : 'NÃO',
+          'ID Transação Gateway': c.gateway_charge_id || '—',
+        }));
+        exportarCSV(csvData, `extrato_ofertas_pix_${extratoMes}`);
+      } else {
+        if (datasetFiltrado.length === 0) return;
+        const headers = ['Data', 'Destino', 'Congregação', 'Pagador', 'Documento', 'Valor', 'Status', 'Conciliado'];
+        const rows = datasetFiltrado.map((c) => [
+          fmtDate(c.created_at),
+          `"${(c.fin_payment_destinations?.label ?? '').replace(/"/g, '""')}"`,
+          `"${(c.fin_payment_destinations?.congregacoes?.nome ?? 'Sede / Todas').replace(/"/g, '""')}"`,
+          `"${(c.payer_name || 'Anônimo').replace(/"/g, '""')}"`,
+          c.payer_document || '',
+          Number(c.valor_pago ?? c.valor_solicitado ?? 0).toFixed(2),
+          STATUS_BADGES[c.status]?.label ?? c.status,
+          c.tesouraria_lancamento_id ? 'Sim' : 'Não',
+        ]);
+        const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', `extrato_ofertas_pix_${extratoMes}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (err: any) {
+      showModal('Erro na Exportação', err.message || 'Falha ao recuperar dados completos para CSV.', 'error');
+    } finally {
+      setExportingReport(false);
+    }
+  };
+
+  // Impressão com recuperação integral dos dados filtrados
+  const handleImprimirExtrato = async () => {
+    try {
+      setExportingReport(true);
+      const dataset = await fetchAllFilteredCobrancas();
+      const datasetFiltrado = dataset.filter((c) => {
+        if (extratoTipoMovimento === 'saidas') return false;
+        const chargeDate = c.paid_at ? c.paid_at.split('T')[0] : c.created_at ? c.created_at.split('T')[0] : '';
+        if (extratoDataInicio && chargeDate && chargeDate < extratoDataInicio) return false;
+        if (extratoDataFim && chargeDate && chargeDate > extratoDataFim) return false;
+        if (!buscaExtrato.trim()) return true;
+        const term = buscaExtrato.toLowerCase();
+        const pagador = (c.payer_name ?? '').toLowerCase();
+        const dest = (c.fin_payment_destinations?.label ?? '').toLowerCase();
+        const doc = (c.payer_document ?? '').toLowerCase();
+        const gwId = (c.gateway_charge_id ?? '').toLowerCase();
+        const cong = (c.fin_payment_destinations?.congregacoes?.nome ?? '').toLowerCase();
+        return (
+          pagador.includes(term) ||
+          dest.includes(term) ||
+          doc.includes(term) ||
+          gwId.includes(term) ||
+          cong.includes(term)
+        );
+      });
+
+      setReportDataToPrint(datasetFiltrado);
+      // Timeout para permitir a renderização do bloco print-only antes do diálogo do navegador
+      setTimeout(() => {
+        window.print();
+        setExportingReport(false);
+      }, 300);
+    } catch (err: any) {
+      setExportingReport(false);
+      showModal('Erro na Impressão', err.message || 'Falha ao preparar dados completos para impressão.', 'error');
     }
   };
 
@@ -1253,16 +1379,28 @@ export default function ArrecadacaoDigitalContent({
 
             <div className="flex items-center gap-2.5 self-end xl:self-end shrink-0">
               <button
+                disabled={exportingReport || loadingCobrancas}
                 onClick={handleExportarExtratoCSV}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-slate-300 bg-white text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-50 hover:text-slate-900 transition h-[38px] cursor-pointer shadow-2xs"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-slate-300 bg-white text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-50 hover:text-slate-900 transition h-[38px] cursor-pointer shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <FileSpreadsheet className="h-4 w-4 text-slate-500" /> Exportar CSV
+                {exportingReport ? (
+                  <Loader2 className="h-4 w-4 text-slate-500 animate-spin" />
+                ) : (
+                  <FileSpreadsheet className="h-4 w-4 text-slate-500" />
+                )}
+                Exportar CSV
               </button>
               <button
-                onClick={() => window.print()}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-sm font-bold transition h-[38px] cursor-pointer shadow-xs border border-teal-800"
+                disabled={exportingReport || loadingCobrancas}
+                onClick={handleImprimirExtrato}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-sm font-bold transition h-[38px] cursor-pointer shadow-xs border border-teal-800 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Printer className="h-4 w-4 text-teal-100" /> Imprimir
+                {exportingReport ? (
+                  <Loader2 className="h-4 w-4 text-teal-100 animate-spin" />
+                ) : (
+                  <Printer className="h-4 w-4 text-teal-100" />
+                )}
+                Imprimir
               </button>
             </div>
           </div>
@@ -1350,6 +1488,41 @@ export default function ArrecadacaoDigitalContent({
                     })}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {/* Rodapé da Tabela do Extrato com Controles de Paginação */}
+            {extratoTotalCount > 0 && (
+              <div className="p-4 bg-slate-50/80 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+                <div>
+                  Exibindo{' '}
+                  <span className="font-bold text-slate-800">
+                    {(extratoPage - 1) * extratoPageSize + 1}–{Math.min(extratoPage * extratoPageSize, extratoTotalCount)}
+                  </span>{' '}
+                  de <span className="font-bold text-slate-800">{extratoTotalCount}</span> transações
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={extratoPage <= 1 || loadingCobrancas}
+                    onClick={() => setExtratoPage((p) => Math.max(1, p - 1))}
+                    className="px-3.5 py-1.5 border border-slate-300 rounded-xl bg-white font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer shadow-2xs"
+                  >
+                    Anterior
+                  </button>
+
+                  <span className="font-bold text-slate-700 px-2">
+                    Página {extratoPage} de {extratoTotalPages}
+                  </span>
+
+                  <button
+                    disabled={extratoPage >= extratoTotalPages || loadingCobrancas}
+                    onClick={() => setExtratoPage((p) => Math.min(extratoTotalPages, p + 1))}
+                    className="px-3.5 py-1.5 border border-slate-300 rounded-xl bg-white font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer shadow-2xs"
+                  >
+                    Próxima
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -1496,88 +1669,109 @@ export default function ArrecadacaoDigitalContent({
             </div>
           </div>
 
-          {/* Bloco de Destaque: TOTAL ARRECADADO NO PERÍODO */}
-          <div className="border border-emerald-200 bg-emerald-50/60 rounded-xl p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase font-bold text-emerald-800 tracking-wider">
-                Total Arrecadado no Período
-              </p>
-              <p className="text-2xl font-black text-emerald-700 leading-tight">
-                {fmtBRL(summary.totalArrecadado || totalArrecadadoCalculado)}
-              </p>
-            </div>
-            <div className="text-right text-xs text-emerald-800 font-medium space-y-0.5">
-              <p>
-                Ofertas Pagas: <span className="font-bold">{summary.transacoesPagas || transacoesPagasCount}</span>
-              </p>
-              {Boolean(summary.destinosDistintos || destinosAtivosCount) && (
-                <p>
-                  Destinos Distintos: <span className="font-bold">{summary.destinosDistintos ?? destinosAtivosCount}</span>
-                </p>
-              )}
-            </div>
-          </div>
+          {/* Resolução dos dados impressos: usa dataset completo recuperado para impressão (ou fallback para cobrancasFiltradas) */}
+          {(() => {
+            const printList = reportDataToPrint !== null ? reportDataToPrint : cobrancasFiltradas;
+            const printListPagas = printList.filter((c) => {
+              const st = String(c.status || '').toLowerCase().trim();
+              return st === 'pago' || st === 'paid' || st === 'concluida' || st === 'received' || st === 'confirmed';
+            });
+            const printTotalPagasCount = hasLocalFilters
+              ? printListPagas.length
+              : (summary.transacoesPagas !== undefined && summary.transacoesPagas !== null
+                  ? summary.transacoesPagas
+                  : printListPagas.length);
+            const printTotalArrecadado = hasLocalFilters
+              ? printListPagas.reduce((acc, c) => acc + Number(c.valor_pago ?? c.valor_solicitado ?? 0), 0)
+              : (summary.totalArrecadado !== undefined && summary.totalArrecadado !== null
+                  ? summary.totalArrecadado
+                  : printListPagas.reduce((acc, c) => acc + Number(c.valor_pago ?? c.valor_solicitado ?? 0), 0));
+            const printDestinosCount = hasLocalFilters
+              ? new Set(printList.map((c) => c.destination_id).filter(Boolean)).size
+              : (summary.destinosDistintos ?? new Set(printList.map((c) => c.destination_id).filter(Boolean)).size);
 
-          {/* Tabela de Extrato de Ofertas Formato Impressão A4 */}
-          <table className="w-full border-collapse text-xs text-left">
-            <thead>
-              <tr className="border-b border-gray-300 bg-gray-50">
-                <th className="py-2.5 px-3 font-bold text-gray-700 w-[22%]">Data</th>
-                <th className="py-2.5 px-3 font-bold text-gray-700 w-[34%]">Destino PIX</th>
-                <th className="py-2.5 px-3 font-bold text-gray-700 w-[24%]">Congregação</th>
-                <th className="py-2.5 px-3 font-bold text-gray-700 text-right w-[20%]">Valor</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cobrancasFiltradas.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="py-6 text-center text-gray-400">
-                    Nenhuma oferta PIX registrada no período/filtros selecionados.
-                  </td>
-                </tr>
-              ) : (
-                cobrancasFiltradas.map((c) => {
-                  const valor = c.valor_pago ?? c.valor_solicitado ?? 0;
-                  const dataFormatada = formatExtratoDateTime(c.paid_at || c.created_at);
-                  return (
-                    <tr key={c.id} className="border-b border-gray-100">
-                      <td className="py-2 px-3 text-gray-700 whitespace-nowrap">
-                        {dataFormatada}
+            return (
+              <>
+                {/* Bloco de Destaque: TOTAL ARRECADADO NO PERÍODO */}
+                <div className="border border-emerald-200 bg-emerald-50/60 rounded-xl p-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs uppercase font-bold text-emerald-800 tracking-wider">
+                      Total Arrecadado no Período
+                    </p>
+                    <p className="text-2xl font-black text-emerald-700 leading-tight">
+                      {fmtBRL(printTotalArrecadado)}
+                    </p>
+                  </div>
+                  <div className="text-right text-xs text-emerald-800 font-medium space-y-0.5">
+                    <p>
+                      Ofertas Pagas: <span className="font-bold">{printTotalPagasCount}</span>
+                    </p>
+                    {Boolean(printDestinosCount) && (
+                      <p>
+                        Destinos Distintos: <span className="font-bold">{printDestinosCount}</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Tabela de Extrato de Ofertas Formato Impressão A4 */}
+                <table className="w-full border-collapse text-xs text-left">
+                  <thead>
+                    <tr className="border-b border-gray-300 bg-gray-50">
+                      <th className="py-2.5 px-3 font-bold text-gray-700 w-[22%]">Data</th>
+                      <th className="py-2.5 px-3 font-bold text-gray-700 w-[34%]">Destino PIX</th>
+                      <th className="py-2.5 px-3 font-bold text-gray-700 w-[24%]">Congregação</th>
+                      <th className="py-2.5 px-3 font-bold text-gray-700 text-right w-[20%]">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {printList.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-6 text-center text-gray-400">
+                          Nenhuma oferta PIX registrada no período/filtros selecionados.
+                        </td>
+                      </tr>
+                    ) : (
+                      printList.map((c) => {
+                        const valor = c.valor_pago ?? c.valor_solicitado ?? 0;
+                        const dataFormatada = formatExtratoDateTime(c.paid_at || c.created_at);
+                        return (
+                          <tr key={c.id} className="border-b border-gray-100">
+                            <td className="py-2 px-3 text-gray-700 whitespace-nowrap">
+                              {dataFormatada}
+                            </td>
+                            <td className="py-2 px-3 font-semibold text-gray-800">
+                              {c.fin_payment_destinations?.label ?? 'Destino Indefinido'}
+                            </td>
+                            <td className="py-2 px-3 text-gray-600">
+                              {c.fin_payment_destinations?.congregacoes?.nome ?? 'Sede / Todas'}
+                            </td>
+                            <td className="py-2 px-3 text-right font-bold text-emerald-700 whitespace-nowrap">
+                              {fmtBRL(valor)}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-gray-300 font-bold bg-gray-50 text-xs">
+                      <td colSpan={2} className="py-2.5 px-3 text-gray-700">
+                        Total de Transações no Relatório: {printList.length} | Pagas:{' '}
+                        {printTotalPagasCount}
                       </td>
-                      <td className="py-2 px-3 font-semibold text-gray-800">
-                        {c.fin_payment_destinations?.label ?? 'Destino Indefinido'}
+                      <td className="py-2.5 px-3 text-right text-gray-700">
+                        Total Arrecadado:
                       </td>
-                      <td className="py-2 px-3 text-gray-600">
-                        {c.fin_payment_destinations?.congregacoes?.nome ?? 'Sede / Todas'}
-                      </td>
-                      <td className="py-2 px-3 text-right font-bold text-emerald-700 whitespace-nowrap">
-                        {fmtBRL(valor)}
+                      <td className="py-2.5 px-3 text-right text-emerald-800 font-extrabold text-sm whitespace-nowrap">
+                        {fmtBRL(printTotalArrecadado)}
                       </td>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-            <tfoot>
-              <tr className="border-t-2 border-gray-300 font-bold bg-gray-50 text-xs">
-                <td colSpan={2} className="py-2.5 px-3 text-gray-700">
-                  Total de Transações no Relatório: {cobrancasFiltradas.length} | Pagas:{' '}
-                  {
-                    cobrancasFiltradas.filter((c) => {
-                      const st = String(c.status || '').toLowerCase();
-                      return st === 'pago' || st === 'paid' || st === 'concluida' || st === 'received' || st === 'confirmed';
-                    }).length
-                  }
-                </td>
-                <td className="py-2.5 px-3 text-right text-gray-700">
-                  Total Arrecadado:
-                </td>
-                <td className="py-2.5 px-3 text-right text-emerald-800 font-extrabold text-sm whitespace-nowrap">
-                  {fmtBRL(summary.totalArrecadado || totalArrecadadoCalculado)}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+                  </tfoot>
+                </table>
+              </>
+            );
+          })()}
         </div>
       )}
     </div>
