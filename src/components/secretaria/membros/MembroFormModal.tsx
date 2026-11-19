@@ -9,7 +9,6 @@ import {
   MapPin,
   Church,
   Image as ImageIcon,
-  Coins,
   Search,
   Loader2,
   Check,
@@ -95,16 +94,28 @@ export default function MembroFormModal({
   salvarMembro,
   salvandoMembro = false,
   fecharFormulario,
-  dizimosHistorico,
-  loadingDizimosHistorico,
-  isDizimista,
-  setIsDizimista,
+  dizimosHistorico: _dizimosHistorico,
+  loadingDizimosHistorico: _loadingDizimosHistorico,
+  isDizimista: _isDizimista,
+  setIsDizimista: _setIsDizimista,
   isAdmin = false,
 }: MembroFormModalProps) {
   const [editandoMatricula, setEditandoMatricula] = React.useState(false);
   const [buscandoConjuge, setBuscandoConjuge] = React.useState(false);
   const [conjugeMsg, setConjugeMsg] = React.useState<{ tipo: 'sucesso' | 'info' | 'erro'; texto: string } | null>(null);
   const ultimoCpfBuscadoRef = React.useRef<string>('');
+
+  // Estados do Modal Híbrido de Filhos
+  const [showModalFilho, setShowModalFilho] = React.useState(false);
+  const [tipoAcaoFilho, setTipoAcaoFilho] = React.useState<'vincular' | 'cadastrar'>('vincular');
+  const [buscaFilhoTerm, setBuscaFilhoTerm] = React.useState('');
+  const [resultadosBuscaFilho, setResultadosBuscaFilho] = React.useState<any[]>([]);
+  const [buscandoFilhos, setBuscandoFilhos] = React.useState(false);
+  const [novoFilhoNome, setNovoFilhoNome] = React.useState('');
+  const [novoFilhoNascimento, setNovoFilhoNascimento] = React.useState('');
+  const [novoFilhoSexo, setNovoFilhoSexo] = React.useState('MASCULINO');
+  const [salvandoFilho, setSalvandoFilho] = React.useState(false);
+  const [filhoErro, setFilhoErro] = React.useState<string | null>(null);
 
   // Reseta estado de edição da matrícula ao abrir ou trocar de membro
   React.useEffect(() => {
@@ -216,6 +227,196 @@ export default function MembroFormModal({
       return () => clearTimeout(timer);
     }
   }, [dadosPessoais.cpfConjuge, buscarConjugePorCpf]);
+
+  // Busca pessoas no banco para vincular como filho
+  const buscarPessoasParaFilho = React.useCallback(async (termo: string) => {
+    const t = termo.trim();
+    if (t.length < 2) {
+      setResultadosBuscaFilho([]);
+      return;
+    }
+
+    setBuscandoFilhos(true);
+    setFilhoErro(null);
+    try {
+      const supabase = createClient();
+      let query = supabase
+        .from('members')
+        .select('id, name, matricula, data_nascimento, role, tipo_cadastro, congregacao_id')
+        .limit(10);
+
+      if (membroEditando?.id) {
+        query = query.neq('id', membroEditando.id);
+      }
+
+      const isNumeric = /^\d+$/.test(t);
+      if (isNumeric) {
+        query = query.or(`matricula.ilike.%${t}%,name.ilike.%${t}%`);
+      } else {
+        query = query.ilike('name', `%${t}%`);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      setResultadosBuscaFilho(data || []);
+    } catch (err: any) {
+      console.error('Erro ao pesquisar pessoas para vínculo familiar:', err);
+      setFilhoErro('Não foi possível buscar registros.');
+    } finally {
+      setBuscandoFilhos(false);
+    }
+  }, [membroEditando?.id]);
+
+  // Vincular pessoa existente
+  const handleVincularFilhoExistente = async (pessoa: any) => {
+    const filhosAtuais = (dadosPessoais.filhos || []) as any[];
+    const jaExiste = filhosAtuais.some(
+      (f) => f.memberId === pessoa.id || (f.nome && f.nome.toUpperCase() === pessoa.name?.toUpperCase())
+    );
+
+    if (jaExiste) {
+      setFilhoErro('Esta pessoa já está vinculada como filho(a).');
+      return;
+    }
+
+    const novoVinculo = {
+      memberId: pessoa.id,
+      nome: pessoa.name,
+      matricula: pessoa.matricula || '',
+      dataNascimento: normalizeDateForInput(pessoa.data_nascimento),
+      tipo: 'filho',
+    };
+
+    setDadosPessoais((prev: any) => ({
+      ...prev,
+      filhos: [...(prev.filhos || []), novoVinculo],
+    }));
+
+    // Se estamos editando um membro existente, persistir o relacionamento imediatamente na API de família
+    if (membroEditando?.id) {
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (token) {
+          await fetch(`/api/v1/members/${membroEditando.id}/familia`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              childId: pessoa.id,
+              nome: pessoa.name,
+              dataNascimento: pessoa.data_nascimento,
+              tipo: 'filho',
+            }),
+          });
+        }
+      } catch (linkErr) {
+        console.warn('Vínculo imediato na API de família falhou (será salvo com o formulário):', linkErr);
+      }
+    }
+
+    setShowModalFilho(false);
+    setBuscaFilhoTerm('');
+    setResultadosBuscaFilho([]);
+    setFilhoErro(null);
+  };
+
+  // Cadastrar novo filho de forma simplificada usando a API oficial
+  const handleCadastrarNovoFilho = async () => {
+    if (!novoFilhoNome.trim()) {
+      setFilhoErro('O nome do filho(a) é obrigatório.');
+      return;
+    }
+
+    setSalvandoFilho(true);
+    setFilhoErro(null);
+
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error('Não autenticado');
+
+      // Chamada à API oficial POST /api/v1/members
+      const res = await fetch('/api/v1/members', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: novoFilhoNome.trim().toUpperCase(),
+          data_nascimento: novoFilhoNascimento || null,
+          sexo: novoFilhoSexo || 'MASCULINO',
+          role: 'crianca',
+          tipo_cadastro: 'crianca',
+          status: 'active',
+          nome_pai: dadosPessoais.sexo === 'MASCULINO' ? dadosPessoais.nome : dadosPessoais.nomePai || null,
+          nome_mae: dadosPessoais.sexo === 'FEMININO' ? dadosPessoais.nome : dadosPessoais.nomeMae || null,
+        }),
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Erro ao cadastrar novo filho pela API.');
+      }
+
+      const { data: novoMembro } = await res.json();
+
+      const novoVinculo = {
+        memberId: novoMembro.id,
+        nome: novoMembro.name,
+        matricula: novoMembro.matricula || '',
+        dataNascimento: normalizeDateForInput(novoMembro.data_nascimento),
+        tipo: 'filho',
+      };
+
+      setDadosPessoais((prev: any) => ({
+        ...prev,
+        filhos: [...(prev.filhos || []), novoVinculo],
+      }));
+
+      // Se estamos editando um membro existente, persistir o relacionamento imediatamente na API de família
+      if (membroEditando?.id) {
+        const linkRes = await fetch(`/api/v1/members/${membroEditando.id}/familia`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            childId: novoMembro.id,
+            nome: novoMembro.name,
+            dataNascimento: novoMembro.data_nascimento,
+            tipo: 'filho',
+          }),
+        });
+
+        if (!linkRes.ok) {
+          // Se falhar o vínculo em membro já existente, remover o cadastro criado para não deixar registro órfão
+          console.warn('Falha ao vincular o novo filho na API de família. Revertendo cadastro...');
+          await fetch(`/api/v1/members/${novoMembro.id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+          }).catch(() => {});
+          throw new Error('Falha ao vincular o novo filho ao responsável. Operação cancelada.');
+        }
+      }
+
+      setShowModalFilho(false);
+      setNovoFilhoNome('');
+      setNovoFilhoNascimento('');
+      setFilhoErro(null);
+    } catch (err: any) {
+      console.error('Erro ao cadastrar novo filho:', err);
+      setFilhoErro(err.message || 'Erro ao cadastrar novo filho.');
+    } finally {
+      setSalvandoFilho(false);
+    }
+  };
 
   if (!showForm) return null;
 
@@ -354,24 +555,24 @@ export default function MembroFormModal({
 
           <button
             type="button"
-            onClick={() => setActiveTab('dizimos')}
+            onClick={() => setActiveTab('familia')}
             className={`group relative py-3.5 px-3 font-semibold text-xs sm:text-sm flex items-center gap-2.5 whitespace-nowrap transition-colors cursor-pointer ${
-              activeTab === 'dizimos'
+              activeTab === 'familia'
                 ? 'text-emerald-900 font-bold'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             <div
               className={`p-1.5 rounded-lg transition-colors ${
-                activeTab === 'dizimos'
+                activeTab === 'familia'
                   ? 'bg-emerald-100/70 text-emerald-800'
                   : 'bg-slate-100 text-slate-400 group-hover:text-slate-700 group-hover:bg-slate-200/70'
               }`}
             >
-              <Coins className="w-4 h-4" />
+              <Users className="w-4 h-4" />
             </div>
-            <span>Dízimos</span>
-            {activeTab === 'dizimos' && (
+            <span>Família</span>
+            {activeTab === 'familia' && (
               <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-emerald-600 rounded-t-full shadow-xs" />
             )}
           </button>
@@ -1577,95 +1778,216 @@ export default function MembroFormModal({
             </div>
           )}
 
-          {/* ═══════════ ABA: DÍZIMOS ═══════════ */}
-          {activeTab === 'dizimos' && (
+          {/* ═══════════ ABA: FAMÍLIA ═══════════ */}
+          {activeTab === 'familia' && (
             <div className="space-y-6">
               <div className="flex items-center gap-2 pb-2 border-b border-slate-100 text-slate-800">
-                <Coins className="w-4 h-4 text-teal-600" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Controle e Histórico de Dízimos</h3>
+                <Users className="w-4 h-4 text-teal-600" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Composição Familiar</h3>
               </div>
 
-              {/* Checkbox Marcar como dizimista */}
-              <div className="flex items-start gap-3.5 p-4 border border-teal-200/80 rounded-2xl bg-teal-50/40">
-                <input
-                  type="checkbox"
-                  id="chkIsDizimista"
-                  checked={!!isDizimista}
-                  onChange={(e) => setIsDizimista(e.target.checked)}
-                  className="w-5 h-5 mt-0.5 text-teal-700 rounded-md border-slate-300 focus:ring-teal-600 cursor-pointer"
-                />
-                <div>
-                  <label htmlFor="chkIsDizimista" className="text-sm font-bold text-slate-900 cursor-pointer">
-                    Marcar como dizimista ativo?
-                  </label>
-                  <p className="text-xs text-slate-600 mt-0.5">
-                    Ao marcar este membro como dizimista, ele será gerenciado no painel de adimplência/inadimplência na aba <strong>Tesouraria → Dizimistas</strong>.
-                  </p>
+              {/* Informações de Filiação e Cônjuge (Sincronizadas com o cadastro) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Pai */}
+                <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">Pai</label>
+                    <span className="text-[11px] text-slate-400">Filiação</span>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Nome completo do pai"
+                    value={dadosPessoais.nomePai || ''}
+                    onChange={(e) => setDadosPessoais((prev: any) => ({ ...prev, nomePai: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                  />
+                </div>
+
+                {/* Mãe */}
+                <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">Mãe</label>
+                    <span className="text-[11px] text-slate-400">Filiação</span>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Nome completo da mãe"
+                    value={dadosPessoais.nomeMae || ''}
+                    onChange={(e) => setDadosPessoais((prev: any) => ({ ...prev, nomeMae: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                  />
                 </div>
               </div>
 
-              {!membroEditando ? (
-                <div className="text-center py-8 text-slate-500 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                  <p className="text-sm font-medium">Salve o cadastro do membro primeiro para visualizar o histórico de dízimos.</p>
+              {/* Cônjuge */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Cônjuge</span>
+                    {dadosPessoais.estadoCivil !== 'casado' && (
+                      <span className="text-[11px] text-amber-600 font-medium bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                        Estado Civil: {dadosPessoais.estadoCivil ? dadosPessoais.estadoCivil.replace('_', ' ') : 'Não informado'}
+                      </span>
+                    )}
+                  </div>
+                  {buscandoConjuge && (
+                    <span className="text-xs text-teal-700 flex items-center gap-1.5 font-medium">
+                      <Loader2 className="animate-spin h-3.5 w-3.5 text-teal-600" />
+                      Buscando na base...
+                    </span>
+                  )}
                 </div>
-              ) : (
-                <>
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs text-slate-600 flex items-center justify-between">
-                    <span>Para registrar novos pagamentos, acesse o módulo <strong>Tesouraria → Dizimistas</strong>.</span>
-                    <span className="text-teal-700 font-semibold">Histórico financeiro</span>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">CPF do Cônjuge</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="000.000.000-00"
+                        value={formatCpf(dadosPessoais.cpfConjuge || '')}
+                        onChange={(e) => handleCpfConjugeChange(e.target.value)}
+                        maxLength={14}
+                        className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition pr-8"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => buscarConjugePorCpf(dadosPessoais.cpfConjuge || '')}
+                        title="Buscar cônjuge na base"
+                        className="absolute right-2 top-2 p-1 text-slate-400 hover:text-teal-700 transition"
+                      >
+                        <Search className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
-                  {loadingDizimosHistorico ? (
-                    <div className="flex items-center justify-center py-8 gap-2 text-slate-400 text-sm">
-                      <Loader2 className="w-4 h-4 animate-spin text-teal-600" />
-                      <span>Carregando histórico...</span>
-                    </div>
-                  ) : !dizimosHistorico || dizimosHistorico.length === 0 ? (
-                    <div className="text-center py-8 text-slate-400 text-sm bg-slate-50 rounded-2xl border border-slate-200">
-                      Nenhum registro de dízimo encontrado para este membro.
-                    </div>
-                  ) : (
-                    <div className="border border-slate-200 rounded-xl overflow-hidden">
-                      <table className="w-full text-sm border-collapse">
-                        <thead>
-                          <tr className="bg-slate-100/70 border-b border-slate-200 text-slate-700">
-                            <th className="text-left p-3 text-xs font-bold uppercase tracking-wider">Mês/Ano</th>
-                            <th className="text-left p-3 text-xs font-bold uppercase tracking-wider">Status</th>
-                            <th className="text-left p-3 text-xs font-bold uppercase tracking-wider">Valor</th>
-                            <th className="text-left p-3 text-xs font-bold uppercase tracking-wider">Data Pagamento</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {dizimosHistorico.map((h: any) => (
-                            <tr key={h.mes_referencia} className="hover:bg-slate-50/80 transition">
-                              <td className="p-3 text-slate-900 font-medium">
-                                {h.mes_referencia.split('-').reverse().join('/')}
-                              </td>
-                              <td className="p-3">
-                                <span
-                                  className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${
-                                    h.status === 'pago'
-                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                      : 'bg-amber-50 text-amber-800 border-amber-200'
-                                  }`}
-                                >
-                                  {h.status === 'pago' ? 'Pago' : 'Pendente'}
-                                </span>
-                              </td>
-                              <td className="p-3 text-slate-800 font-semibold">
-                                {h.valor != null ? `R$ ${Number(h.valor).toFixed(2).replace('.', ',')}` : '—'}
-                              </td>
-                              <td className="p-3 text-slate-600">
-                                {h.data_pagamento ? h.data_pagamento.split('-').reverse().join('/') : '—'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </>
-              )}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Nome do Cônjuge</label>
+                    <input
+                      type="text"
+                      placeholder="Nome completo do cônjuge"
+                      value={dadosPessoais.nomeConjuge || ''}
+                      onChange={(e) => setDadosPessoais((prev: any) => ({ ...prev, nomeConjuge: e.target.value }))}
+                      className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Data de Nascimento</label>
+                    <input
+                      type="date"
+                      value={dadosPessoais.dataNascimentoConjuge || ''}
+                      onChange={(e) => setDadosPessoais((prev: any) => ({ ...prev, dataNascimentoConjuge: e.target.value }))}
+                      className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Seção Filhos */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">Filhos</h4>
+                    <span className="text-[11px] text-slate-400">
+                      ({((dadosPessoais as any).filhos || []).length})
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTipoAcaoFilho('vincular');
+                      setBuscaFilhoTerm('');
+                      setResultadosBuscaFilho([]);
+                      setNovoFilhoNome('');
+                      setNovoFilhoNascimento('');
+                      setNovoFilhoSexo('MASCULINO');
+                      setFilhoErro(null);
+                      setShowModalFilho(true);
+                    }}
+                    className="px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <span>+</span>
+                    <span>Adicionar Filho</span>
+                  </button>
+                </div>
+
+                {!((dadosPessoais as any).filhos) || (dadosPessoais as any).filhos.length === 0 ? (
+                  <div className="text-center py-6 text-slate-400 text-xs bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                    Nenhum filho adicionado ao registro familiar.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {(dadosPessoais as any).filhos.map((filho: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 bg-white border border-slate-200 rounded-xl shadow-2xs hover:border-slate-300 transition"
+                      >
+                        <div className="flex-1 w-full sm:w-auto">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-slate-900">{filho.nome}</span>
+                            {filho.matricula && (
+                              <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 font-mono">
+                                Matr. {filho.matricula}
+                              </span>
+                            )}
+                            {filho.memberId ? (
+                              <span className="text-[10px] bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded border border-teal-200 font-medium">
+                                Vinculado à base
+                              </span>
+                            ) : (
+                              <span className="text-[10px] bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">
+                                Registro direto
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-slate-500 mt-0.5">
+                            {filho.dataNascimento ? (
+                              <span>Nascimento: {filho.dataNascimento.split('-').reverse().join('/')}</span>
+                            ) : (
+                              <span>Nascimento não informado</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const filhoParaRemover = ((dadosPessoais as any).filhos || [])[idx];
+                            const lista = ((dadosPessoais as any).filhos || []).filter((_: any, i: number) => i !== idx);
+                            setDadosPessoais((prev: any) => ({ ...prev, filhos: lista }));
+
+                            // Se estiver editando um membro existente, remover também na API oficial de família
+                            if (membroEditando?.id && (filhoParaRemover?.id || filhoParaRemover?.memberId)) {
+                              try {
+                                const relId = filhoParaRemover.id || filhoParaRemover.memberId;
+                                const supabase = createClient();
+                                const { data: { session } } = await supabase.auth.getSession();
+                                const token = session?.access_token;
+                                if (token) {
+                                  await fetch(`/api/v1/members/${membroEditando.id}/familia/${relId}`, {
+                                    method: 'DELETE',
+                                    headers: {
+                                      Authorization: `Bearer ${token}`,
+                                    },
+                                  });
+                                }
+                              } catch (delErr) {
+                                console.warn('Remoção imediata na API de família falhou (será salva com o formulário):', delErr);
+                              }
+                            }
+                          }}
+                          className="px-2.5 py-1 text-xs text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded-lg hover:bg-red-50 transition cursor-pointer flex items-center gap-1 shrink-0"
+                          title="Desvincular filho (não exclui o cadastro da pessoa)"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          <span>Desvincular</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -1701,6 +2023,196 @@ export default function MembroFormModal({
           </button>
         </div>
       </div>
+
+      {/* Modal Híbrido: Vincular Pessoa Existente ou Cadastrar Novo Filho */}
+      {showModalFilho && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-[60] p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden flex flex-col">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-teal-700" />
+                <h3 className="text-sm font-bold text-slate-800">Adicionar Filho ao Registro Familiar</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowModalFilho(false)}
+                className="text-slate-400 hover:text-slate-600 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Alternância de Modo */}
+            <div className="p-4 border-b border-slate-100 bg-white">
+              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTipoAcaoFilho('vincular');
+                    setFilhoErro(null);
+                  }}
+                  className={`py-2 text-xs font-bold rounded-lg transition ${
+                    tipoAcaoFilho === 'vincular'
+                      ? 'bg-white text-teal-800 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Vincular Existente
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTipoAcaoFilho('cadastrar');
+                    setFilhoErro(null);
+                  }}
+                  className={`py-2 text-xs font-bold rounded-lg transition ${
+                    tipoAcaoFilho === 'cadastrar'
+                      ? 'bg-white text-teal-800 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Cadastrar Novo
+                </button>
+              </div>
+            </div>
+
+            {/* Conteúdo do Modo */}
+            <div className="p-5 space-y-4">
+              {filhoErro && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
+                  {filhoErro}
+                </div>
+              )}
+
+              {tipoAcaoFilho === 'vincular' ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Buscar pessoa na base
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Digite o nome ou matrícula..."
+                        value={buscaFilhoTerm}
+                        onChange={(e) => {
+                          setBuscaFilhoTerm(e.target.value);
+                          buscarPessoasParaFilho(e.target.value);
+                        }}
+                        className="w-full px-3.5 py-2.5 text-xs font-medium border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600"
+                      />
+                      {buscandoFilhos && (
+                        <span className="absolute right-3 top-3 text-slate-400">
+                          <Loader2 className="animate-spin h-4 w-4 text-teal-600" />
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {resultadosBuscaFilho.length > 0 && (
+                    <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl">
+                      {resultadosBuscaFilho.map((p) => (
+                        <div
+                          key={p.id}
+                          onClick={() => handleVincularFilhoExistente(p)}
+                          className="p-3 hover:bg-teal-50/60 cursor-pointer transition flex items-center justify-between text-xs"
+                        >
+                          <div>
+                            <p className="font-bold text-slate-800">{p.name}</p>
+                            <p className="text-[11px] text-slate-500">
+                              Matrícula: {p.matricula || '—'} • {p.role || p.tipo_cadastro || 'membro'}
+                            </p>
+                          </div>
+                          <span className="text-[11px] text-teal-700 font-semibold bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                            Selecionar
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {buscaFilhoTerm.trim().length >= 2 && !buscandoFilhos && resultadosBuscaFilho.length === 0 && (
+                    <p className="text-center text-xs text-slate-500 py-3">
+                      Nenhuma pessoa encontrada com esse termo.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Nome Completo <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Nome do filho(a)"
+                      value={novoFilhoNome}
+                      onChange={(e) => setNovoFilhoNome(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-xs font-medium border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        Data de Nascimento
+                      </label>
+                      <input
+                        type="date"
+                        value={novoFilhoNascimento}
+                        onChange={(e) => setNovoFilhoNascimento(e.target.value)}
+                        className="w-full px-3.5 py-2.5 text-xs font-medium border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">Sexo</label>
+                      <select
+                        value={novoFilhoSexo}
+                        onChange={(e) => setNovoFilhoSexo(e.target.value)}
+                        className="w-full px-3.5 py-2.5 text-xs font-medium border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 bg-white cursor-pointer"
+                      >
+                        <option value="MASCULINO">Masculino</option>
+                        <option value="FEMININO">Feminino</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-slate-500 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                    O filho será adicionado ao cadastro com o vínculo de filiação estabelecido e sincronizado com a base de pessoas do ministério.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="px-5 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowModalFilho(false)}
+                className="px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200/60 rounded-xl transition"
+              >
+                Cancelar
+              </button>
+              {tipoAcaoFilho === 'cadastrar' && (
+                <button
+                  type="button"
+                  onClick={handleCadastrarNovoFilho}
+                  disabled={salvandoFilho}
+                  className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm disabled:opacity-60 cursor-pointer"
+                >
+                  {salvandoFilho ? (
+                    <>
+                      <Loader2 className="animate-spin w-3.5 h-3.5 text-white" />
+                      <span>Cadastrando...</span>
+                    </>
+                  ) : (
+                    <span>Cadastrar e Vincular</span>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -12,6 +12,8 @@ export interface MembrosToolbarProps {
   setStatusFilter: (status: string) => void;
   congregacaoFilter?: string;
   setCongregacaoFilter?: (congregacao: string) => void;
+  somenteMinistros?: boolean;
+  setSomenteMinistros?: (somente: boolean) => void;
   congregacoesOptions?: Array<{ id: string; nome: string }>;
   setCurrentPage: (page: number) => void;
   setSortOrdemAlfabetica?: (sort: boolean) => void;
@@ -38,6 +40,8 @@ export default function MembrosToolbar({
   setStatusFilter,
   congregacaoFilter = 'TODAS',
   setCongregacaoFilter,
+  somenteMinistros = false,
+  setSomenteMinistros,
   congregacoesOptions = [],
   setCurrentPage,
   setSortOrdemAlfabetica,
@@ -61,6 +65,7 @@ export default function MembrosToolbar({
     setStatusFilter('TODOS');
     setCargoFilter('TODOS');
     setCongregacaoFilter?.('TODAS');
+    setSomenteMinistros?.(false);
     setSortOrdemAlfabetica?.(false);
     setCurrentPage(1);
   };
@@ -178,6 +183,25 @@ export default function MembrosToolbar({
               <span>Limpar</span>
             </button>
           </div>
+        </div>
+
+        {/* Checkbox Somente Ministros */}
+        <div className="mt-4 pt-3.5 border-t border-slate-100 flex items-center">
+          <label className="inline-flex items-center gap-2 cursor-pointer select-none text-xs sm:text-sm font-semibold text-slate-700 hover:text-slate-900 transition">
+            <input
+              type="checkbox"
+              checked={somenteMinistros}
+              onChange={(e) => {
+                setSomenteMinistros?.(e.target.checked);
+                setCurrentPage(1);
+              }}
+              className="w-4 h-4 rounded text-teal-600 border-slate-300 focus:ring-teal-500 cursor-pointer"
+            />
+            <span>Somente Ministros</span>
+            <span className="text-[11px] font-normal text-slate-400">
+              (exibe exclusivamente registros com Tipo de Cadastro = Ministro)
+            </span>
+          </label>
         </div>
       </div>
 

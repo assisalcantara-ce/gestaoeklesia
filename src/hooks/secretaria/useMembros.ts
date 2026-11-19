@@ -81,6 +81,14 @@ export interface Membro {
   };
   observacoesMinisteriais?: string;
   isDizimista?: boolean;
+  filhos?: Array<{
+    id?: string;
+    memberId?: string;
+    nome: string;
+    dataNascimento?: string;
+    tipo?: string;
+    matricula?: string;
+  }>;
 }
 
 export interface DivisaoOption {
@@ -121,9 +129,17 @@ export interface DadosPessoaisState {
   zonaEleitoral: string;
   secaoEleitoral: string;
   observacoes: string;
+  filhos: Array<{
+    id?: string;
+    memberId?: string;
+    nome: string;
+    dataNascimento?: string;
+    tipo?: string;
+    matricula?: string;
+  }>;
 }
 
-export type MembrosFormTab = 'dados' | 'endereco' | 'ministerial' | 'foto' | 'dizimos';
+export type MembrosFormTab = 'dados' | 'endereco' | 'ministerial' | 'foto' | 'familia';
 
 // ─── Helpers puros (sem estado) ────────────────────────────────────────────────
 
@@ -261,6 +277,7 @@ const DADOS_PESSOAIS_INICIAL: DadosPessoaisState = {
   zonaEleitoral: '',
   secaoEleitoral: '',
   observacoes: '',
+  filhos: [],
 };
 
 const ENDERECO_INICIAL = {
@@ -335,6 +352,7 @@ export function useMembros() {
   const [statusFilter, setStatusFilter] = useState('ATIVO');
   const [cargoFilter, setCargoFilter] = useState('TODOS');
   const [congregacaoFilter, setCongregacaoFilter] = useState('TODAS');
+  const [somenteMinistros, setSomenteMinistros] = useState(false);
   const [sortOrdemAlfabetica, setSortOrdemAlfabetica] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -514,6 +532,7 @@ export function useMembros() {
       dataBatismoEspiritoSanto: String(member.data_batismo_espirito_santo || (cf as any).dataBatismoEspiritoSanto || ''),
       fotoUrl: member.foto_url || (cf as any).fotoUrl || undefined,
       isDizimista: member.is_dizimista ?? (cf as any).isDizimista ?? false,
+      filhos: Array.isArray((cf as any).filhos) ? (cf as any).filhos : [],
     };
   };
 
@@ -536,6 +555,7 @@ export function useMembros() {
         status: statusFilter === 'TODOS' ? undefined : statusFilter,
         cargo: cargoFilter === 'TODOS' ? undefined : cargoFilter,
         congregacaoId: congregacaoFilter === 'TODAS' ? undefined : congregacaoFilter,
+        tipoCadastro: somenteMinistros ? 'ministro' : undefined,
         sort: sortOrdemAlfabetica ? 'name_asc' : 'matricula_asc',
       });
 
@@ -551,12 +571,12 @@ export function useMembros() {
       if (e instanceof Error && e.message === 'Não autenticado') return;
       console.error('Erro ao carregar membros (API):', e);
     }
-  }, [fetchMembers, currentPage, itemsPerPage, searchTerm, statusFilter, cargoFilter, congregacaoFilter, sortOrdemAlfabetica]);
+  }, [fetchMembers, currentPage, itemsPerPage, searchTerm, statusFilter, cargoFilter, congregacaoFilter, somenteMinistros, sortOrdemAlfabetica]);
 
   // Resetar para primeira página ao alterar filtros ou busca
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, cargoFilter, congregacaoFilter, sortOrdemAlfabetica, itemsPerPage]);
+  }, [searchTerm, statusFilter, cargoFilter, congregacaoFilter, somenteMinistros, sortOrdemAlfabetica, itemsPerPage]);
 
   // Debounce para recarregar a lista quando filtros/busca/página mudam
   useEffect(() => {
@@ -767,7 +787,37 @@ export function useMembros() {
       zonaEleitoral: membro.zonaEleitoral || '',
       secaoEleitoral: membro.secaoEleitoral || '',
       observacoes: membro.observacoes || '',
+      filhos: Array.isArray(membro.filhos) ? membro.filhos : [],
     });
+
+    // Carregar vínculos familiares atualizados da API oficial (/api/v1/members/[id]/familia)
+    if (membro.id) {
+      void (async () => {
+        try {
+          const supabase = createClient();
+          const { data: { session } } = await supabase.auth.getSession();
+          const token = session?.access_token;
+          if (!token) return;
+
+          const res = await fetch(`/api/v1/members/${membro.id}/familia`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          if (res.ok) {
+            const json = await res.json();
+            if (Array.isArray(json.data) && json.data.length > 0) {
+              setDadosPessoais((prev) => ({
+                ...prev,
+                filhos: json.data,
+              }));
+            }
+          }
+        } catch (fErr) {
+          console.warn('Não foi possível carregar vínculos de família da API:', fErr);
+        }
+      })();
+    }
     setEnderecoData({
       cep: formatCep(membro.cep || ''),
       logradouro: membro.logradouro || '',
@@ -881,6 +931,7 @@ export function useMembros() {
         zonaEleitoral: dadosPessoais.zonaEleitoral,
         secaoEleitoral: dadosPessoais.secaoEleitoral,
         observacoes: dadosPessoais.observacoes,
+        filhos: dadosPessoais.filhos || [],
         ...enderecoData,
         ...dadosMinisteriais,
         cargoMinisterial: cargoSelecionado,
@@ -1137,6 +1188,8 @@ export function useMembros() {
         search: searchTerm.trim() || undefined,
         status: statusFilter === 'TODOS' ? undefined : statusFilter,
         cargo: cargoFilter === 'TODOS' ? undefined : cargoFilter,
+        congregacaoId: congregacaoFilter === 'TODAS' ? undefined : congregacaoFilter,
+        tipoCadastro: somenteMinistros ? 'ministro' : undefined,
         sort: sortOrdemAlfabetica ? 'name_asc' : 'created_asc',
       });
       if (res?.data && res.data.length > 0) {
@@ -1458,6 +1511,8 @@ export function useMembros() {
     setCargoFilter,
     congregacaoFilter,
     setCongregacaoFilter,
+    somenteMinistros,
+    setSomenteMinistros,
     sortOrdemAlfabetica,
     setSortOrdemAlfabetica,
     currentPage,

@@ -47,6 +47,8 @@ export default function MembrosPage() {
     setCargoFilter,
     congregacaoFilter,
     setCongregacaoFilter,
+    somenteMinistros,
+    setSomenteMinistros,
     sortOrdemAlfabetica,
     setSortOrdemAlfabetica,
     currentPage,
@@ -409,6 +411,8 @@ export default function MembrosPage() {
                 setStatusFilter={setStatusFilter}
                 congregacaoFilter={congregacaoFilter}
                 setCongregacaoFilter={setCongregacaoFilter}
+                somenteMinistros={somenteMinistros}
+                setSomenteMinistros={setSomenteMinistros}
                 congregacoesOptions={congregacoesOptions}
                 setCurrentPage={setCurrentPage}
                 setSortOrdemAlfabetica={setSortOrdemAlfabetica}
