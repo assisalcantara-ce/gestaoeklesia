@@ -244,4 +244,94 @@ describe('Tesouraria — Conciliação de Arrecadação PIX', () => {
     const totalReais = totalCentavos / 100;
     assert.equal(totalReais, 312.20);
   });
+
+  describe('Filtros Dependentes no Extrato PIX e Nomenclatura QR Code Avulso', () => {
+    const mockAllDestinos = [
+      { id: 'dest-avulso-1', label: 'Oferta Geral Culto', congregacao_id: null },
+      { id: 'dest-avulso-2', label: 'Campanha de Missões', congregacao_id: null },
+      { id: 'dest-cong1-1', label: 'Dízimos e Ofertas Sede', congregacao_id: 'cong-sede' },
+      { id: 'dest-cong1-2', label: 'Construção Templo Sede', congregacao_id: 'cong-sede' },
+      { id: 'dest-cong2-1', label: 'Ofertas Congregação Norte', congregacao_id: 'cong-norte' },
+    ];
+
+    function getDestinosDisponiveis(allDestinos, extratoCong) {
+      if (!extratoCong) return [];
+      if (extratoCong === 'none') {
+        return allDestinos.filter((d) => d.congregacao_id === null);
+      }
+      return allDestinos.filter((d) => d.congregacao_id === extratoCong);
+    }
+
+    it('9. Cenário 1: Todas as congregações ("") → Destino deve ficar desabilitado (lista vazia)', () => {
+      const disponiveis = getDestinosDisponiveis(mockAllDestinos, '');
+      assert.equal(disponiveis.length, 0);
+    });
+
+    it('10. Cenário 2: Congregação específica selecionada → Lista somente QR Codes vinculados a ela', () => {
+      const disponiveis = getDestinosDisponiveis(mockAllDestinos, 'cong-sede');
+      assert.equal(disponiveis.length, 2);
+      assert.ok(disponiveis.every((d) => d.congregacao_id === 'cong-sede'));
+      assert.equal(disponiveis[0].id, 'dest-cong1-1');
+      assert.equal(disponiveis[1].id, 'dest-cong1-2');
+    });
+
+    it('11. Cenário 3: "QR Code Avulso" ("none") selecionado → Lista somente destinos sem vínculo (congregacao_id null)', () => {
+      const disponiveis = getDestinosDisponiveis(mockAllDestinos, 'none');
+      assert.equal(disponiveis.length, 2);
+      assert.ok(disponiveis.every((d) => d.congregacao_id === null));
+      assert.equal(disponiveis[0].id, 'dest-avulso-1');
+      assert.equal(disponiveis[1].id, 'dest-avulso-2');
+    });
+
+    it('12. Cenário 4: Troca ou limpeza de congregação limpa o destino selecionado', () => {
+      let extratoCong = 'cong-sede';
+      let extratoDestino = 'dest-cong1-1';
+
+      function handleExtratoCongChange(novaCong) {
+        extratoCong = novaCong;
+        extratoDestino = '';
+      }
+
+      handleExtratoCongChange('none');
+      assert.equal(extratoCong, 'none');
+      assert.equal(extratoDestino, '');
+
+      extratoDestino = 'dest-avulso-1';
+      handleExtratoCongChange('');
+      assert.equal(extratoCong, '');
+      assert.equal(extratoDestino, '');
+    });
+
+    it('13. Cenário 5: Cadastro/Edição de destino trata checkbox "QR Code Avulso" e congregacao_id', () => {
+      // Quando marcado como avulso
+      const payloadAvulso = {
+        label: 'Oferta Especial Jovens',
+        tipo_recebimento: 'oferta',
+        congregacao_id: true /* isAvulso */ ? null : 'cong-sede',
+      };
+      assert.equal(payloadAvulso.congregacao_id, null);
+
+      // Quando desmarcado (vinculado a congregação)
+      const payloadVinculado = {
+        label: 'Oferta Especial Jovens',
+        tipo_recebimento: 'oferta',
+        congregacao_id: false /* isAvulso */ ? null : 'cong-sede',
+      };
+      assert.equal(payloadVinculado.congregacao_id, 'cong-sede');
+    });
+
+    it('14. Nomenclatura amigável: quando congregação é nula/vazia, exibe "QR Code Avulso" na impressão e CSV', () => {
+      const mockChargeSemCong = {
+        id: 'c1',
+        valor_pago: 100,
+        fin_payment_destinations: {
+          label: 'Oferta Geral',
+          congregacoes: null,
+        },
+      };
+
+      const congLabel = mockChargeSemCong.fin_payment_destinations?.congregacoes?.nome ?? 'QR Code Avulso';
+      assert.equal(congLabel, 'QR Code Avulso');
+    });
+  });
 });

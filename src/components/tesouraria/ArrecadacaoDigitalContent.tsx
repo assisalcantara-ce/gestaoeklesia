@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import {
   QrCode,
@@ -372,18 +372,18 @@ export default function ArrecadacaoDigitalContent({
   // Handler para troca de congregação no Extrato com reset de destino inconsistente
   const handleExtratoCongChange = (novaCong: string) => {
     setExtratoCong(novaCong);
+    setExtratoDestino('');
     setExtratoPage(1);
-    if (extratoDestino) {
-      const destAtual = allDestinos.find((d) => d.id === extratoDestino);
-      if (destAtual) {
-        if (novaCong === 'none' && destAtual.congregacao_id !== null) {
-          setExtratoDestino('');
-        } else if (novaCong !== '' && novaCong !== 'none' && destAtual.congregacao_id !== novaCong) {
-          setExtratoDestino('');
-        }
-      }
-    }
   };
+
+  // Destinos disponíveis para o select de QR CODE / DESTINO no Extrato dependente da congregação selecionada
+  const destinosDisponiveisExtrato = useMemo<{ id: string; label: string; congregacao_id?: string | null }[]>(() => {
+    if (!extratoCong) return [];
+    if (extratoCong === 'none') {
+      return allDestinos.filter((d) => d.congregacao_id === null);
+    }
+    return allDestinos.filter((d) => d.congregacao_id === extratoCong);
+  }, [allDestinos, extratoCong]);
 
   // Helper para construir os parâmetros de query do Extrato
   const buildExtratoParams = useCallback((pPage: number, pPageSize: number) => {
@@ -674,7 +674,7 @@ export default function ArrecadacaoDigitalContent({
         const csvData = datasetFiltrado.map((c) => ({
           'Data / Hora': formatExtratoDateTime(c.paid_at || c.created_at),
           'Destino PIX': c.fin_payment_destinations?.label ?? 'Destino Indefinido',
-          'Congregação': c.fin_payment_destinations?.congregacoes?.nome ?? 'Sede / Todas',
+          'Congregação': c.fin_payment_destinations?.congregacoes?.nome ?? 'QR Code Avulso',
           'Pagador / Doador': c.payer_name || 'Anônimo / Não identificado',
           'Documento': c.payer_document || '—',
           'Valor (R$)': Number(c.valor_pago ?? c.valor_solicitado ?? 0).toFixed(2),
@@ -689,7 +689,7 @@ export default function ArrecadacaoDigitalContent({
         const rows = datasetFiltrado.map((c) => [
           formatExtratoDateTime(c.paid_at || c.created_at),
           `"${(c.fin_payment_destinations?.label ?? '').replace(/"/g, '""')}"`,
-          `"${(c.fin_payment_destinations?.congregacoes?.nome ?? 'Sede / Todas').replace(/"/g, '""')}"`,
+          `"${(c.fin_payment_destinations?.congregacoes?.nome ?? 'QR Code Avulso').replace(/"/g, '""')}"`,
           `"${(c.payer_name || 'Anônimo').replace(/"/g, '""')}"`,
           c.payer_document || '',
           Number(c.valor_pago ?? c.valor_solicitado ?? 0).toFixed(2),
@@ -1069,7 +1069,7 @@ export default function ArrecadacaoDigitalContent({
                 className="border border-slate-300 rounded-xl px-3 py-2 bg-white text-slate-800 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition cursor-pointer"
               >
                 <option value="">Todas as Congregações</option>
-                <option value="none">Sem Congregação / Sem Vínculo</option>
+                <option value="none">QR Code Avulso</option>
                 {congregacoes.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.nome}
@@ -1296,7 +1296,7 @@ export default function ArrecadacaoDigitalContent({
                     className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white font-medium text-slate-800 h-[38px] focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition cursor-pointer"
                   >
                     <option value="">Todas as Congregações</option>
-                    <option value="none">Sem Congregação / Sem Vínculo</option>
+                    <option value="none">QR Code Avulso</option>
                     {congregacoes.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.nome}
@@ -1311,24 +1311,21 @@ export default function ArrecadacaoDigitalContent({
                 <select
                   value={extratoDestino}
                   onChange={(e) => setExtratoDestino(e.target.value)}
-                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white font-medium text-slate-800 h-[38px] focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition cursor-pointer max-w-[240px]"
+                  disabled={!extratoCong}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white font-medium text-slate-800 h-[38px] focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition cursor-pointer max-w-[240px] disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                 >
-                  <option value="">Todos os QR Codes</option>
-                  {allDestinos
-                    .filter((d) => {
-                      if (extratoCong === 'none') {
-                        return d.congregacao_id === null;
-                      }
-                      if (extratoCong) {
-                        return d.congregacao_id === extratoCong;
-                      }
-                      return true;
-                    })
-                    .map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.label}
-                      </option>
-                    ))}
+                  <option value="">
+                    {!extratoCong
+                      ? 'Selecione uma congregação'
+                      : destinosDisponiveisExtrato.length === 0
+                      ? 'Nenhum QR Code disponível'
+                      : 'Todos os QR Codes'}
+                  </option>
+                  {destinosDisponiveisExtrato.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -1498,7 +1495,7 @@ export default function ArrecadacaoDigitalContent({
                               {c.fin_payment_destinations?.label ?? 'Destino Indefinido'}
                             </p>
                             <p className="text-xs text-slate-400">
-                              {c.fin_payment_destinations?.congregacoes?.nome ?? 'Sede / Todas'}
+                              {c.fin_payment_destinations?.congregacoes?.nome ?? 'QR Code Avulso'}
                             </p>
                           </td>
                           <td className="px-4 py-3.5">
@@ -1677,7 +1674,7 @@ export default function ArrecadacaoDigitalContent({
                 Congregação:{' '}
                 <span className="font-bold text-gray-800">
                   {extratoCong === 'none'
-                    ? 'Sem Congregação / Sem Vínculo'
+                    ? 'QR Code Avulso'
                     : extratoCong
                     ? congregacoes.find((c) => c.id === extratoCong)?.nome ||
                       (congNome ? congNome(extratoCong) : 'Congregação Selecionada')
@@ -1791,7 +1788,7 @@ export default function ArrecadacaoDigitalContent({
                               {c.fin_payment_destinations?.label ?? 'Destino Indefinido'}
                             </td>
                             <td className="py-2 px-3 text-gray-600">
-                              {c.fin_payment_destinations?.congregacoes?.nome ?? 'Sede / Todas'}
+                              {c.fin_payment_destinations?.congregacoes?.nome ?? 'QR Code Avulso'}
                             </td>
                             <td className="py-2 px-3 text-right font-bold text-emerald-700 whitespace-nowrap">
                               {fmtBRL(valor)}
