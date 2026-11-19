@@ -39,6 +39,8 @@ interface PageProps {
 interface CongregacaoOption {
   id: string;
   nome: string;
+  campo_id?: string | null;
+  campo_nome?: string | null;
 }
 
 interface MemberFormData {
@@ -486,9 +488,12 @@ export default function PublicMemberPage({ params }: PageProps) {
       setSaving(true);
       setErrorMessage(null);
 
+      const selectedCongObj = congregacoes.find((c) => c.id === selectedCongregacaoId);
+
       const payload = {
         institution,
         congregacao_id: selectedCongregacaoId,
+        campo_id: selectedCongObj?.campo_id || null,
         cpf: cpf.replace(/\D/g, ''),
         tipo_cadastro: formData.tipo_cadastro || 'membro',
         cargo_ministerial: formData.tipo_cadastro === 'ministro' ? (formData.cargo_ministerial || null) : null,
@@ -685,7 +690,7 @@ export default function PublicMemberPage({ params }: PageProps) {
                   <option value="">-- Selecione sua congregação --</option>
                   {congregacoes.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.nome}
+                      {c.nome}{c.campo_nome ? ` (${c.campo_nome})` : ''}
                     </option>
                   ))}
                 </select>

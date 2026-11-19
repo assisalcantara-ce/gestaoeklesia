@@ -25,6 +25,7 @@ export interface Membro {
   supervisao: string;
   campo: string;
   congregacao: string;
+  congregacao_id?: string | null;
   status: 'ativo' | 'inativo';
   dataNascimento?: string;
   sexo?: string;
@@ -472,6 +473,26 @@ export function useMembros() {
         ? String((cf as any).uniqueId)
         : String(member.id || '').replace(/-/g, '').slice(0, 16).toUpperCase());
 
+    // Resiliência de recuperação: se supervisao ou campo não estiverem em custom_fields,
+    // recuperar a partir do congregacao_id preenchido na tabela members
+    let supervisaoRecuperada = String((cf as any).supervisao || '');
+    let campoRecuperado = String((cf as any).campo || '');
+
+    if ((!supervisaoRecuperada || !campoRecuperado) && member.congregacao_id) {
+      const congEncontrada = congregacoes.find((c) => c.id === member.congregacao_id);
+      if (congEncontrada) {
+        if (!supervisaoRecuperada) {
+          supervisaoRecuperada = congEncontrada.nome;
+        }
+        if (!campoRecuperado && (congEncontrada as any).campo_id) {
+          const campoEncontrado = campos.find((cp) => cp.id === (congEncontrada as any).campo_id);
+          if (campoEncontrado) {
+            campoRecuperado = campoEncontrado.nome;
+          }
+        }
+      }
+    }
+
     return {
       id: member.id,
       uniqueId: stableUniqueId,
@@ -480,9 +501,10 @@ export function useMembros() {
       nome: String(member.name || (cf as any).nome || ''),
       cpf: formatCpf(String(member.cpf || (cf as any).cpf || '')),
       tipoCadastro: normalizeTipoCadastro(member.tipo_cadastro || member.role || (cf as any).tipoCadastro),
-      supervisao: String((cf as any).supervisao || ''),
-      campo: String((cf as any).campo || ''),
+      supervisao: supervisaoRecuperada,
+      campo: campoRecuperado,
       congregacao: String((cf as any).congregacao || ''),
+      congregacao_id: member.congregacao_id || (cf as any).congregacao_id || null,
       status: dbStatusToUi(member.status),
       dataNascimento: String(member.data_nascimento || (cf as any).dataNascimento || ''),
       sexo: String(member.sexo || (cf as any).sexo || ''),
@@ -755,6 +777,21 @@ export function useMembros() {
   };
 
   const abrirEdicao = (membro: Membro) => {
+    // Resolução retroativa de congregação/grupo caso venham vazios do custom_fields
+    let supervisaoInicial = membro.supervisao || '';
+    let campoInicial = membro.campo || '';
+
+    if ((!supervisaoInicial || !campoInicial) && membro.congregacao_id) {
+      const congEncontrada = congregacoes.find((c) => c.id === membro.congregacao_id);
+      if (congEncontrada) {
+        if (!supervisaoInicial) supervisaoInicial = congEncontrada.nome;
+        if (!campoInicial && (congEncontrada as any).campo_id) {
+          const campoEncontrado = campos.find((cp) => cp.id === (congEncontrada as any).campo_id);
+          if (campoEncontrado) campoInicial = campoEncontrado.nome;
+        }
+      }
+    }
+
     setMembroEditando(membro);
     setDadosPessoais({
       matricula: membro.matricula || '',
@@ -776,8 +813,8 @@ export function useMembros() {
       nacionalidade: membro.nacionalidade || 'BRASILEIRA',
       naturalidade: membro.naturalidade || '',
       uf: membro.uf || '',
-      supervisao: membro.supervisao || '',
-      campo: membro.campo || '',
+      supervisao: supervisaoInicial,
+      campo: campoInicial,
       congregacao: membro.congregacao || '',
       email: membro.email || '',
       celular: formatPhone(membro.celular || ''),

@@ -112,18 +112,25 @@ export async function POST(request: NextRequest) {
 
   const ministryId = ministry.id;
 
-  // ── 4. Validar se a congregação pertence estritamente ao tenant no servidor ──
+  // ── 4. Validar e resolver Congregação e Grupo/Campo pertencentes ao tenant no servidor ──
+  let congregacaoNome: string = '';
+  let campoIdFinal: string | null = null;
+  let campoNomeFinal: string | null = null;
+
   const { data: validCong } = await admin
     .from('congregacoes')
-    .select('id')
+    .select('id, nome, campo_id')
     .eq('id', congregacao_id.trim())
     .eq('ministry_id', ministryId)
     .maybeSingle();
 
-  if (!validCong) {
+  if (validCong) {
+    congregacaoNome = validCong.nome ? validCong.nome.trim() : '';
+    campoIdFinal = validCong.campo_id || null;
+  } else {
     const { data: validSup } = await admin
       .from('supervisoes')
-      .select('id')
+      .select('id, nome')
       .eq('id', congregacao_id.trim())
       .eq('ministry_id', ministryId)
       .maybeSingle();
@@ -133,6 +140,36 @@ export async function POST(request: NextRequest) {
         { error: 'Congregação inválida para esta instituição.' },
         { status: 400 }
       );
+    }
+    congregacaoNome = validSup.nome ? validSup.nome.trim() : '';
+  }
+
+  // Se a requisição enviou campo_id explícito compatível com o tenant, validar no servidor
+  if (body.campo_id && typeof body.campo_id === 'string' && body.campo_id.trim()) {
+    const { data: validCampo } = await admin
+      .from('campos')
+      .select('id, nome')
+      .eq('id', body.campo_id.trim())
+      .eq('ministry_id', ministryId)
+      .maybeSingle();
+
+    if (validCampo) {
+      campoIdFinal = validCampo.id;
+      campoNomeFinal = validCampo.nome ? validCampo.nome.trim() : null;
+    }
+  }
+
+  // Se campo_id foi resolvido via congregação mas ainda não temos o nome do campo
+  if (campoIdFinal && !campoNomeFinal) {
+    const { data: campoRow } = await admin
+      .from('campos')
+      .select('id, nome')
+      .eq('id', campoIdFinal)
+      .eq('ministry_id', ministryId)
+      .maybeSingle();
+
+    if (campoRow && campoRow.nome) {
+      campoNomeFinal = campoRow.nome.trim();
     }
   }
 
@@ -174,7 +211,7 @@ export async function POST(request: NextRequest) {
 
   const { data: existingMember } = await admin
     .from('members')
-    .select('id, name, cpf')
+    .select('id, name, cpf, custom_fields')
     .eq('ministry_id', ministryId)
     .or(`cpf.eq.${cleanCpf},cpf.eq.${formattedCpf}`)
     .maybeSingle();
@@ -188,8 +225,21 @@ export async function POST(request: NextRequest) {
 
   // ── 8. LÓGICA DE UPDATE (Membro já existente) ──────────────────────────────
   if (existingMember) {
+    const existingCf = (existingMember.custom_fields && typeof existingMember.custom_fields === 'object')
+      ? existingMember.custom_fields
+      : {};
+
+    const updatedCf = {
+      ...existingCf,
+      supervisao: congregacaoNome || (existingCf as any).supervisao || '',
+      campo: campoNomeFinal || (existingCf as any).campo || '',
+      congregacao_id: congregacao_id.trim(),
+      ...(campoIdFinal ? { campo_id: campoIdFinal } : {}),
+    };
+
     const updatePayload: Record<string, any> = {
       congregacao_id: congregacao_id.trim(),
+      custom_fields: updatedCf,
       nome_pai: normalizedBody.nome_pai.trim(),
       nome_mae: normalizedBody.nome_mae.trim(),
       rg: cleanVal(normalizedBody.rg),
@@ -269,9 +319,17 @@ export async function POST(request: NextRequest) {
 
   const matricula = await MemberMatriculaService.alocarProximaMatricula(admin, ministryId);
 
+  const initialCustomFields: Record<string, any> = {
+    supervisao: congregacaoNome || '',
+    campo: campoNomeFinal || '',
+    congregacao_id: congregacao_id.trim(),
+    ...(campoIdFinal ? { campo_id: campoIdFinal } : {}),
+  };
+
   const insertPayload: Record<string, any> = {
     ministry_id: ministryId,
     congregacao_id: congregacao_id.trim(),
+    custom_fields: initialCustomFields,
     matricula: matricula,
     name: normalizedBody.name.trim(),
     cpf: cleanCpf,

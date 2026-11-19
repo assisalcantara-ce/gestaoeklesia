@@ -57,18 +57,37 @@ export async function GET(request: NextRequest) {
 
     const ministryId = ministry.id;
 
-    // Buscar congregações ativas pertencentes ao tenant
-    let congregacoes: Array<{ id: string; nome: string }> = [];
+    // Buscar congregações ativas pertencentes ao tenant com vínculo ao campo (grupo)
+    let congregacoes: Array<{ id: string; nome: string; campo_id?: string | null; campo_nome?: string | null }> = [];
 
     const { data: congData, error: congErr } = await admin
       .from('congregacoes')
-      .select('id, nome, is_active')
+      .select('id, nome, campo_id, is_active')
       .eq('ministry_id', ministryId)
       .or('is_active.eq.true,is_active.is.null')
       .order('nome', { ascending: true });
 
+    // Buscar campos (grupos/setores) ativos para mapear nomes
+    const { data: camposData } = await admin
+      .from('campos')
+      .select('id, nome, is_active')
+      .eq('ministry_id', ministryId)
+      .or('is_active.eq.true,is_active.is.null');
+
+    const camposMap = new Map<string, string>();
+    if (camposData && Array.isArray(camposData)) {
+      camposData.forEach((cp: any) => {
+        if (cp.id && cp.nome) camposMap.set(cp.id, cp.nome.trim());
+      });
+    }
+
     if (!congErr && congData && congData.length > 0) {
-      congregacoes = congData.map((c: any) => ({ id: c.id, nome: c.nome }));
+      congregacoes = congData.map((c: any) => ({
+        id: c.id,
+        nome: c.nome,
+        campo_id: c.campo_id || null,
+        campo_nome: c.campo_id ? camposMap.get(c.campo_id) || null : null,
+      }));
     } else {
       // Fallback: se o tenant utiliza a 1ª divisão em supervisoes
       const { data: supData } = await admin
@@ -79,7 +98,12 @@ export async function GET(request: NextRequest) {
         .order('nome', { ascending: true });
 
       if (supData && supData.length > 0) {
-        congregacoes = supData.map((s: any) => ({ id: s.id, nome: s.nome }));
+        congregacoes = supData.map((s: any) => ({
+          id: s.id,
+          nome: s.nome,
+          campo_id: null,
+          campo_nome: null,
+        }));
       }
     }
 
