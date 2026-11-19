@@ -152,27 +152,48 @@ interface ArrecadacaoDigitalContentProps {
   congNome?: (id?: string | null) => string;
 }
 
-// Formatação amigável para data e hora no padrão brasileiro (dd/MM/yyyy HH:mm)
+// Formatação amigável para data e hora no padrão brasileiro (dd/MM/yyyy HH:mm) no fuso institucional UTC-3
 function formatExtratoDateTime(dateStr: string | null | undefined): string {
   if (!dateStr) return '—';
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
-    const dia = String(d.getDate()).padStart(2, '0');
-    const mes = String(d.getMonth() + 1).padStart(2, '0');
-    const ano = d.getFullYear();
-    const horas = String(d.getHours()).padStart(2, '0');
-    const mins = String(d.getMinutes()).padStart(2, '0');
-    return `${dia}/${mes}/${ano} ${horas}:${mins}`;
+    const formatted = new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Belem',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(d);
+    return formatted.replace(', ', ' ');
   } catch {
     return dateStr;
+  }
+}
+
+// Extrai data civil YYYY-MM-DD no fuso institucional para comparação sem corte UTC
+function getChargeLocalDateStr(dateStr: string | null | undefined): string {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return typeof dateStr === 'string' ? dateStr.split('T')[0] : '';
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Belem',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(d);
+  } catch {
+    return typeof dateStr === 'string' ? dateStr.split('T')[0] : '';
   }
 }
 
 export default function ArrecadacaoDigitalContent({
   congregacoes,
   fmtBRL,
-  fmtDate,
+  fmtDate: _fmtDate,
   showModal,
   onOpenNovoDestino,
   onOpenQrModal,
@@ -533,33 +554,39 @@ export default function ArrecadacaoDigitalContent({
 
 
   // Filtragem de Extrato (busca textual, tipo de movimento e período de datas)
-  const cobrancasFiltradas = cobrancas.filter((c) => {
-    // Filtro por tipo de movimento
-    if (extratoTipoMovimento === 'saidas') {
-      // Arrecadação PIX trata de entradas de ofertas
-      return false;
-    }
+  const cobrancasFiltradas = cobrancas
+    .filter((c) => {
+      // Filtro por tipo de movimento
+      if (extratoTipoMovimento === 'saidas') {
+        // Arrecadação PIX trata de entradas de ofertas
+        return false;
+      }
 
-    // Filtro por período de datas (data efetiva da oferta / criação do PIX)
-    const chargeDate = c.paid_at ? c.paid_at.split('T')[0] : c.created_at ? c.created_at.split('T')[0] : '';
-    if (extratoDataInicio && chargeDate && chargeDate < extratoDataInicio) return false;
-    if (extratoDataFim && chargeDate && chargeDate > extratoDataFim) return false;
+      // Filtro por período de datas (data efetiva da oferta / criação do PIX) no fuso local
+      const chargeDate = getChargeLocalDateStr(c.paid_at || c.created_at);
+      if (extratoDataInicio && chargeDate && chargeDate < extratoDataInicio) return false;
+      if (extratoDataFim && chargeDate && chargeDate > extratoDataFim) return false;
 
-    if (!buscaExtrato) return true;
-    const term = buscaExtrato.toLowerCase();
-    const pagador = (c.payer_name ?? '').toLowerCase();
-    const dest = (c.fin_payment_destinations?.label ?? '').toLowerCase();
-    const doc = (c.payer_document ?? '').toLowerCase();
-    const gwId = (c.gateway_charge_id ?? '').toLowerCase();
-    const cong = (c.fin_payment_destinations?.congregacoes?.nome ?? '').toLowerCase();
-    return (
-      pagador.includes(term) ||
-      dest.includes(term) ||
-      doc.includes(term) ||
-      gwId.includes(term) ||
-      cong.includes(term)
-    );
-  });
+      if (!buscaExtrato) return true;
+      const term = buscaExtrato.toLowerCase();
+      const pagador = (c.payer_name ?? '').toLowerCase();
+      const dest = (c.fin_payment_destinations?.label ?? '').toLowerCase();
+      const doc = (c.payer_document ?? '').toLowerCase();
+      const gwId = (c.gateway_charge_id ?? '').toLowerCase();
+      const cong = (c.fin_payment_destinations?.congregacoes?.nome ?? '').toLowerCase();
+      return (
+        pagador.includes(term) ||
+        dest.includes(term) ||
+        doc.includes(term) ||
+        gwId.includes(term) ||
+        cong.includes(term)
+      );
+    })
+    .sort((a, b) => {
+      const timeB = new Date(b.paid_at || b.created_at).getTime();
+      const timeA = new Date(a.paid_at || a.created_at).getTime();
+      return timeB - timeA;
+    });
 
   // Métricas Computadas
   // Quando estamos na subAba 'extrato', os cards refletem a agregação oficial do backend (ou filtro local se ativo)
@@ -617,7 +644,7 @@ export default function ArrecadacaoDigitalContent({
       const dataset = await fetchAllFilteredCobrancas();
       const datasetFiltrado = dataset.filter((c) => {
         if (extratoTipoMovimento === 'saidas') return false;
-        const chargeDate = c.paid_at ? c.paid_at.split('T')[0] : c.created_at ? c.created_at.split('T')[0] : '';
+        const chargeDate = getChargeLocalDateStr(c.paid_at || c.created_at);
         if (extratoDataInicio && chargeDate && chargeDate < extratoDataInicio) return false;
         if (extratoDataFim && chargeDate && chargeDate > extratoDataFim) return false;
         if (!buscaExtrato.trim()) return true;
@@ -636,9 +663,16 @@ export default function ArrecadacaoDigitalContent({
         );
       });
 
+      // Ordenação cronológica decrescente estrita
+      datasetFiltrado.sort((a, b) => {
+        const timeB = new Date(b.paid_at || b.created_at).getTime();
+        const timeA = new Date(a.paid_at || a.created_at).getTime();
+        return timeB - timeA;
+      });
+
       if (exportarCSV) {
         const csvData = datasetFiltrado.map((c) => ({
-          'Data / Hora': fmtDate(c.created_at),
+          'Data / Hora': formatExtratoDateTime(c.paid_at || c.created_at),
           'Destino PIX': c.fin_payment_destinations?.label ?? 'Destino Indefinido',
           'Congregação': c.fin_payment_destinations?.congregacoes?.nome ?? 'Sede / Todas',
           'Pagador / Doador': c.payer_name || 'Anônimo / Não identificado',
@@ -653,7 +687,7 @@ export default function ArrecadacaoDigitalContent({
         if (datasetFiltrado.length === 0) return;
         const headers = ['Data', 'Destino', 'Congregação', 'Pagador', 'Documento', 'Valor', 'Status', 'Conciliado'];
         const rows = datasetFiltrado.map((c) => [
-          fmtDate(c.created_at),
+          formatExtratoDateTime(c.paid_at || c.created_at),
           `"${(c.fin_payment_destinations?.label ?? '').replace(/"/g, '""')}"`,
           `"${(c.fin_payment_destinations?.congregacoes?.nome ?? 'Sede / Todas').replace(/"/g, '""')}"`,
           `"${(c.payer_name || 'Anônimo').replace(/"/g, '""')}"`,
@@ -685,7 +719,7 @@ export default function ArrecadacaoDigitalContent({
       const dataset = await fetchAllFilteredCobrancas();
       const datasetFiltrado = dataset.filter((c) => {
         if (extratoTipoMovimento === 'saidas') return false;
-        const chargeDate = c.paid_at ? c.paid_at.split('T')[0] : c.created_at ? c.created_at.split('T')[0] : '';
+        const chargeDate = getChargeLocalDateStr(c.paid_at || c.created_at);
         if (extratoDataInicio && chargeDate && chargeDate < extratoDataInicio) return false;
         if (extratoDataFim && chargeDate && chargeDate > extratoDataFim) return false;
         if (!buscaExtrato.trim()) return true;
@@ -702,6 +736,13 @@ export default function ArrecadacaoDigitalContent({
           gwId.includes(term) ||
           cong.includes(term)
         );
+      });
+
+      // Ordenação cronológica decrescente estrita para o relatório impresso
+      datasetFiltrado.sort((a, b) => {
+        const timeB = new Date(b.paid_at || b.created_at).getTime();
+        const timeA = new Date(a.paid_at || a.created_at).getTime();
+        return timeB - timeA;
       });
 
       setReportDataToPrint(datasetFiltrado);
@@ -1231,7 +1272,7 @@ export default function ArrecadacaoDigitalContent({
 
       {/* ── 5. VISÃO EXTRATO DE OFERTAS PIX ── */}
       {subAba === 'extrato' && (
-        <div className="space-y-4">
+        <div className="space-y-4 print:hidden">
           {/* Barra de Filtros com Estilo Idêntico ao Módulo Tesouraria / Relatórios */}
           <div className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-xs flex flex-col xl:flex-row justify-between items-start xl:items-end gap-4">
             <div className="flex flex-wrap items-end gap-3.5 flex-1 w-full">
@@ -1449,8 +1490,8 @@ export default function ArrecadacaoDigitalContent({
 
                       return (
                         <tr key={c.id} className="hover:bg-slate-50/90 transition-colors">
-                          <td className="px-4 py-3.5 text-slate-600 font-medium">
-                            {fmtDate(c.created_at)}
+                          <td className="px-4 py-3.5 text-slate-600 font-medium whitespace-nowrap">
+                            {formatExtratoDateTime(c.paid_at || c.created_at)}
                           </td>
                           <td className="px-4 py-3.5">
                             <p className="font-bold text-slate-900">
@@ -1671,7 +1712,13 @@ export default function ArrecadacaoDigitalContent({
 
           {/* Resolução dos dados impressos: usa dataset completo recuperado para impressão (ou fallback para cobrancasFiltradas) */}
           {(() => {
-            const printList = reportDataToPrint !== null ? reportDataToPrint : cobrancasFiltradas;
+            const rawPrintList = reportDataToPrint !== null ? reportDataToPrint : cobrancasFiltradas;
+            // Garantir ordenação decrescente estrita
+            const printList = [...rawPrintList].sort((a, b) => {
+              const timeB = new Date(b.paid_at || b.created_at).getTime();
+              const timeA = new Date(a.paid_at || a.created_at).getTime();
+              return timeB - timeA;
+            });
             const printListPagas = printList.filter((c) => {
               const st = String(c.status || '').toLowerCase().trim();
               return st === 'pago' || st === 'paid' || st === 'concluida' || st === 'received' || st === 'confirmed';

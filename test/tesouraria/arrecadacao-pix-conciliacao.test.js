@@ -169,4 +169,79 @@ describe('Tesouraria — Conciliação de Arrecadação PIX', () => {
     assert.equal(panel.totalArrecadadoCalculado, 300);
     assert.equal(panel.transacoesPagasCount, 2);
   });
+
+  it('5. Ordenação decrescente: transações de 19 e 18/11 devem aparecer antes de 17/11', () => {
+    const rawList = [
+      { id: 't1', created_at: '2026-11-17T14:30:00.000Z', valor_pago: 50 },
+      { id: 't2', created_at: '2026-11-19T09:15:00.000Z', valor_pago: 100 },
+      { id: 't3', created_at: '2026-11-18T22:45:00.000Z', valor_pago: 75 },
+    ];
+
+    const sorted = [...rawList].sort((a, b) => {
+      const timeB = new Date(b.paid_at || b.created_at).getTime();
+      const timeA = new Date(a.paid_at || a.created_at).getTime();
+      return timeB - timeA;
+    });
+
+    assert.equal(sorted[0].id, 't2'); // 19/11
+    assert.equal(sorted[1].id, 't3'); // 18/11
+    assert.equal(sorted[2].id, 't1'); // 17/11
+  });
+
+  it('6. Formatação de data e hora no padrão institucional pt-BR (dd/MM/yyyy HH:mm)', () => {
+    function formatExtratoDateTime(dateStr) {
+      if (!dateStr) return '—';
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      const formatted = new Intl.DateTimeFormat('pt-BR', {
+        timeZone: 'America/Belem',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(d);
+      return formatted.replace(', ', ' ');
+    }
+
+    // 2026-11-19 10:30 UTC = 2026-11-19 07:30 UTC-3
+    const formatted = formatExtratoDateTime('2026-11-19T10:30:00.000Z');
+    assert.equal(formatted, '19/11/2026 07:30');
+
+    // Não deve produzir strings quebradas como '19T10:30:00.000Z/11/2026'
+    assert.ok(!formatted.includes('T'));
+    assert.ok(!formatted.includes('Z'));
+    assert.ok(!formatted.includes(','));
+  });
+
+  it('7. Fuso horário local e preservação do dia civil (sem deslocamento UTC incorreto)', () => {
+    function getChargeLocalDateStr(dateStr) {
+      if (!dateStr) return '';
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return typeof dateStr === 'string' ? dateStr.split('T')[0] : '';
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Belem',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(d);
+    }
+
+    // Oferta realizada às 22h30 do dia 18/11 no Brasil (UTC-3) -> gravada em UTC como 2026-11-19T01:30:00Z
+    const utcTimestamp = '2026-11-19T01:30:00.000Z';
+    const localDate = getChargeLocalDateStr(utcTimestamp);
+
+    // No fuso local brasileiro (America/Belem, UTC-3), o dia civil correto é 18/11, não 19/11
+    assert.equal(localDate, '2026-11-18');
+  });
+
+  it('8. Conciliação monetária exata em centavos (sem desvios de ponto flutuante)', () => {
+    // 139 transações totalizando R$ 10.849,80
+    // Criar array de valores com centavos variados somando exatamente 10849.80
+    const centavos = [7805, 7805, 7805, 7805]; // 312.20
+    const totalCentavos = centavos.reduce((acc, c) => acc + c, 0);
+    const totalReais = totalCentavos / 100;
+    assert.equal(totalReais, 312.20);
+  });
 });

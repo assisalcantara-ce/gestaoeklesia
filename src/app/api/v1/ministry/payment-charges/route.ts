@@ -96,19 +96,22 @@ export async function GET(request: NextRequest) {
       )
       .eq('ministry_id', ctx.ministryId);
 
-    // Filtro por Período de Datas ou Mês de Referência (YYYY-MM)
+    // Filtro por Período de Datas ou Mês de Referência (YYYY-MM) no fuso institucional UTC-3
     if (dataInicioParam && dataFimParam) {
-      query = query.gte('created_at', `${dataInicioParam}T00:00:00.000Z`).lte('created_at', `${dataFimParam}T23:59:59.999Z`);
+      query = query.gte('created_at', `${dataInicioParam}T00:00:00.000-03:00`).lte('created_at', `${dataFimParam}T23:59:59.999-03:00`);
     } else if (dataInicioParam) {
-      query = query.gte('created_at', `${dataInicioParam}T00:00:00.000Z`);
+      query = query.gte('created_at', `${dataInicioParam}T00:00:00.000-03:00`);
     } else if (dataFimParam) {
-      query = query.lte('created_at', `${dataFimParam}T23:59:59.999Z`);
+      query = query.lte('created_at', `${dataFimParam}T23:59:59.999-03:00`);
     } else if (mesParam && /^\d{4}-\d{2}$/.test(mesParam)) {
       const [anoStr, mesStr] = mesParam.split('-');
       const ano = parseInt(anoStr, 10);
       const mes = parseInt(mesStr, 10);
-      const startIso = new Date(ano, mes - 1, 1).toISOString();
-      const endIso = new Date(ano, mes, 0, 23, 59, 59, 999).toISOString();
+      const startIso = new Date(`${anoStr}-${mesStr}-01T00:00:00.000-03:00`).toISOString();
+      const nextYear = mes === 12 ? ano + 1 : ano;
+      const nextMonth = mes === 12 ? 1 : mes + 1;
+      const nextMonthStr = String(nextMonth).padStart(2, '0');
+      const endIso = new Date(new Date(`${nextYear}-${nextMonthStr}-01T00:00:00.000-03:00`).getTime() - 1).toISOString();
       query = query.gte('created_at', startIso).lte('created_at', endIso);
     }
 
@@ -209,11 +212,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Ordenação e Paginação
+    // Ordenação e Paginação (ordem cronológica decrescente estrita por created_at e desempate por id)
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
 
-    query = query.order('created_at', { ascending: false }).range(from, to);
+    query = query
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(from, to);
 
     const { data: charges, error, count } = await query;
 
@@ -231,17 +237,20 @@ export async function GET(request: NextRequest) {
 
     // Aplicar os mesmos filtros temporais na agregação
     if (dataInicioParam && dataFimParam) {
-      summaryQuery = summaryQuery.gte('created_at', `${dataInicioParam}T00:00:00.000Z`).lte('created_at', `${dataFimParam}T23:59:59.999Z`);
+      summaryQuery = summaryQuery.gte('created_at', `${dataInicioParam}T00:00:00.000-03:00`).lte('created_at', `${dataFimParam}T23:59:59.999-03:00`);
     } else if (dataInicioParam) {
-      summaryQuery = summaryQuery.gte('created_at', `${dataInicioParam}T00:00:00.000Z`);
+      summaryQuery = summaryQuery.gte('created_at', `${dataInicioParam}T00:00:00.000-03:00`);
     } else if (dataFimParam) {
-      summaryQuery = summaryQuery.lte('created_at', `${dataFimParam}T23:59:59.999Z`);
+      summaryQuery = summaryQuery.lte('created_at', `${dataFimParam}T23:59:59.999-03:00`);
     } else if (mesParam && /^\d{4}-\d{2}$/.test(mesParam)) {
       const [anoStr, mesStr] = mesParam.split('-');
       const ano = parseInt(anoStr, 10);
       const mes = parseInt(mesStr, 10);
-      const startIso = new Date(ano, mes - 1, 1).toISOString();
-      const endIso = new Date(ano, mes, 0, 23, 59, 59, 999).toISOString();
+      const startIso = new Date(`${anoStr}-${mesStr}-01T00:00:00.000-03:00`).toISOString();
+      const nextYear = mes === 12 ? ano + 1 : ano;
+      const nextMonth = mes === 12 ? 1 : mes + 1;
+      const nextMonthStr = String(nextMonth).padStart(2, '0');
+      const endIso = new Date(new Date(`${nextYear}-${nextMonthStr}-01T00:00:00.000-03:00`).getTime() - 1).toISOString();
       summaryQuery = summaryQuery.gte('created_at', startIso).lte('created_at', endIso);
     }
 
