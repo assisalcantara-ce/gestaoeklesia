@@ -142,6 +142,7 @@ export default function MembrosPage() {
     cancelarReativar,
     abrirNovoCadastro,
     abrirEdicao,
+    abrirEdicaoPorId,
     abrirDocumentosMembro,
     abrirConfirmacaoDeletar,
     fecharFormulario,
@@ -498,6 +499,8 @@ export default function MembrosPage() {
                 isDizimista={isDizimista}
                 setIsDizimista={setIsDizimista}
                 isAdmin={isAdmin}
+                onAbrirMembro={abrirEdicaoPorId}
+                recarregarMembros={recarregarMembros}
               />
             </div>
           )}

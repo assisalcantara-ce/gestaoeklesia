@@ -858,6 +858,30 @@ export function useMembros() {
     setActiveTab('dados');
   };
 
+  const abrirEdicaoPorId = async (id: string) => {
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) return;
+
+      const res = await fetch(`/api/v1/members/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) return;
+      const member = await res.json();
+      if (!member || !member.id) return;
+
+      const membroFormatado = memberToMembro(member);
+      abrirEdicao(membroFormatado);
+    } catch (err) {
+      console.warn('Erro ao abrir edição de membro por ID:', err);
+    }
+  };
+
   const abrirConfirmacaoDeletar = (membro: Membro) => setMembroDeletando(membro);
   const cancelarDeletar = () => setMembroDeletando(null);
 
@@ -1614,6 +1638,7 @@ export function useMembros() {
     deletarMembro,
     abrirNovoCadastro,
     abrirEdicao,
+    abrirEdicaoPorId,
     abrirDocumentosMembro,
     abrirConfirmacaoDeletar,
     cancelarDeletar,

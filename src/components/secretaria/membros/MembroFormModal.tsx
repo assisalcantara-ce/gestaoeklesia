@@ -20,10 +20,14 @@ import {
   GraduationCap,
   Sparkles,
   ScrollText,
+  ExternalLink,
+  ShieldCheck,
+  Heart,
+  Baby,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase-client';
 import EditorFotoMinisterial from './EditorFotoMinisterial';
-import { formatCpf, formatCep, formatPhone } from '@/lib/mascaras';
+import { formatCpf, formatCep, formatPhone, validarCpf } from '@/lib/mascaras';
 
 export interface MembroFormModalProps {
   showForm: boolean;
@@ -61,6 +65,8 @@ export interface MembroFormModalProps {
   isDizimista: boolean;
   setIsDizimista: (val: boolean) => void;
   isAdmin?: boolean;
+  onAbrirMembro?: (id: string) => void;
+  recarregarMembros?: () => Promise<void>;
 }
 
 export default function MembroFormModal({
@@ -99,6 +105,8 @@ export default function MembroFormModal({
   isDizimista: _isDizimista,
   setIsDizimista: _setIsDizimista,
   isAdmin = false,
+  onAbrirMembro,
+  recarregarMembros,
 }: MembroFormModalProps) {
   const [editandoMatricula, setEditandoMatricula] = React.useState(false);
   const [buscandoConjuge, setBuscandoConjuge] = React.useState(false);
@@ -114,6 +122,10 @@ export default function MembroFormModal({
   const [novoFilhoNome, setNovoFilhoNome] = React.useState('');
   const [novoFilhoNascimento, setNovoFilhoNascimento] = React.useState('');
   const [novoFilhoSexo, setNovoFilhoSexo] = React.useState('MASCULINO');
+  const [novoFilhoCpf, setNovoFilhoCpf] = React.useState('');
+  const [novoFilhoTelefone, setNovoFilhoTelefone] = React.useState('');
+  const [novoFilhoEmail, setNovoFilhoEmail] = React.useState('');
+  const [novoFilhoCongregacaoId, setNovoFilhoCongregacaoId] = React.useState('');
   const [salvandoFilho, setSalvandoFilho] = React.useState(false);
   const [filhoErro, setFilhoErro] = React.useState<string | null>(null);
 
@@ -324,10 +336,34 @@ export default function MembroFormModal({
     setFilhoErro(null);
   };
 
-  // Cadastrar novo filho de forma simplificada usando a API oficial
+  // Cadastrar novo filho de forma ampliada usando a API oficial de membros
   const handleCadastrarNovoFilho = async () => {
     if (!novoFilhoNome.trim()) {
-      setFilhoErro('O nome do filho(a) é obrigatório.');
+      setFilhoErro('O nome completo do filho(a) é obrigatório.');
+      return;
+    }
+
+    if (!novoFilhoNascimento) {
+      setFilhoErro('A data de nascimento é obrigatória.');
+      return;
+    }
+
+    if (!novoFilhoSexo) {
+      setFilhoErro('O sexo é obrigatório.');
+      return;
+    }
+
+    const cleanCpf = novoFilhoCpf.replace(/\D/g, '');
+    if (cleanCpf && cleanCpf.length > 0) {
+      if (cleanCpf.length !== 11 || !validarCpf(cleanCpf)) {
+        setFilhoErro('O CPF informado para o filho(a) é inválido.');
+        return;
+      }
+    }
+
+    const cleanEmail = novoFilhoEmail.trim().toLowerCase();
+    if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setFilhoErro('O e-mail informado para o filho(a) é inválido.');
       return;
     }
 
@@ -340,6 +376,28 @@ export default function MembroFormModal({
       const token = session?.access_token;
       if (!token) throw new Error('Não autenticado');
 
+      // Verificação preventiva de duplicidade de CPF se informado
+      if (cleanCpf) {
+        const { data: existingCpf } = await supabase
+          .from('members')
+          .select('id, name')
+          .eq('cpf', cleanCpf)
+          .maybeSingle();
+
+        if (existingCpf) {
+          throw new Error(`Já existe um cadastro com este CPF (${existingCpf.name}). Utilize a opção "Vincular Existente".`);
+        }
+      }
+
+      // Resolver congregação: selecionada no modal ou herdada do responsável
+      const congregacaoFinalId =
+        novoFilhoCongregacaoId ||
+        (congregacoesOptions || []).find((c) => c.nome === dadosPessoais.supervisao || c.nome === dadosPessoais.congregacao)?.id ||
+        membroEditando?.congregacao_id ||
+        null;
+
+      const cleanPhone = novoFilhoTelefone.replace(/\D/g, '');
+
       // Chamada à API oficial POST /api/v1/members
       const res = await fetch('/api/v1/members', {
         method: 'POST',
@@ -349,13 +407,19 @@ export default function MembroFormModal({
         },
         body: JSON.stringify({
           name: novoFilhoNome.trim().toUpperCase(),
-          data_nascimento: novoFilhoNascimento || null,
+          data_nascimento: novoFilhoNascimento,
           sexo: novoFilhoSexo || 'MASCULINO',
+          cpf: cleanCpf || null,
+          celular: cleanPhone || null,
+          whatsapp: cleanPhone || null,
+          phone: cleanPhone || null,
+          email: cleanEmail || null,
+          congregacao_id: congregacaoFinalId,
           role: 'crianca',
           tipo_cadastro: 'crianca',
           status: 'active',
-          nome_pai: dadosPessoais.sexo === 'MASCULINO' ? dadosPessoais.nome : dadosPessoais.nomePai || null,
-          nome_mae: dadosPessoais.sexo === 'FEMININO' ? dadosPessoais.nome : dadosPessoais.nomeMae || null,
+          nome_pai: dadosPessoais.sexo === 'MASCULINO' ? (dadosPessoais.nome || membroEditando?.nome) : dadosPessoais.nomePai || null,
+          nome_mae: dadosPessoais.sexo === 'FEMININO' ? (dadosPessoais.nome || membroEditando?.nome) : dadosPessoais.nomeMae || null,
         }),
       });
 
@@ -406,9 +470,19 @@ export default function MembroFormModal({
         }
       }
 
+      // Atualizar lista geral de membros em segundo plano
+      if (recarregarMembros) {
+        void recarregarMembros();
+      }
+
       setShowModalFilho(false);
       setNovoFilhoNome('');
       setNovoFilhoNascimento('');
+      setNovoFilhoSexo('MASCULINO');
+      setNovoFilhoCpf('');
+      setNovoFilhoTelefone('');
+      setNovoFilhoEmail('');
+      setNovoFilhoCongregacaoId('');
       setFilhoErro(null);
     } catch (err: any) {
       console.error('Erro ao cadastrar novo filho:', err);
@@ -1781,66 +1855,85 @@ export default function MembroFormModal({
           {/* ═══════════ ABA: FAMÍLIA ═══════════ */}
           {activeTab === 'familia' && (
             <div className="space-y-6">
-              <div className="flex items-center gap-2 pb-2 border-b border-slate-100 text-slate-800">
-                <Users className="w-4 h-4 text-teal-600" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Composição Familiar</h3>
-              </div>
-
-              {/* Informações de Filiação e Cônjuge (Sincronizadas com o cadastro) */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Pai */}
-                <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">Pai</label>
-                    <span className="text-[11px] text-slate-400">Filiação</span>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200/80">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200/80 flex items-center justify-center font-bold">
+                    <Users className="w-4 h-4 text-emerald-700" />
                   </div>
-                  <input
-                    type="text"
-                    placeholder="Nome completo do pai"
-                    value={dadosPessoais.nomePai || ''}
-                    onChange={(e) => setDadosPessoais((prev: any) => ({ ...prev, nomePai: e.target.value }))}
-                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
-                  />
-                </div>
-
-                {/* Mãe */}
-                <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">Mãe</label>
-                    <span className="text-[11px] text-slate-400">Filiação</span>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800">Núcleo Familiar</h3>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      Organização familiar do membro: responsável, cônjuge e filhos cadastrados
+                    </p>
                   </div>
-                  <input
-                    type="text"
-                    placeholder="Nome completo da mãe"
-                    value={dadosPessoais.nomeMae || ''}
-                    onChange={(e) => setDadosPessoais((prev: any) => ({ ...prev, nomeMae: e.target.value }))}
-                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
-                  />
                 </div>
               </div>
 
-              {/* Cônjuge */}
-              <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+              {/* 1. BLOCO RESPONSÁVEL (MINISTRO / TITULAR) */}
+              <div className="bg-slate-50/70 border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs">
+                <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/70">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Cônjuge</span>
+                    <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      Responsável / Titular
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                    {dadosPessoais.tipoCadastro ? String(dadosPessoais.tipoCadastro).toUpperCase() : 'CADASTRO'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                  <div>
+                    <span className="text-slate-400 block text-[11px] font-medium">Nome</span>
+                    <span className="font-bold text-slate-900 text-sm">
+                      {dadosPessoais.nome || membroEditando?.nome || 'Não informado'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[11px] font-medium">Matrícula</span>
+                    <span className="font-mono font-semibold text-slate-700">
+                      {dadosPessoais.matricula || membroEditando?.matricula || 'Gerada ao salvar'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[11px] font-medium">CPF</span>
+                    <span className="font-mono text-slate-700">
+                      {dadosPessoais.cpf || 'Não informado'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[11px] font-medium">Congregação</span>
+                    <span className="font-medium text-slate-800">
+                      {dadosPessoais.supervisao || dadosPessoais.congregacao || 'Sede'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. BLOCO CÔNJUGE */}
+              <div className="bg-slate-50/70 border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200/70">
+                  <div className="flex items-center gap-2">
+                    <Heart className="w-4 h-4 text-emerald-700" />
+                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Cônjuge</span>
                     {dadosPessoais.estadoCivil !== 'casado' && (
-                      <span className="text-[11px] text-amber-600 font-medium bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                      <span className="text-[11px] text-amber-700 font-medium bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
                         Estado Civil: {dadosPessoais.estadoCivil ? dadosPessoais.estadoCivil.replace('_', ' ') : 'Não informado'}
                       </span>
                     )}
                   </div>
                   {buscandoConjuge && (
-                    <span className="text-xs text-teal-700 flex items-center gap-1.5 font-medium">
-                      <Loader2 className="animate-spin h-3.5 w-3.5 text-teal-600" />
+                    <span className="text-xs text-emerald-800 flex items-center gap-1.5 font-medium">
+                      <Loader2 className="animate-spin h-3.5 w-3.5 text-emerald-700" />
                       Buscando na base...
                     </span>
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">CPF do Cônjuge</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">CPF do Cônjuge</label>
                     <div className="relative">
                       <input
                         type="text"
@@ -1848,49 +1941,62 @@ export default function MembroFormModal({
                         value={formatCpf(dadosPessoais.cpfConjuge || '')}
                         onChange={(e) => handleCpfConjugeChange(e.target.value)}
                         maxLength={14}
-                        className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition pr-8"
+                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition pr-9 shadow-2xs"
                       />
                       <button
                         type="button"
                         onClick={() => buscarConjugePorCpf(dadosPessoais.cpfConjuge || '')}
-                        title="Buscar cônjuge na base"
-                        className="absolute right-2 top-2 p-1 text-slate-400 hover:text-teal-700 transition"
+                        title="Buscar cônjuge na base de membros"
+                        className="absolute right-2.5 top-2.5 p-1 text-slate-400 hover:text-emerald-700 transition cursor-pointer"
                       >
-                        <Search className="w-3.5 h-3.5" />
+                        <Search className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Nome do Cônjuge</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">Nome do Cônjuge</label>
                     <input
                       type="text"
                       placeholder="Nome completo do cônjuge"
                       value={dadosPessoais.nomeConjuge || ''}
                       onChange={(e) => setDadosPessoais((prev: any) => ({ ...prev, nomeConjuge: e.target.value }))}
-                      className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition shadow-2xs"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Data de Nascimento</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">Data de Nascimento</label>
                     <input
                       type="date"
                       value={dadosPessoais.dataNascimentoConjuge || ''}
                       onChange={(e) => setDadosPessoais((prev: any) => ({ ...prev, dataNascimentoConjuge: e.target.value }))}
-                      className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition shadow-2xs"
                     />
                   </div>
                 </div>
+
+                {conjugeMsg && (
+                  <div
+                    className={`text-xs font-medium px-3.5 py-2 rounded-xl border transition-all ${
+                      conjugeMsg.tipo === 'sucesso'
+                        ? 'text-emerald-800 bg-emerald-50 border-emerald-200'
+                        : 'text-amber-800 bg-amber-50 border-amber-200'
+                    }`}
+                  >
+                    {conjugeMsg.texto}
+                  </div>
+                )}
               </div>
 
-              {/* Seção Filhos */}
-              <div className="space-y-3 pt-2">
-                <div className="flex items-center justify-between">
+              {/* 3. BLOCO FILHOS */}
+              <div className="bg-slate-50/70 border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200/70">
                   <div className="flex items-center gap-2">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">Filhos</h4>
-                    <span className="text-[11px] text-slate-400">
-                      ({((dadosPessoais as any).filhos || []).length})
+                    <Baby className="w-4 h-4 text-emerald-700" />
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">Filhos</h4>
+                    <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                      {((dadosPessoais as any).filhos || []).length}
                     </span>
                   </div>
                   <button
@@ -1902,10 +2008,18 @@ export default function MembroFormModal({
                       setNovoFilhoNome('');
                       setNovoFilhoNascimento('');
                       setNovoFilhoSexo('MASCULINO');
+                      setNovoFilhoCpf('');
+                      setNovoFilhoTelefone('');
+                      setNovoFilhoEmail('');
+                      setNovoFilhoCongregacaoId(
+                        (congregacoesOptions || []).find((c) => c.nome === dadosPessoais.supervisao || c.nome === dadosPessoais.congregacao)?.id ||
+                        membroEditando?.congregacao_id ||
+                        ''
+                      );
                       setFilhoErro(null);
                       setShowModalFilho(true);
                     }}
-                    className="px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
                   >
                     <span>+</span>
                     <span>Adicionar Filho</span>
@@ -1913,76 +2027,90 @@ export default function MembroFormModal({
                 </div>
 
                 {!((dadosPessoais as any).filhos) || (dadosPessoais as any).filhos.length === 0 ? (
-                  <div className="text-center py-6 text-slate-400 text-xs bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                    Nenhum filho adicionado ao registro familiar.
+                  <div className="text-center py-8 text-slate-400 text-xs bg-white rounded-xl border border-dashed border-slate-200">
+                    Nenhum filho vinculado ou cadastrado neste registro familiar.
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2.5">
                     {(dadosPessoais as any).filhos.map((filho: any, idx: number) => (
                       <div
                         key={idx}
-                        className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 bg-white border border-slate-200 rounded-xl shadow-2xs hover:border-slate-300 transition"
+                        className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 bg-white border border-slate-200 rounded-xl shadow-2xs hover:border-emerald-300 transition"
                       >
-                        <div className="flex-1 w-full sm:w-auto">
-                          <div className="flex items-center gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
                             <span className="text-xs font-bold text-slate-900">{filho.nome}</span>
                             {filho.matricula && (
-                              <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 font-mono">
+                              <span className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200 font-mono font-medium">
                                 Matr. {filho.matricula}
                               </span>
                             )}
                             {filho.memberId ? (
-                              <span className="text-[10px] bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded border border-teal-200 font-medium">
-                                Vinculado à base
+                              <span className="text-[10px] bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200 font-semibold">
+                                Vinculado à base oficial
                               </span>
                             ) : (
-                              <span className="text-[10px] bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">
+                              <span className="text-[10px] bg-slate-50 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">
                                 Registro direto
                               </span>
                             )}
                           </div>
-                          <div className="text-[11px] text-slate-500 mt-0.5">
+                          <div className="text-[11px] text-slate-500 mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
                             {filho.dataNascimento ? (
-                              <span>Nascimento: {filho.dataNascimento.split('-').reverse().join('/')}</span>
+                              <span>Nascimento: <strong>{filho.dataNascimento.split('-').reverse().join('/')}</strong></span>
                             ) : (
                               <span>Nascimento não informado</span>
                             )}
                           </div>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const filhoParaRemover = ((dadosPessoais as any).filhos || [])[idx];
-                            const lista = ((dadosPessoais as any).filhos || []).filter((_: any, i: number) => i !== idx);
-                            setDadosPessoais((prev: any) => ({ ...prev, filhos: lista }));
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                          {filho.memberId && onAbrirMembro && (
+                            <button
+                              type="button"
+                              onClick={() => onAbrirMembro(filho.memberId)}
+                              className="px-2.5 py-1 text-xs text-emerald-800 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100/70 border border-emerald-200 rounded-lg transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                              title="Abrir ficha completa deste membro"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                              <span>Ver Ficha</span>
+                            </button>
+                          )}
 
-                            // Se estiver editando um membro existente, remover também na API oficial de família
-                            if (membroEditando?.id && (filhoParaRemover?.id || filhoParaRemover?.memberId)) {
-                              try {
-                                const relId = filhoParaRemover.id || filhoParaRemover.memberId;
-                                const supabase = createClient();
-                                const { data: { session } } = await supabase.auth.getSession();
-                                const token = session?.access_token;
-                                if (token) {
-                                  await fetch(`/api/v1/members/${membroEditando.id}/familia/${relId}`, {
-                                    method: 'DELETE',
-                                    headers: {
-                                      Authorization: `Bearer ${token}`,
-                                    },
-                                  });
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const filhoParaRemover = ((dadosPessoais as any).filhos || [])[idx];
+                              const lista = ((dadosPessoais as any).filhos || []).filter((_: any, i: number) => i !== idx);
+                              setDadosPessoais((prev: any) => ({ ...prev, filhos: lista }));
+
+                              // Se estiver editando um membro existente, remover também na API oficial de família
+                              if (membroEditando?.id && (filhoParaRemover?.id || filhoParaRemover?.memberId)) {
+                                try {
+                                  const relId = filhoParaRemover.id || filhoParaRemover.memberId;
+                                  const supabase = createClient();
+                                  const { data: { session } } = await supabase.auth.getSession();
+                                  const token = session?.access_token;
+                                  if (token) {
+                                    await fetch(`/api/v1/members/${membroEditando.id}/familia/${relId}`, {
+                                      method: 'DELETE',
+                                      headers: {
+                                        Authorization: `Bearer ${token}`,
+                                      },
+                                    });
+                                  }
+                                } catch (delErr) {
+                                  console.warn('Remoção imediata na API de família falhou (será salva com o formulário):', delErr);
                                 }
-                              } catch (delErr) {
-                                console.warn('Remoção imediata na API de família falhou (será salva com o formulário):', delErr);
                               }
-                            }
-                          }}
-                          className="px-2.5 py-1 text-xs text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded-lg hover:bg-red-50 transition cursor-pointer flex items-center gap-1 shrink-0"
-                          title="Desvincular filho (não exclui o cadastro da pessoa)"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                          <span>Desvincular</span>
-                        </button>
+                            }}
+                            className="px-2.5 py-1 text-xs text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded-lg hover:bg-red-50 transition cursor-pointer flex items-center gap-1 shrink-0"
+                            title="Desvincular filho (não exclui o cadastro da pessoa)"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            <span>Desvincular</span>
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -2138,38 +2266,42 @@ export default function MembroFormModal({
                   )}
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-3.5">
+                  {/* Nome Completo */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Nome Completo <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
-                      placeholder="Nome do filho(a)"
+                      placeholder="Nome completo do filho(a)"
                       value={novoFilhoNome}
                       onChange={(e) => setNovoFilhoNome(e.target.value)}
-                      className="w-full px-3.5 py-2.5 text-xs font-medium border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600"
+                      className="w-full px-3.5 py-2 text-xs font-medium border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 shadow-2xs"
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  {/* Nascimento e Sexo */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                        Data de Nascimento
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Data de Nascimento <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="date"
                         value={novoFilhoNascimento}
                         onChange={(e) => setNovoFilhoNascimento(e.target.value)}
-                        className="w-full px-3.5 py-2.5 text-xs font-medium border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600"
+                        className="w-full px-3.5 py-2 text-xs font-medium border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">Sexo</label>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Sexo <span className="text-red-500">*</span>
+                      </label>
                       <select
                         value={novoFilhoSexo}
                         onChange={(e) => setNovoFilhoSexo(e.target.value)}
-                        className="w-full px-3.5 py-2.5 text-xs font-medium border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 bg-white cursor-pointer"
+                        className="w-full px-3.5 py-2 text-xs font-medium border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 bg-white cursor-pointer shadow-2xs"
                       >
                         <option value="MASCULINO">Masculino</option>
                         <option value="FEMININO">Feminino</option>
@@ -2177,8 +2309,71 @@ export default function MembroFormModal({
                     </div>
                   </div>
 
+                  {/* CPF e Telefone (Opcionais) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        CPF <span className="text-[10px] text-slate-400 font-normal">(opcional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="000.000.000-00"
+                        value={formatCpf(novoFilhoCpf)}
+                        onChange={(e) => setNovoFilhoCpf(formatCpf(e.target.value))}
+                        maxLength={14}
+                        className="w-full px-3.5 py-2 text-xs font-medium border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 shadow-2xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Telefone / WhatsApp <span className="text-[10px] text-slate-400 font-normal">(opcional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="(00) 00000-0000"
+                        value={formatPhone(novoFilhoTelefone)}
+                        onChange={(e) => setNovoFilhoTelefone(formatPhone(e.target.value))}
+                        maxLength={15}
+                        className="w-full px-3.5 py-2 text-xs font-medium border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 shadow-2xs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* E-mail e Congregação */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        E-mail <span className="text-[10px] text-slate-400 font-normal">(opcional)</span>
+                      </label>
+                      <input
+                        type="email"
+                        placeholder="email@exemplo.com"
+                        value={novoFilhoEmail}
+                        onChange={(e) => setNovoFilhoEmail(e.target.value)}
+                        className="w-full px-3.5 py-2 text-xs font-medium border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 shadow-2xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Congregação
+                      </label>
+                      <select
+                        value={novoFilhoCongregacaoId}
+                        onChange={(e) => setNovoFilhoCongregacaoId(e.target.value)}
+                        className="w-full px-3.5 py-2 text-xs font-medium border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 bg-white cursor-pointer shadow-2xs"
+                      >
+                        <option value="">(Herdar da congregação do responsável)</option>
+                        {(congregacoesOptions || []).map((cg) => (
+                          <option key={cg.id} value={cg.id}>
+                            {cg.nome}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
                   <p className="text-[11px] text-slate-500 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                    O filho será adicionado ao cadastro com o vínculo de filiação estabelecido e sincronizado com a base de pessoas do ministério.
+                    O filho(a) será registrado na base oficial como <strong>Criança</strong> (sem atribuição indevida de membro batizado ou ministro), com vínculo de filiação automático ao titular.
                   </p>
                 </div>
               )}
@@ -2188,7 +2383,7 @@ export default function MembroFormModal({
               <button
                 type="button"
                 onClick={() => setShowModalFilho(false)}
-                className="px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200/60 rounded-xl transition"
+                className="px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200/60 rounded-xl transition cursor-pointer"
               >
                 Cancelar
               </button>
@@ -2197,7 +2392,7 @@ export default function MembroFormModal({
                   type="button"
                   onClick={handleCadastrarNovoFilho}
                   disabled={salvandoFilho}
-                  className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm disabled:opacity-60 cursor-pointer"
+                  className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm disabled:opacity-60 cursor-pointer"
                 >
                   {salvandoFilho ? (
                     <>
