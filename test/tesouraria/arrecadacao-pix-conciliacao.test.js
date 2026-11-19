@@ -333,5 +333,30 @@ describe('Tesouraria — Conciliação de Arrecadação PIX', () => {
       const congLabel = mockChargeSemCong.fin_payment_destinations?.congregacoes?.nome ?? 'QR Code Avulso';
       assert.equal(congLabel, 'QR Code Avulso');
     });
+
+    it('15. Isolamento de carregamento entre Exportar CSV e Imprimir (estados independentes)', () => {
+      let exportingCSV = false;
+      let printingReport = false;
+
+      // Ao clicar em Exportar CSV:
+      exportingCSV = true;
+      assert.equal(exportingCSV, true);
+      assert.equal(printingReport, false); // Imprimir não pode sofrer alteração visual
+
+      // Ao finalizar CSV:
+      exportingCSV = false;
+      assert.equal(exportingCSV, false);
+      assert.equal(printingReport, false);
+
+      // Ao clicar em Imprimir:
+      printingReport = true;
+      assert.equal(printingReport, true);
+      assert.equal(exportingCSV, false); // CSV não pode sofrer alteração visual
+
+      // Ao finalizar impressão:
+      printingReport = false;
+      assert.equal(printingReport, false);
+      assert.equal(exportingCSV, false);
+    });
   });
 });

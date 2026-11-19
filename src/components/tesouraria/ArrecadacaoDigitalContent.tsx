@@ -251,7 +251,8 @@ export default function ArrecadacaoDigitalContent({
   const extratoPageSize = 25;
   const [extratoTotalCount, setExtratoTotalCount] = useState(0);
   const [extratoTotalPages, setExtratoTotalPages] = useState(1);
-  const [exportingReport, setExportingReport] = useState(false);
+  const [exportingCSV, setExportingCSV] = useState(false);
+  const [printingReport, setPrintingReport] = useState(false);
   const [reportDataToPrint, setReportDataToPrint] = useState<FinCobrancaCharge[] | null>(null);
 
   const handleStatusFiltroChange = (novoStatus: 'ativo' | 'inativo') => {
@@ -639,8 +640,9 @@ export default function ArrecadacaoDigitalContent({
 
   // Exportar Extrato para CSV (com recuperação integral sem truncamento)
   const handleExportarExtratoCSV = async () => {
+    if (exportingCSV) return;
     try {
-      setExportingReport(true);
+      setExportingCSV(true);
       const dataset = await fetchAllFilteredCobrancas();
       const datasetFiltrado = dataset.filter((c) => {
         if (extratoTipoMovimento === 'saidas') return false;
@@ -708,14 +710,15 @@ export default function ArrecadacaoDigitalContent({
     } catch (err: any) {
       showModal('Erro na Exportação', err.message || 'Falha ao recuperar dados completos para CSV.', 'error');
     } finally {
-      setExportingReport(false);
+      setExportingCSV(false);
     }
   };
 
   // Impressão com recuperação integral dos dados filtrados
   const handleImprimirExtrato = async () => {
+    if (printingReport) return;
     try {
-      setExportingReport(true);
+      setPrintingReport(true);
       const dataset = await fetchAllFilteredCobrancas();
       const datasetFiltrado = dataset.filter((c) => {
         if (extratoTipoMovimento === 'saidas') return false;
@@ -748,11 +751,14 @@ export default function ArrecadacaoDigitalContent({
       setReportDataToPrint(datasetFiltrado);
       // Timeout para permitir a renderização do bloco print-only antes do diálogo do navegador
       setTimeout(() => {
-        window.print();
-        setExportingReport(false);
+        try {
+          window.print();
+        } finally {
+          setPrintingReport(false);
+        }
       }, 300);
     } catch (err: any) {
-      setExportingReport(false);
+      setPrintingReport(false);
       showModal('Erro na Impressão', err.message || 'Falha ao preparar dados completos para impressão.', 'error');
     }
   };
@@ -1417,11 +1423,11 @@ export default function ArrecadacaoDigitalContent({
 
             <div className="flex items-center gap-2.5 self-end xl:self-end shrink-0">
               <button
-                disabled={exportingReport || loadingCobrancas}
+                disabled={exportingCSV || loadingCobrancas}
                 onClick={handleExportarExtratoCSV}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-slate-300 bg-white text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-50 hover:text-slate-900 transition h-[38px] cursor-pointer shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {exportingReport ? (
+                {exportingCSV ? (
                   <Loader2 className="h-4 w-4 text-slate-500 animate-spin" />
                 ) : (
                   <FileSpreadsheet className="h-4 w-4 text-slate-500" />
@@ -1429,11 +1435,11 @@ export default function ArrecadacaoDigitalContent({
                 Exportar CSV
               </button>
               <button
-                disabled={exportingReport || loadingCobrancas}
+                disabled={printingReport || loadingCobrancas}
                 onClick={handleImprimirExtrato}
                 className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-sm font-bold transition h-[38px] cursor-pointer shadow-xs border border-teal-800 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {exportingReport ? (
+                {printingReport ? (
                   <Loader2 className="h-4 w-4 text-teal-100 animate-spin" />
                 ) : (
                   <Printer className="h-4 w-4 text-teal-100" />
