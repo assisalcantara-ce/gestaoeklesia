@@ -1,5 +1,4 @@
 import { resolveTenantAuth } from '@/lib/tenant-auth';
-import { authTenantErrorResponse } from '@/lib/api-errors';
 import { temAcessoEscrita } from '@/lib/access-control';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -7,16 +6,22 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/v1/members/[id]/familia
  * Lista os vínculos familiares (filhos/dependentes) do membro
  */
-export async function GET(request: NextRequest, context: RouteContext) {
+export async function GET(request: NextRequest, context: RouteContext): Promise<NextResponse> {
   let ctx: Awaited<ReturnType<typeof resolveTenantAuth>>;
   try {
     ctx = await resolveTenantAuth(request);
   } catch (err: any) {
-    return authTenantErrorResponse(err);
+    const isUnauth = err?.message === 'UNAUTHORIZED';
+    return NextResponse.json(
+      { error: isUnauth ? 'Não autenticado.' : 'Acesso negado: sem ministério associado.' },
+      { status: isUnauth ? 401 : 403 }
+    );
   }
 
   const { id: memberId } = await context.params;
@@ -84,12 +89,16 @@ export async function GET(request: NextRequest, context: RouteContext) {
  * POST /api/v1/members/[id]/familia
  * Cria ou vincula um filho/dependente
  */
-export async function POST(request: NextRequest, context: RouteContext) {
+export async function POST(request: NextRequest, context: RouteContext): Promise<NextResponse> {
   let ctx: Awaited<ReturnType<typeof resolveTenantAuth>>;
   try {
     ctx = await resolveTenantAuth(request);
   } catch (err: any) {
-    return authTenantErrorResponse(err);
+    const isUnauth = err?.message === 'UNAUTHORIZED';
+    return NextResponse.json(
+      { error: isUnauth ? 'Não autenticado.' : 'Acesso negado: sem ministério associado.' },
+      { status: isUnauth ? 401 : 403 }
+    );
   }
 
   if (!temAcessoEscrita(ctx.nivel, 'secretaria') && ctx.nivel !== 'administrador') {
