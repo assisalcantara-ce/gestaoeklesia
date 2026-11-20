@@ -67,6 +67,7 @@ const PATH_TO_MENU_ID: { path: string; id: string }[] = [
   { path: '/secretaria/relatorios',            id: 'relatorios-secretaria'},
   { path: '/secretaria/cartas',                id: 'cartas'               },
   { path: '/secretaria/membros',               id: 'membros'              },
+  { path: '/secretaria/pre-cadastro',          id: 'pre-cadastro'         },
   { path: '/secretaria/dirigentes',            id: 'dirigentes'           },
   { path: '/presidencia/prestacao-contas-oficial', id: 'prestacao-contas-oficial' },
   { path: '/presidencia/prestacao-contas',         id: 'prestacao-contas'         },
@@ -233,6 +234,7 @@ export default function Sidebar() {
       submenu: [
         { id: 'estrutura-hierarquica', label: 'Estrutura Hierárquica', path: '/secretaria/estrutura-hierarquica', modulo: 'gestao' },
         { id: 'membros', label: 'Membros', path: '/secretaria/membros' },
+        { id: 'pre-cadastro', label: 'Pré-cadastros', path: '/secretaria/pre-cadastro', modulo: 'secretaria' },
         { id: 'escala-pregadores', label: 'Escala de Pregadores', path: '/secretaria/escala-pregadores', modulo: 'secretaria_local' },
         { id: 'dirigentes', label: 'Dirigentes', path: '/secretaria/dirigentes', modulo: 'gestao' },
         { id: 'departamentos', label: 'Departamentos', path: '/secretaria/departamentos', modulo: 'secretaria_local' },

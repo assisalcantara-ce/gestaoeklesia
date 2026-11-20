@@ -1,26 +1,30 @@
 /**
- * API ROUTE PÚBLICA: Criar / Atualizar Membro no Cadastro Público
+ * API ROUTE PÚBLICA: Solicitação de Cadastro / Atualização de Membro no Link Público
  * POST /api/v1/public/members/save
  *
- * Funcionalidade:
- * - Recebe `institution` (id ou slug do ministério) e o `cpf`.
+ * Funcionalidade Segura (Lote 2 - Fundação de Pré-cadastro):
+ * - Recebe `institution` (id ou slug do ministério), `congregacao_id` e o `cpf`.
  * - Valida a existência e o status da instituição.
  * - Valida e limpa o CPF (deve possuir 11 dígitos numéricos).
+ * - Valida campos obrigatórios (`name`, `nome_pai`, `nome_mae`).
+ * - Valida e resolve `congregacao_id` e `campo_id` no servidor garantindo pertencimento ao mesmo ministério.
+ * - Proteção de Integridade:
+ *     - NUNCA grava diretamente na tabela `members`.
+ *     - NUNCA aloca matrícula oficial de membro antecipadamente.
+ *     - NUNCA ativa carteirinha de membro de forma automática.
  * - Se o CPF NÃO EXISTIR no ministério:
- *     - Cria um NOVO membro (`insert`).
- *     - Exige o campo `name`.
- *     - Define os campos default seguros: `tipo_cadastro = 'membro'`, `status = 'active'`.
- * - Se o CPF JÁ EXISTIR no ministério:
- *     - Atualiza APENAS os campos públicos permitidos (`update`).
- *     - IGNORA e NUNCA PERMITE alterar: `name`, `cpf`, `ministry_id`, `id`, `tipo_cadastro`, `status`, `role`, dados ministeriais, notas ou cargos.
- * - Aplica a normalização de textos em caixa alta (uppercase-normalizer) em conformidade com o padrão da aplicação.
+ *     - Grava solicitação em `member_pre_registrations` com `tipo_solicitacao = 'novo_cadastro'` e `status = 'pendente'`.
+ *     - Se já houver um pré-cadastro 'pendente' com este CPF, atualiza a solicitação pendente existente.
+ * - Se o CPF JÁ PERTENCER a um membro oficial da instituição:
+ *     - NUNCA sobrescreve a ficha oficial em `members`.
+ *     - Grava solicitação em `member_pre_registrations` com `tipo_solicitacao = 'atualizacao'`, `existing_member_id` vinculado e `status = 'pendente'`.
+ * - Aplica a normalização de textos em caixa alta (uppercase-normalizer).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
 import { normalizePayloadToUppercase } from '@/lib/uppercase-normalizer';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { MemberMatriculaService } from '@/lib/services/member-matricula-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -206,16 +210,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // ── 7. Buscar se o membro já existe no ministério ──────────────────────────
-  const formattedCpf = `${cleanCpf.slice(0, 3)}.${cleanCpf.slice(3, 6)}.${cleanCpf.slice(6, 9)}-${cleanCpf.slice(9)}`;
-
-  const { data: existingMember } = await admin
-    .from('members')
-    .select('id, name, cpf, custom_fields')
-    .eq('ministry_id', ministryId)
-    .or(`cpf.eq.${cleanCpf},cpf.eq.${formattedCpf}`)
-    .maybeSingle();
-
   // Helper para sanitizar valores: converte string vazia em null
   const cleanVal = (val: any) => {
     if (val === undefined || val === null) return null;
@@ -223,131 +217,58 @@ export async function POST(request: NextRequest) {
     return val;
   };
 
-  // ── 8. LÓGICA DE UPDATE (Membro já existente) ──────────────────────────────
-  if (existingMember) {
-    const existingCf = (existingMember.custom_fields && typeof existingMember.custom_fields === 'object')
-      ? existingMember.custom_fields
-      : {};
+  // ── 7. Determinar se já é membro oficial ou se é novo solicitante ────────
+  const formattedCpf = `${cleanCpf.slice(0, 3)}.${cleanCpf.slice(3, 6)}.${cleanCpf.slice(6, 9)}-${cleanCpf.slice(9)}`;
 
-    const updatedCf = {
-      ...existingCf,
-      supervisao: congregacaoNome || (existingCf as any).supervisao || '',
-      campo: campoNomeFinal || (existingCf as any).campo || '',
-      congregacao_id: congregacao_id.trim(),
-      ...(campoIdFinal ? { campo_id: campoIdFinal } : {}),
-    };
+  const { data: existingMember } = await admin
+    .from('members')
+    .select('id, name, cpf, status, matricula')
+    .eq('ministry_id', ministryId)
+    .or(`cpf.eq.${cleanCpf},cpf.eq.${formattedCpf}`)
+    .maybeSingle();
 
-    const updatePayload: Record<string, any> = {
-      congregacao_id: congregacao_id.trim(),
-      custom_fields: updatedCf,
-      nome_pai: normalizedBody.nome_pai.trim(),
-      nome_mae: normalizedBody.nome_mae.trim(),
-      rg: cleanVal(normalizedBody.rg),
-      data_batismo_aguas: cleanVal(normalizedBody.data_batismo_aguas),
-      email: typeof normalizedBody.email === 'string' && normalizedBody.email.trim() ? normalizedBody.email.toLowerCase().trim() : null,
-      phone: cleanVal(normalizedBody.phone),
-      celular: cleanVal(normalizedBody.celular),
-      whatsapp: cleanVal(normalizedBody.whatsapp),
-      data_nascimento: cleanVal(normalizedBody.data_nascimento),
-      sexo: cleanVal(normalizedBody.sexo),
-      estado_civil: cleanVal(normalizedBody.estado_civil),
-      nome_conjuge: cleanVal(normalizedBody.nome_conjuge),
-      cpf_conjuge: cleanVal(normalizedBody.cpf_conjuge),
-      data_nascimento_conjuge: cleanVal(normalizedBody.data_nascimento_conjuge),
-      profissao: cleanVal(normalizedBody.profissao),
-      cep: cleanVal(normalizedBody.cep),
-      logradouro: cleanVal(normalizedBody.logradouro),
-      numero: cleanVal(normalizedBody.numero),
-      bairro: cleanVal(normalizedBody.bairro),
-      complemento: cleanVal(normalizedBody.complemento),
-      cidade: cleanVal(normalizedBody.cidade),
-      estado: cleanVal(normalizedBody.estado),
-      escolaridade: cleanVal(normalizedBody.escolaridade),
-      nacionalidade: cleanVal(normalizedBody.nacionalidade),
-      naturalidade: cleanVal(normalizedBody.naturalidade),
-      uf_naturalidade: cleanVal(normalizedBody.uf_naturalidade),
-      ...(normalizedBody.foto_url ? { foto_url: cleanVal(normalizedBody.foto_url) } : {}),
-      updated_at: new Date().toISOString(),
-    };
-
-    const { error: updateErr } = await admin
-      .from('members')
-      .update(updatePayload)
-      .eq('id', existingMember.id)
-      .eq('ministry_id', ministryId);
-
-    if (updateErr) {
-      console.error('[POST /api/v1/public/members/save] Update error:', updateErr);
-      return NextResponse.json(
-        { error: updateErr.message || 'Erro ao atualizar dados cadastrais do membro.' },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      action: 'updated',
-      message: 'Cadastro atualizado com sucesso.',
-    });
-  }
-
-  // ── 9. LÓGICA DE INSERT (Novo membro) ──────────────────────────────────────
-  const planData = (ministry as any)?.subscription_plans;
-  const maxMembers: number = planData?.max_members ?? 0;
-
-  if (maxMembers > 0) {
-    const { count: totalMembers } = await admin
-      .from('members')
-      .select('id', { count: 'exact', head: true })
-      .eq('ministry_id', ministryId);
-
-    if ((totalMembers ?? 0) >= maxMembers) {
-      return NextResponse.json(
-        { error: 'O limite de cadastros desta instituição foi atingido. Entre em contato com a secretaria.' },
-        { status: 403 }
-      );
-    }
-  }
-
-  // Determinar classificação do cadastro
+  // Determinar classificação e cargo sugeridos
   const rawTipo = typeof body.tipo_cadastro === 'string' ? body.tipo_cadastro.toLowerCase().trim() : 'membro';
   const tipoCadastro = rawTipo === 'ministro' ? 'ministro' : 'membro';
-  const role = tipoCadastro;
   const cargoMinisterial = tipoCadastro === 'ministro' && typeof body.cargo_ministerial === 'string' && body.cargo_ministerial.trim()
     ? body.cargo_ministerial.toUpperCase().trim()
     : null;
 
-  const matricula = await MemberMatriculaService.alocarProximaMatricula(admin, ministryId);
-
-  const initialCustomFields: Record<string, any> = {
-    supervisao: congregacaoNome || '',
-    campo: campoNomeFinal || '',
-    congregacao_id: congregacao_id.trim(),
-    ...(campoIdFinal ? { campo_id: campoIdFinal } : {}),
+  // Metadados adicionais para auditoria da secretaria
+  const dadosAdicionais = {
+    congregacao_nome: congregacaoNome || null,
+    campo_nome: campoNomeFinal || null,
+    raw_submissao: {
+      origem_ip: request.headers.get('x-forwarded-for') || null,
+      submitted_at: new Date().toISOString(),
+    },
   };
 
-  const insertPayload: Record<string, any> = {
+  // Objeto base dos dados do pré-cadastro
+  const basePreRegData: Record<string, any> = {
     ministry_id: ministryId,
-    congregacao_id: congregacao_id.trim(),
-    custom_fields: initialCustomFields,
-    matricula: matricula,
     name: normalizedBody.name.trim(),
     cpf: cleanCpf,
-    nome_pai: normalizedBody.nome_pai.trim(),
-    nome_mae: normalizedBody.nome_mae.trim(),
     rg: cleanVal(normalizedBody.rg),
-    data_batismo_aguas: cleanVal(normalizedBody.data_batismo_aguas),
-    email: typeof normalizedBody.email === 'string' && normalizedBody.email.trim() ? normalizedBody.email.toLowerCase().trim() : null,
-    phone: cleanVal(normalizedBody.phone),
-    celular: cleanVal(normalizedBody.celular),
-    whatsapp: cleanVal(normalizedBody.whatsapp),
+    orgao_emissor: cleanVal(normalizedBody.orgao_emissor),
     data_nascimento: cleanVal(normalizedBody.data_nascimento),
     sexo: cleanVal(normalizedBody.sexo),
+    tipo_sanguineo: cleanVal(normalizedBody.tipo_sanguineo),
+    escolaridade: cleanVal(normalizedBody.escolaridade),
     estado_civil: cleanVal(normalizedBody.estado_civil),
+    nome_pai: normalizedBody.nome_pai.trim(),
+    nome_mae: normalizedBody.nome_mae.trim(),
     nome_conjuge: cleanVal(normalizedBody.nome_conjuge),
     cpf_conjuge: cleanVal(normalizedBody.cpf_conjuge),
     data_nascimento_conjuge: cleanVal(normalizedBody.data_nascimento_conjuge),
-    profissao: cleanVal(normalizedBody.profissao),
+    nacionalidade: cleanVal(normalizedBody.nacionalidade),
+    naturalidade: cleanVal(normalizedBody.naturalidade),
+    uf_naturalidade: cleanVal(normalizedBody.uf_naturalidade),
+    tipo_cadastro: tipoCadastro,
+    cargo_ministerial: cargoMinisterial,
+    data_batismo_aguas: cleanVal(normalizedBody.data_batismo_aguas),
+    congregacao_id: congregacao_id.trim(),
+    campo_id: campoIdFinal,
     cep: cleanVal(normalizedBody.cep),
     logradouro: cleanVal(normalizedBody.logradouro),
     numero: cleanVal(normalizedBody.numero),
@@ -355,41 +276,121 @@ export async function POST(request: NextRequest) {
     complemento: cleanVal(normalizedBody.complemento),
     cidade: cleanVal(normalizedBody.cidade),
     estado: cleanVal(normalizedBody.estado),
-    escolaridade: cleanVal(normalizedBody.escolaridade),
-    nacionalidade: cleanVal(normalizedBody.nacionalidade),
-    naturalidade: cleanVal(normalizedBody.naturalidade),
-    uf_naturalidade: cleanVal(normalizedBody.uf_naturalidade),
+    email: typeof normalizedBody.email === 'string' && normalizedBody.email.trim() ? normalizedBody.email.toLowerCase().trim() : null,
+    phone: cleanVal(normalizedBody.phone),
+    celular: cleanVal(normalizedBody.celular),
+    whatsapp: cleanVal(normalizedBody.whatsapp),
+    profissao: cleanVal(normalizedBody.profissao),
     foto_url: cleanVal(normalizedBody.foto_url),
-    tipo_cadastro: tipoCadastro,
-    role: role,
-    ...(cargoMinisterial ? { cargo_ministerial: cargoMinisterial } : {}),
-    status: 'active',
-    member_since: new Date().toISOString().split('T')[0],
+    origem: 'link_publico',
+    status: 'pendente',
+    dados_adicionais: dadosAdicionais,
+    updated_at: new Date().toISOString(),
   };
 
-  const { error: insertErr } = await admin
-    .from('members')
-    .insert([insertPayload]);
+  // ── 8. CASO 1: O CPF já pertence a um membro oficial existente ───────────
+  if (existingMember) {
+    // Verificar se já existe uma solicitação pendente de atualização para este membro
+    const { data: pendingReview } = await admin
+      .from('member_pre_registrations')
+      .select('id')
+      .eq('ministry_id', ministryId)
+      .eq('existing_member_id', existingMember.id)
+      .eq('status', 'pendente')
+      .maybeSingle();
 
-  if (insertErr) {
-    console.error('[POST /api/v1/public/members/save] Insert error:', insertErr);
-    if (insertErr.code === '23505' || insertErr.message.includes('unique')) {
+    if (pendingReview) {
+      const { error: updErr } = await admin
+        .from('member_pre_registrations')
+        .update({
+          ...basePreRegData,
+          tipo_solicitacao: 'atualizacao',
+          existing_member_id: existingMember.id,
+        })
+        .eq('id', pendingReview.id);
+
+      if (updErr) {
+        console.error('[POST /api/v1/public/members/save] Update pending review error:', updErr);
+        return NextResponse.json(
+          { error: 'Erro ao atualizar solicitação de revisão cadastral.' },
+          { status: 500 }
+        );
+      }
+    } else {
+      const { error: insErr } = await admin
+        .from('member_pre_registrations')
+        .insert([{
+          ...basePreRegData,
+          tipo_solicitacao: 'atualizacao',
+          existing_member_id: existingMember.id,
+        }]);
+
+      if (insErr) {
+        console.error('[POST /api/v1/public/members/save] Insert review request error:', insErr);
+        return NextResponse.json(
+          { error: 'Erro ao registrar solicitação de atualização cadastral.' },
+          { status: 500 }
+        );
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      action: 'updated',
+      message: 'Solicitação de atualização enviada para análise da secretaria.',
+    });
+  }
+
+  // ── 9. CASO 2: Novo membro (Pré-cadastro) ─────────────────────────────────
+  // Verificar se já existe pré-cadastro pendente para este CPF
+  const { data: pendingPreReg } = await admin
+    .from('member_pre_registrations')
+    .select('id')
+    .eq('ministry_id', ministryId)
+    .eq('cpf', cleanCpf)
+    .eq('status', 'pendente')
+    .maybeSingle();
+
+  if (pendingPreReg) {
+    const { error: updPendingErr } = await admin
+      .from('member_pre_registrations')
+      .update({
+        ...basePreRegData,
+        tipo_solicitacao: 'novo_cadastro',
+        existing_member_id: null,
+      })
+      .eq('id', pendingPreReg.id);
+
+    if (updPendingErr) {
+      console.error('[POST /api/v1/public/members/save] Update pending pre-reg error:', updPendingErr);
       return NextResponse.json(
-        { error: 'Este CPF já foi cadastrado nesta instituição.' },
-        { status: 409 }
+        { error: 'Erro ao atualizar solicitação de pré-cadastro.' },
+        { status: 500 }
       );
     }
-    return NextResponse.json(
-      { error: insertErr.message || 'Erro ao registrar novo membro.' },
-      { status: 500 }
-    );
+  } else {
+    const { error: insPreRegErr } = await admin
+      .from('member_pre_registrations')
+      .insert([{
+        ...basePreRegData,
+        tipo_solicitacao: 'novo_cadastro',
+        existing_member_id: null,
+      }]);
+
+    if (insPreRegErr) {
+      console.error('[POST /api/v1/public/members/save] Insert pre-registration error:', insPreRegErr);
+      return NextResponse.json(
+        { error: 'Erro ao registrar pré-cadastro de membro.' },
+        { status: 500 }
+      );
+    }
   }
 
   return NextResponse.json(
     {
       success: true,
       action: 'created',
-      message: 'Cadastro realizado com sucesso.',
+      message: 'Pré-cadastro realizado com sucesso! Aguarde a homologação da secretaria.',
     },
     { status: 201 }
   );
