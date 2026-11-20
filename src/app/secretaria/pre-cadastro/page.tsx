@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import PageLayout from '@/components/PageLayout';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { temAcessoEscrita, type NivelAcesso } from '@/lib/access-control';
 import { createClient } from '@/lib/supabase-client';
@@ -255,12 +254,26 @@ export default function PreCadastroPage() {
   };
 
   return (
-    <PageLayout
-      title="Central de Pré-Cadastros"
-      description="Gerenciamento, validação e homologação de solicitações de membros e atualizações"
-      activeMenu="pre-cadastro"
-    >
-      {/* ── 1. CARDS DE STATUS / RESUMO ── */}
+    <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#f4f7fa] min-h-screen">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-[96rem] mx-auto w-full">
+        {/* ── HEADER DA PÁGINA (PADRÃO MEMBROS) ── */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-teal-700 text-white flex items-center justify-center border border-teal-800 shadow-sm flex-shrink-0">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Pré-Cadastros</h1>
+              <p className="text-xs sm:text-sm text-slate-600 font-medium mt-0.5">
+                Validação, homologação e gerenciamento de novos membros e atualizações cadastrais.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* ── 1. CARDS DE STATUS / RESUMO ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {/* Card 1: Pendentes (Laranja / Âmbar) */}
         <button
@@ -395,127 +408,169 @@ export default function PreCadastroPage() {
         </button>
       </div>
 
-      {/* ── 2. BARRA DE FILTROS INSTITUCIONAL ── */}
-      <div className="bg-white p-4 rounded-3xl border border-slate-200/90 shadow-sm mb-6 space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
-          {/* Busca por Nome ou CPF */}
-          <div className="lg:col-span-4 relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Buscar por nome ou CPF..."
-              value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition shadow-2xs"
-            />
-          </div>
+        {/* ── 2. BARRA DE FILTROS (PADRÃO LISTAGEM DE MEMBROS) ── */}
+        <div className="bg-slate-50/70 border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs mb-6">
+          <div className="flex flex-col lg:flex-row lg:items-end gap-3.5">
+            {/* Buscar por Nome ou CPF */}
+            <div className="w-full lg:flex-1 min-w-[200px]">
+              <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Buscar solicitações
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                  <Search className="w-4 h-4" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Buscar por nome ou CPF..."
+                  value={searchTerm}
+                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                  className="w-full pl-10 pr-3.5 py-2 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition shadow-2xs"
+                />
+              </div>
+            </div>
 
-          {/* Filtro Congregação */}
-          <div className="lg:col-span-3">
-            <select
-              value={congregacaoFilter}
-              onChange={(e) => { setCongregacaoFilter(e.target.value); setCurrentPage(1); }}
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition cursor-pointer shadow-2xs"
-            >
-              <option value="todas">Todas as Congregações</option>
-              {congregacoes.map((c) => (
-                <option key={c.id} value={c.id}>{c.nome}</option>
-              ))}
-            </select>
-          </div>
+            {/* Filtro Congregação */}
+            <div className="w-full sm:w-auto lg:w-48 shrink-0">
+              <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Congregação
+              </label>
+              <select
+                value={congregacaoFilter}
+                onChange={(e) => { setCongregacaoFilter(e.target.value); setCurrentPage(1); }}
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition shadow-2xs cursor-pointer"
+              >
+                <option value="todas">Todas as Congregações</option>
+                {congregacoes.map((c) => (
+                  <option key={c.id} value={c.id}>{c.nome}</option>
+                ))}
+              </select>
+            </div>
 
-          {/* Filtro Tipo Solicitação */}
-          <div className="lg:col-span-2">
-            <select
-              value={tipoSolicitacaoFilter}
-              onChange={(e) => { setTipoSolicitacaoFilter(e.target.value); setCurrentPage(1); }}
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition cursor-pointer shadow-2xs"
-            >
-              <option value="todos">Todos os Tipos</option>
-              <option value="novo_cadastro">Novo Cadastro</option>
-              <option value="atualizacao">Atualização</option>
-            </select>
-          </div>
+            {/* Filtro Tipo Solicitação */}
+            <div className="w-full sm:w-auto lg:w-44 shrink-0">
+              <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Tipo
+              </label>
+              <select
+                value={tipoSolicitacaoFilter}
+                onChange={(e) => { setTipoSolicitacaoFilter(e.target.value); setCurrentPage(1); }}
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition shadow-2xs cursor-pointer"
+              >
+                <option value="todos">Todos os Tipos</option>
+                <option value="novo_cadastro">Novo Cadastro</option>
+                <option value="atualizacao">Atualização</option>
+              </select>
+            </div>
 
-          {/* Filtro Origem */}
-          <div className="lg:col-span-2">
-            <select
-              value={origemFilter}
-              onChange={(e) => { setOrigemFilter(e.target.value); setCurrentPage(1); }}
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition cursor-pointer shadow-2xs"
-            >
-              <option value="todos">Todas as Origens</option>
-              <option value="link_publico">Link Público</option>
-              <option value="app_membro">App do Membro</option>
-              <option value="secretaria">Secretaria</option>
-            </select>
-          </div>
+            {/* Filtro Origem */}
+            <div className="w-full sm:w-auto lg:w-44 shrink-0">
+              <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Origem
+              </label>
+              <select
+                value={origemFilter}
+                onChange={(e) => { setOrigemFilter(e.target.value); setCurrentPage(1); }}
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition shadow-2xs cursor-pointer"
+              >
+                <option value="todos">Todas as Origens</option>
+                <option value="link_publico">Link Público</option>
+                <option value="app_membro">App do Membro</option>
+                <option value="secretaria">Secretaria</option>
+              </select>
+            </div>
 
-          {/* Limpar / Atualizar */}
-          <div className="lg:col-span-1 flex items-center justify-end gap-1.5">
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setCongregacaoFilter('todas');
-                setTipoSolicitacaoFilter('todos');
-                setOrigemFilter('todos');
-                setCurrentPage(1);
-              }}
-              title="Limpar Filtros"
-              className="p-2.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-2xl transition border border-slate-200 cursor-pointer shadow-2xs"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
-            <button
-              onClick={fetchPreCadastros}
-              title="Atualizar Lista"
-              className="p-2.5 text-teal-700 hover:text-teal-900 hover:bg-teal-50 rounded-2xl transition border border-teal-200 cursor-pointer shadow-2xs"
-            >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-            </button>
+            {/* Botões Limpar e Atualizar */}
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm('');
+                  setCongregacaoFilter('todas');
+                  setTipoSolicitacaoFilter('todos');
+                  setOrigemFilter('todos');
+                  setCurrentPage(1);
+                }}
+                className="h-[38px] px-3.5 bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 border border-slate-300 hover:border-emerald-400 rounded-xl font-bold text-xs sm:text-sm transition shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer"
+                title="Limpar todos os filtros"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-slate-500 hover:text-emerald-700" />
+                <span>Limpar</span>
+              </button>
+              <button
+                type="button"
+                onClick={fetchPreCadastros}
+                className="h-[38px] px-3.5 bg-white hover:bg-emerald-50 text-teal-700 hover:text-teal-900 border border-slate-300 hover:border-teal-400 rounded-xl font-bold text-xs sm:text-sm transition shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer"
+                title="Atualizar Lista"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+                <span>Atualizar</span>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* ── 3. LISTAGEM PRINCIPAL ── */}
-      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden">
+      {/* ── 3. LISTAGEM PRINCIPAL (PADRÃO LISTAGEM DE MEMBROS) ── */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden mb-8">
+        {/* Cabeçalho Interno da Tabela com Ícone, Título e Contador */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5 border-b border-slate-200/80 bg-white">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-700 border border-teal-200 flex items-center justify-center font-bold">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16M4 18h7" />
+              </svg>
+            </div>
+            <h2 className="text-lg font-bold text-slate-900">
+              Solicitações de Pré-Cadastro
+            </h2>
+            <span className="px-3 py-1 bg-teal-50 text-teal-800 border border-teal-200/90 rounded-full text-xs font-bold">
+              {totalCount} {totalCount === 1 ? 'solicitação' : 'solicitações'}
+            </span>
+          </div>
+        </div>
+
         {isLoading ? (
           <div className="p-12 text-center text-slate-500 text-sm font-medium">
             <RefreshCw className="w-6 h-6 animate-spin mx-auto text-teal-600 mb-2" />
             Carregando solicitações...
           </div>
         ) : items.length === 0 ? (
-          <div className="p-12 text-center text-slate-500 text-sm">
+          <div className="p-12 text-center text-slate-500 text-sm font-medium">
             Nenhuma solicitação encontrada para os filtros selecionados.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 uppercase text-[11px] font-bold tracking-wider">
+                <tr className="bg-slate-100 border-b border-slate-200/90 text-slate-700 uppercase text-[11px] font-bold tracking-wider">
                   <th className="px-4 py-3.5">Solicitante</th>
                   <th className="px-4 py-3.5">CPF</th>
                   <th className="px-4 py-3.5">Tipo / Origem</th>
                   <th className="px-4 py-3.5">Congregação / Campo</th>
                   <th className="px-4 py-3.5">Data Envio</th>
                   <th className="px-4 py-3.5">Status</th>
-                  <th className="px-4 py-3.5 text-right">Ações</th>
+                  <th className="px-4 py-3.5 text-center w-36">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200">
-                {items.map((item) => {
+              <tbody className="divide-y divide-slate-200/80">
+                {items.map((item, index) => {
                   const isDuplicado = item.isDuplicidadeDetectada;
+                  const isOddRow = index % 2 === 1;
                   return (
                     <tr
                       key={item.id}
-                      className={`hover:bg-slate-50/80 transition ${
-                        isDuplicado ? 'bg-amber-50/40' : ''
+                      className={`transition-colors text-sm text-slate-800 group hover:bg-[#f1f5f9] ${
+                        isDuplicado
+                          ? 'bg-amber-50/50'
+                          : isOddRow
+                          ? 'bg-[#f8fafc]'
+                          : 'bg-white'
                       }`}
                     >
                       {/* Nome e Alerta */}
                       <td className="px-4 py-3.5 font-bold text-slate-900">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 font-bold overflow-hidden flex-shrink-0">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 font-bold overflow-hidden flex-shrink-0 shadow-2xs">
                             {item.foto_url ? (
                               <img src={item.foto_url} alt="" className="w-full h-full object-cover" />
                             ) : (
@@ -523,10 +578,10 @@ export default function PreCadastroPage() {
                             )}
                           </div>
                           <div>
-                            <p className="font-bold text-slate-900">{item.name}</p>
+                            <p className="font-bold text-slate-900 text-sm leading-snug">{item.name}</p>
                             {isDuplicado && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300 mt-0.5">
-                                <AlertTriangle className="w-3 h-3 text-amber-600" />
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-300 mt-1">
+                                <AlertTriangle className="w-3 h-3 text-amber-600 flex-shrink-0" />
                                 CPF já existe em Membros (Matrícula: {item.existingMemberMatch?.matricula || '-'})
                               </span>
                             )}
@@ -535,14 +590,14 @@ export default function PreCadastroPage() {
                       </td>
 
                       {/* CPF */}
-                      <td className="px-4 py-3.5 font-mono text-slate-700 font-medium">
+                      <td className="px-4 py-3.5 font-mono text-slate-700 font-medium text-xs">
                         {maskCpf(item.cpf)}
                       </td>
 
                       {/* Tipo / Origem */}
                       <td className="px-4 py-3.5">
                         <span
-                          className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${
+                          className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${
                             item.tipo_solicitacao === 'atualizacao'
                               ? 'bg-purple-100 text-purple-900 border-purple-200'
                               : 'bg-sky-100 text-sky-900 border-sky-200'
@@ -550,19 +605,19 @@ export default function PreCadastroPage() {
                         >
                           {item.tipo_solicitacao === 'atualizacao' ? 'Atualização' : 'Novo Membro'}
                         </span>
-                        <span className="block text-[11px] text-slate-500 mt-0.5">
-                          {item.origem || 'link_publico'}
+                        <span className="block text-[11px] text-slate-500 font-medium mt-0.5">
+                          {item.origem === 'link_publico' ? 'Link Público' : item.origem === 'app_membro' ? 'App do Membro' : item.origem || 'link_publico'}
                         </span>
                       </td>
 
                       {/* Congregação e Campo */}
                       <td className="px-4 py-3.5 text-slate-700">
-                        <p className="font-semibold">{item.congregacoes?.nome || item.dados_adicionais?.congregacao_nome || 'Não informada'}</p>
-                        <p className="text-[11px] text-slate-500">{item.campos?.nome || item.dados_adicionais?.campo_nome || '-'}</p>
+                        <p className="font-semibold text-xs text-slate-900">{item.congregacoes?.nome || item.dados_adicionais?.congregacao_nome || 'Não informada'}</p>
+                        <p className="text-[11px] text-slate-500 font-medium">{item.campos?.nome || item.dados_adicionais?.campo_nome || '-'}</p>
                       </td>
 
                       {/* Data de Envio */}
-                      <td className="px-4 py-3.5 text-slate-600">
+                      <td className="px-4 py-3.5 text-slate-600 text-xs font-medium">
                         {item.created_at
                           ? new Date(item.created_at).toLocaleDateString('pt-BR', {
                               day: '2-digit',
@@ -591,14 +646,14 @@ export default function PreCadastroPage() {
                         </span>
                       </td>
 
-                      {/* Ações */}
-                      <td className="px-4 py-3.5 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                      {/* Ações Compactas, Alinhadas e com Tooltips */}
+                      <td className="px-4 py-3.5 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
                           {/* Visualizar */}
                           <button
                             onClick={() => { setSelectedItem(item); setModalMode('view'); }}
                             title="Visualizar Detalhes"
-                            className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition border border-slate-200 cursor-pointer"
+                            className="p-1.5 text-slate-700 hover:text-slate-950 hover:bg-slate-200/60 rounded-lg transition border border-slate-300 cursor-pointer"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
@@ -608,7 +663,7 @@ export default function PreCadastroPage() {
                             <button
                               onClick={() => { setSelectedItem(item); setModalMode('edit'); }}
                               title="Editar Dados"
-                              className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition border border-blue-200 cursor-pointer"
+                              className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-100/60 rounded-lg transition border border-blue-200 cursor-pointer"
                             >
                               <Edit className="w-4 h-4" />
                             </button>
@@ -623,7 +678,7 @@ export default function PreCadastroPage() {
                                 setOverrideCargo(item.cargo_ministerial || '');
                               }}
                               title="Aprovar e Homologar"
-                              className="p-1.5 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50 rounded-lg transition border border-emerald-200 cursor-pointer font-bold"
+                              className="p-1.5 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-100/60 rounded-lg transition border border-emerald-300 cursor-pointer font-bold"
                             >
                               <Check className="w-4 h-4" />
                             </button>
@@ -634,7 +689,7 @@ export default function PreCadastroPage() {
                             <button
                               onClick={() => setActionConfirm({ isOpen: true, type: 'devolver', item })}
                               title="Devolver para Correção"
-                              className="p-1.5 text-blue-700 hover:text-blue-900 hover:bg-blue-50 rounded-lg transition border border-blue-200 cursor-pointer"
+                              className="p-1.5 text-blue-700 hover:text-blue-900 hover:bg-blue-100/60 rounded-lg transition border border-blue-300 cursor-pointer"
                             >
                               <RotateCcw className="w-4 h-4" />
                             </button>
@@ -645,7 +700,7 @@ export default function PreCadastroPage() {
                             <button
                               onClick={() => setActionConfirm({ isOpen: true, type: 'rejeitar', item })}
                               title="Rejeitar Solicitação"
-                              className="p-1.5 text-rose-700 hover:text-rose-900 hover:bg-rose-50 rounded-lg transition border border-rose-200 cursor-pointer"
+                              className="p-1.5 text-rose-700 hover:text-rose-900 hover:bg-rose-100/60 rounded-lg transition border border-rose-300 cursor-pointer"
                             >
                               <X className="w-4 h-4" />
                             </button>
@@ -660,14 +715,17 @@ export default function PreCadastroPage() {
           </div>
         )}
 
-        {/* ── 4. PAGINAÇÃO ── */}
-        <div className="p-4 border-t border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
-          <div className="flex items-center gap-2">
-            <span>Total de <strong>{totalCount}</strong> solicitações</span>
-            <span>•</span>
-            <span>Página <strong>{currentPage}</strong> de <strong>{totalPages || 1}</strong></span>
-            <span>•</span>
-            <div className="flex items-center gap-1">
+        {/* ── 4. PAGINAÇÃO INTEGRADA AO RODAPÉ (PADRÃO LISTAGEM DE MEMBROS) ── */}
+        <div className="p-4 bg-white border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+          {/* Informações e Seletor de Itens */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs font-medium text-slate-600 text-center sm:text-left">
+            <div>
+              Exibindo <span className="font-bold text-slate-900">{totalCount > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}</span> a{' '}
+              <span className="font-bold text-slate-900">{Math.min(currentPage * itemsPerPage, totalCount)}</span> de{' '}
+              <span className="font-bold text-slate-900">{totalCount}</span> solicitações
+            </div>
+
+            <div className="flex items-center gap-1.5">
               <span>Exibir:</span>
               <select
                 value={itemsPerPage}
@@ -675,30 +733,72 @@ export default function PreCadastroPage() {
                   setItemsPerPage(Number(e.target.value));
                   setCurrentPage(1);
                 }}
-                className="px-2 py-0.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold cursor-pointer"
+                className="px-2.5 py-1 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 cursor-pointer shadow-xs"
               >
                 <option value={10}>10</option>
                 <option value={15}>15</option>
                 <option value={30}>30</option>
                 <option value={50}>50</option>
               </select>
+              <span>por página</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          {/* Navegação de Páginas Numérica */}
+          <div className="flex items-center gap-1.5 flex-wrap justify-center">
+            {/* Anterior */}
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage <= 1}
-              className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-bold"
+              className="w-8 h-8 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center text-sm transition cursor-pointer font-bold"
+              title="Página Anterior"
             >
-              Anterior
+              ‹
             </button>
+
+            {/* Páginas com ellipsis */}
+            {(() => {
+              const pages: (number | string)[] = [];
+              if (totalPages <= 7) {
+                for (let i = 1; i <= totalPages; i++) pages.push(i);
+              } else {
+                pages.push(1);
+                if (currentPage > 4) pages.push('...');
+                const start = Math.max(2, currentPage - 2);
+                const end = Math.min(totalPages - 1, currentPage + 2);
+                for (let i = start; i <= end; i++) pages.push(i);
+                if (currentPage < totalPages - 3) pages.push('...');
+                pages.push(totalPages);
+              }
+              return pages.map((p, idx) =>
+                p === '...' ? (
+                  <span key={`ellipsis-${idx}`} className="px-1 text-slate-400 text-xs select-none">
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => setCurrentPage(p as number)}
+                    className={`w-8 h-8 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
+                      currentPage === p
+                        ? 'bg-teal-700 text-white shadow-sm border border-teal-800'
+                        : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                )
+              );
+            })()}
+
+            {/* Próximo */}
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage >= totalPages || totalPages === 0}
-              className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-bold"
+              className="w-8 h-8 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center text-sm transition cursor-pointer font-bold"
+              title="Próxima Página"
             >
-              Próxima
+              ›
             </button>
           </div>
         </div>
@@ -1034,6 +1134,7 @@ export default function PreCadastroPage() {
         title={notification.title}
         message={notification.message}
       />
-    </PageLayout>
+      </div>
+    </div>
   );
 }
