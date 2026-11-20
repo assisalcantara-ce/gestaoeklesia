@@ -22,8 +22,8 @@ export default function PreCadastroPage() {
   const { ctx, bloqueado } = useRequireModulo('secretaria');
   const podeEscrever = ctx.nivel ? temAcessoEscrita(ctx.nivel as NivelAcesso, 'secretaria') : false;
 
-  // Estado da listagem e filtros
-  const [activeTab, setActiveTab] = useState<'pendente' | 'aprovado' | 'rejeitado' | 'devolvido' | 'todos'>('pendente');
+  // Estado da listagem e filtros - Apenas duas abas: 'pendente' e 'inativo'
+  const [activeTab, setActiveTab] = useState<'pendente' | 'inativo'>('pendente');
   const [searchTerm, setSearchTerm] = useState('');
   const [origemFilter, setOrigemFilter] = useState('todos');
   const [congregacaoFilter, setCongregacaoFilter] = useState('todas');
@@ -37,9 +37,7 @@ export default function PreCadastroPage() {
   const [totalCount, setTotalCount] = useState(0);
   const [stats, setStats] = useState({
     pendentes: 0,
-    aprovados: 0,
-    rejeitados: 0,
-    devolvidos: 0,
+    inativos: 0,
     totalGeral: 0,
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -53,7 +51,7 @@ export default function PreCadastroPage() {
   const [modalMode, setModalMode] = useState<'view' | 'edit' | null>(null);
   const [actionConfirm, setActionConfirm] = useState<{
     isOpen: boolean;
-    type: 'aprovar' | 'devolver' | 'rejeitar';
+    type: 'aprovar' | 'inativar' | 'reativar';
     item: any;
   } | null>(null);
 
@@ -159,17 +157,17 @@ export default function PreCadastroPage() {
     return `${c.slice(0, 3)}.${c.slice(3, 6)}.${c.slice(6, 9)}-${c.slice(9)}`;
   };
 
-  // Executar Ação (Aprovar / Devolver / Rejeitar)
+  // Executar Ação (Aprovar / Inativar / Reativar)
   const handleExecuteAction = async () => {
     if (!actionConfirm || !actionConfirm.item) return;
     const { type, item } = actionConfirm;
 
-    if ((type === 'devolver' || type === 'rejeitar') && !actionMotivo.trim()) {
+    if (type === 'inativar' && !actionMotivo.trim()) {
       setNotification({
         isOpen: true,
         type: 'warning',
         title: 'Motivo obrigatório',
-        message: 'Por favor, informe a justificativa ou orientação antes de prosseguir.',
+        message: 'Por favor, informe a justificativa da inativação antes de prosseguir.',
       });
       return;
     }
@@ -273,140 +271,75 @@ export default function PreCadastroPage() {
           </div>
         </div>
 
-        {/* ── 1. CARDS DE STATUS / RESUMO ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {/* Card 1: Pendentes (Laranja / Âmbar) */}
-        <button
-          onClick={() => { setActiveTab('pendente'); setCurrentPage(1); }}
-          className={`bg-[#fff6ea] border border-[#fde4c4] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between text-left cursor-pointer ${
-            activeTab === 'pendente' ? 'ring-2 ring-[#ea580c]/40 ring-offset-2' : ''
-          }`}
-        >
-          <div className="flex items-center gap-3.5 flex-1 min-w-0">
-            <div className="w-13 h-13 rounded-2xl bg-white text-[#ea580c] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#ffedd5]">
-              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        {/* ── 1. CARDS DE INDICADORES (PADRÃO LISTAGEM DE MEMBROS) ── */}
+        {/* Apenas duas abas: Pendentes (Laranja) e Inativos (Vermelho/Rosa) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+          {/* Card 1: Pendentes (Laranja / Âmbar) */}
+          <button
+            onClick={() => { setActiveTab('pendente'); setCurrentPage(1); }}
+            className={`bg-[#fff6ea] border border-[#fde4c4] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between text-left cursor-pointer ${
+              activeTab === 'pendente' ? 'ring-2 ring-[#ea580c]/40 ring-offset-2' : ''
+            }`}
+          >
+            <div className="flex items-center gap-3.5 flex-1 min-w-0">
+              <div className="w-13 h-13 rounded-2xl bg-white text-[#ea580c] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#ffedd5]">
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-slate-800 block truncate">
+                  Pendentes
+                </span>
+                <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
+                  {stats.pendentes}
+                </p>
+                <p className="text-[11px] font-semibold text-slate-700 mt-1 truncate">
+                  Aguardando homologação
+                </p>
+              </div>
+            </div>
+
+            <div className="w-8 h-8 rounded-xl bg-[#ffedd5] text-[#ea580c] flex items-center justify-center flex-shrink-0 self-start font-bold text-xs">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3" />
               </svg>
             </div>
-            <div className="min-w-0">
-              <span className="text-xs font-bold text-slate-800 block truncate">
-                Pendentes
-              </span>
-              <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
-                {stats.pendentes}
-              </p>
-              <p className="text-[11px] font-semibold text-slate-700 mt-1 truncate">
-                Aguardando homologação
-              </p>
+          </button>
+
+          {/* Card 2: Inativos (Vermelho / Rosa) */}
+          <button
+            onClick={() => { setActiveTab('inativo'); setCurrentPage(1); }}
+            className={`bg-[#fff1f2] border border-[#fecdd3] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between text-left cursor-pointer ${
+              activeTab === 'inativo' ? 'ring-2 ring-[#e11d48]/40 ring-offset-2' : ''
+            }`}
+          >
+            <div className="flex items-center gap-3.5 flex-1 min-w-0">
+              <div className="w-13 h-13 rounded-2xl bg-white text-[#e11d48] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#ffe4e6]">
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-slate-800 block truncate">
+                  Inativos
+                </span>
+                <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
+                  {stats.inativos}
+                </p>
+                <p className="text-[11px] font-semibold text-slate-700 mt-1 truncate">
+                  Inativados com justificativa
+                </p>
+              </div>
             </div>
-          </div>
 
-          <div className="w-8 h-8 rounded-xl bg-[#ffedd5] text-[#ea580c] flex items-center justify-center flex-shrink-0 self-start font-bold text-xs">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3" />
-            </svg>
-          </div>
-        </button>
-
-        {/* Card 2: Aprovados (Verde) */}
-        <button
-          onClick={() => { setActiveTab('aprovado'); setCurrentPage(1); }}
-          className={`bg-[#ecfdf3] border border-[#cff7de] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between text-left cursor-pointer ${
-            activeTab === 'aprovado' ? 'ring-2 ring-[#16a34a]/40 ring-offset-2' : ''
-          }`}
-        >
-          <div className="flex items-center gap-3.5 flex-1 min-w-0">
-            <div className="w-13 h-13 rounded-2xl bg-white text-[#16a34a] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#dcfce7]">
-              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <div className="w-8 h-8 rounded-xl bg-[#ffe4e6] text-[#e11d48] flex items-center justify-center flex-shrink-0 self-start">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </div>
-            <div className="min-w-0">
-              <span className="text-xs font-bold text-slate-800 block truncate">
-                Aprovados
-              </span>
-              <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
-                {stats.aprovados}
-              </p>
-              <p className="text-[11px] font-semibold text-slate-700 mt-1 truncate">
-                Oficializados em Membros
-              </p>
-            </div>
-          </div>
-
-          <div className="w-8 h-8 rounded-xl bg-[#dcfce7] text-[#16a34a] flex items-center justify-center flex-shrink-0 self-start">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-        </button>
-
-        {/* Card 3: Para Correção (Azul) */}
-        <button
-          onClick={() => { setActiveTab('devolvido'); setCurrentPage(1); }}
-          className={`bg-[#ebf5ff] border border-[#d0e6ff] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between text-left cursor-pointer ${
-            activeTab === 'devolvido' ? 'ring-2 ring-[#2563eb]/40 ring-offset-2' : ''
-          }`}
-        >
-          <div className="flex items-center gap-3.5 flex-1 min-w-0">
-            <div className="w-13 h-13 rounded-2xl bg-white text-[#2563eb] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#dbeafe]">
-              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-              </svg>
-            </div>
-            <div className="min-w-0">
-              <span className="text-xs font-bold text-slate-800 block truncate">
-                Para Correção
-              </span>
-              <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
-                {stats.devolvidos}
-              </p>
-              <p className="text-[11px] font-semibold text-slate-700 mt-1 truncate">
-                Devolvidos com pendência
-              </p>
-            </div>
-          </div>
-
-          <div className="w-8 h-8 rounded-xl bg-[#dbeafe] text-[#2563eb] flex items-center justify-center flex-shrink-0 self-start">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-          </div>
-        </button>
-
-        {/* Card 4: Rejeitados (Roxo / Violeta) */}
-        <button
-          onClick={() => { setActiveTab('rejeitado'); setCurrentPage(1); }}
-          className={`bg-[#f3f0ff] border border-[#e3dbff] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between text-left cursor-pointer ${
-            activeTab === 'rejeitado' ? 'ring-2 ring-[#7c3aed]/40 ring-offset-2' : ''
-          }`}
-        >
-          <div className="flex items-center gap-3.5 flex-1 min-w-0">
-            <div className="w-13 h-13 rounded-2xl bg-white text-[#7c3aed] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#ede9fe]">
-              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div className="min-w-0">
-              <span className="text-xs font-bold text-slate-800 block truncate">
-                Rejeitados
-              </span>
-              <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
-                {stats.rejeitados}
-              </p>
-              <p className="text-[11px] font-semibold text-slate-700 mt-1 truncate">
-                Recusados pela Secretaria
-              </p>
-            </div>
-          </div>
-
-          <div className="w-8 h-8 rounded-xl bg-[#ede9fe] text-[#7c3aed] flex items-center justify-center flex-shrink-0 self-start">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </div>
-        </button>
-      </div>
+          </button>
+        </div>
 
         {/* ── 2. BARRA DE FILTROS (PADRÃO LISTAGEM DE MEMBROS) ── */}
         <div className="bg-slate-50/70 border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs mb-6">
@@ -476,7 +409,6 @@ export default function PreCadastroPage() {
                 <option value="todos">Todas as Origens</option>
                 <option value="link_publico">Link Público</option>
                 <option value="app_membro">App do Membro</option>
-                <option value="secretaria">Secretaria</option>
               </select>
             </div>
 
@@ -633,16 +565,14 @@ export default function PreCadastroPage() {
                       <td className="px-4 py-3.5">
                         <span
                           className={`inline-block px-2.5 py-1 rounded-md text-[10px] font-bold border uppercase tracking-wider ${
-                            item.status === 'aprovado'
-                              ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                              : item.status === 'pendente'
+                            item.status === 'pendente'
                               ? 'bg-amber-100 text-amber-900 border-amber-300'
-                              : item.status === 'devolvido'
-                              ? 'bg-blue-100 text-blue-900 border-blue-300'
                               : 'bg-rose-100 text-rose-900 border-rose-300'
                           }`}
                         >
-                          {item.status}
+                          {item.status === 'inativo' || item.status === 'rejeitado' || item.status === 'devolvido'
+                            ? 'Inativo'
+                            : item.status}
                         </span>
                       </td>
 
@@ -658,51 +588,56 @@ export default function PreCadastroPage() {
                             <Eye className="w-4 h-4" />
                           </button>
 
-                          {/* Editar (se pendente/devolvido e com permissão) */}
-                          {podeEscrever && item.status !== 'aprovado' && (
-                            <button
-                              onClick={() => { setSelectedItem(item); setModalMode('edit'); }}
-                              title="Editar Dados"
-                              className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-100/60 rounded-lg transition border border-blue-200 cursor-pointer"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </button>
+                          {/* Se Pendente: Editar, Aprovar, Inativar */}
+                          {item.status === 'pendente' && (
+                            <>
+                              {/* Editar Dados */}
+                              {podeEscrever && (
+                                <button
+                                  onClick={() => { setSelectedItem(item); setModalMode('edit'); }}
+                                  title="Editar Dados"
+                                  className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-100/60 rounded-lg transition border border-blue-200 cursor-pointer"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                              )}
+
+                              {/* Aprovar e Homologar */}
+                              {podeEscrever && (
+                                <button
+                                  onClick={() => {
+                                    setActionConfirm({ isOpen: true, type: 'aprovar', item });
+                                    setOverrideTipoCadastro(item.tipo_cadastro || 'membro');
+                                    setOverrideCargo(item.cargo_ministerial || '');
+                                  }}
+                                  title="Aprovar e Homologar"
+                                  className="p-1.5 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-100/60 rounded-lg transition border border-emerald-300 cursor-pointer font-bold"
+                                >
+                                  <Check className="w-4 h-4" />
+                                </button>
+                              )}
+
+                              {/* Inativar */}
+                              {podeEscrever && (
+                                <button
+                                  onClick={() => setActionConfirm({ isOpen: true, type: 'inativar', item })}
+                                  title="Inativar Solicitação"
+                                  className="p-1.5 text-rose-700 hover:text-rose-900 hover:bg-rose-100/60 rounded-lg transition border border-rose-300 cursor-pointer"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              )}
+                            </>
                           )}
 
-                          {/* Aprovar */}
-                          {podeEscrever && item.status !== 'aprovado' && (
+                          {/* Se Inativo: Reativar para Pendente */}
+                          {item.status !== 'pendente' && podeEscrever && (
                             <button
-                              onClick={() => {
-                                setActionConfirm({ isOpen: true, type: 'aprovar', item });
-                                setOverrideTipoCadastro(item.tipo_cadastro || 'membro');
-                                setOverrideCargo(item.cargo_ministerial || '');
-                              }}
-                              title="Aprovar e Homologar"
-                              className="p-1.5 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-100/60 rounded-lg transition border border-emerald-300 cursor-pointer font-bold"
-                            >
-                              <Check className="w-4 h-4" />
-                            </button>
-                          )}
-
-                          {/* Devolver */}
-                          {podeEscrever && item.status === 'pendente' && (
-                            <button
-                              onClick={() => setActionConfirm({ isOpen: true, type: 'devolver', item })}
-                              title="Devolver para Correção"
-                              className="p-1.5 text-blue-700 hover:text-blue-900 hover:bg-blue-100/60 rounded-lg transition border border-blue-300 cursor-pointer"
+                              onClick={() => setActionConfirm({ isOpen: true, type: 'reativar', item })}
+                              title="Reativar para Análise (Pendente)"
+                              className="p-1.5 text-amber-700 hover:text-amber-900 hover:bg-amber-100/60 rounded-lg transition border border-amber-300 cursor-pointer"
                             >
                               <RotateCcw className="w-4 h-4" />
-                            </button>
-                          )}
-
-                          {/* Rejeitar */}
-                          {podeEscrever && item.status !== 'aprovado' && item.status !== 'rejeitado' && (
-                            <button
-                              onClick={() => setActionConfirm({ isOpen: true, type: 'rejeitar', item })}
-                              title="Rejeitar Solicitação"
-                              className="p-1.5 text-rose-700 hover:text-rose-900 hover:bg-rose-100/60 rounded-lg transition border border-rose-300 cursor-pointer"
-                            >
-                              <X className="w-4 h-4" />
                             </button>
                           )}
                         </div>
@@ -990,26 +925,26 @@ export default function PreCadastroPage() {
         </div>
       )}
 
-      {/* ── 7. MODAL DE CONFIRMAÇÃO DE AÇÃO (Aprovar / Devolver / Rejeitar) ── */}
+      {/* ── 7. MODAL DE CONFIRMAÇÃO DE AÇÃO (Aprovar / Inativar / Reativar) ── */}
       {actionConfirm && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden border border-slate-200">
             <div className={`px-6 py-4 border-b flex items-center justify-between ${
               actionConfirm.type === 'aprovar'
                 ? 'bg-emerald-50 border-emerald-200 text-emerald-950'
-                : actionConfirm.type === 'devolver'
-                ? 'bg-blue-50 border-blue-200 text-blue-950'
+                : actionConfirm.type === 'reativar'
+                ? 'bg-amber-50 border-amber-200 text-amber-950'
                 : 'bg-rose-50 border-rose-200 text-rose-950'
             }`}>
               <h3 className="font-bold text-base flex items-center gap-2">
                 {actionConfirm.type === 'aprovar' && <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
-                {actionConfirm.type === 'devolver' && <RotateCcw className="w-5 h-5 text-blue-600" />}
-                {actionConfirm.type === 'rejeitar' && <XCircle className="w-5 h-5 text-rose-600" />}
+                {actionConfirm.type === 'reativar' && <RotateCcw className="w-5 h-5 text-amber-600" />}
+                {actionConfirm.type === 'inativar' && <XCircle className="w-5 h-5 text-rose-600" />}
                 {actionConfirm.type === 'aprovar'
                   ? 'Confirmar Homologação e Aprovação'
-                  : actionConfirm.type === 'devolver'
-                  ? 'Devolver Solicitação para Correção'
-                  : 'Rejeitar Solicitação de Pré-Cadastro'}
+                  : actionConfirm.type === 'reativar'
+                  ? 'Reativar Solicitação para Análise'
+                  : 'Inativar Solicitação de Pré-Cadastro'}
               </h3>
               <button onClick={() => setActionConfirm(null)} className="text-slate-400 hover:text-slate-700 cursor-pointer">
                 <X className="w-5 h-5" />
@@ -1080,19 +1015,26 @@ export default function PreCadastroPage() {
                 </>
               )}
 
-              {(actionConfirm.type === 'devolver' || actionConfirm.type === 'rejeitar') && (
+              {actionConfirm.type === 'inativar' && (
                 <div>
                   <label className="text-slate-700 font-bold block mb-1">
-                    {actionConfirm.type === 'devolver' ? 'Orientação / Pendência' : 'Motivo da Rejeição'} *
+                    Motivo da Inativação *
                   </label>
                   <textarea
                     rows={3}
                     value={actionMotivo}
                     onChange={(e) => setActionMotivo(e.target.value)}
-                    placeholder="Descreva o motivo que será registrado para auditoria da secretaria..."
+                    placeholder="Descreva a justificativa para inativar esta solicitação (obrigatório para auditoria)..."
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl font-medium"
                     required
                   />
+                </div>
+              )}
+
+              {actionConfirm.type === 'reativar' && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-slate-700 space-y-1">
+                  <p className="font-bold text-amber-900">Reativar Solicitação para Análise</p>
+                  <p>A solicitação retornará à aba <strong>Pendentes</strong> com todos os dados preservados para revisão da Secretaria. Nenhum registro será criado em Membros nesta etapa.</p>
                 </div>
               )}
             </div>
@@ -1113,13 +1055,13 @@ export default function PreCadastroPage() {
                 className={`px-5 py-2 text-white rounded-xl font-bold cursor-pointer shadow-xs flex items-center gap-1.5 ${
                   actionConfirm.type === 'aprovar'
                     ? 'bg-emerald-600 hover:bg-emerald-700'
-                    : actionConfirm.type === 'devolver'
-                    ? 'bg-blue-600 hover:bg-blue-700'
+                    : actionConfirm.type === 'reativar'
+                    ? 'bg-amber-600 hover:bg-amber-700'
                     : 'bg-rose-600 hover:bg-rose-700'
                 }`}
               >
                 {isSubmittingAction && <RefreshCw className="w-4 h-4 animate-spin" />}
-                Confirmar {actionConfirm.type === 'aprovar' ? 'Aprovação' : actionConfirm.type === 'devolver' ? 'Devolução' : 'Rejeição'}
+                Confirmar {actionConfirm.type === 'aprovar' ? 'Aprovação' : actionConfirm.type === 'reativar' ? 'Reativação' : 'Inativação'}
               </button>
             </div>
           </div>

@@ -48,10 +48,11 @@ export async function GET(request: NextRequest) {
     const tipoSolicitacaoParam = searchParams.get('tipo_solicitacao')?.trim() || '';
     const searchParam = searchParams.get('search')?.trim() || '';
 
-    // Contadores gerais por status para os cards
+    // Contadores para as duas abas oficiais: Pendentes e Inativos
+    // Para backward compatibility com registros já existentes, 'inativos' inclui 'inativo', 'rejeitado' e 'devolvido'
     const [
       { count: countPendentes },
-      { count: countAprovados },
+      { count: countInativosEfetivos },
       { count: countRejeitados },
       { count: countDevolvidos },
     ] = await Promise.all([
@@ -64,7 +65,7 @@ export async function GET(request: NextRequest) {
         .from('member_pre_registrations')
         .select('id', { count: 'exact', head: true })
         .eq('ministry_id', ministryId)
-        .eq('status', 'aprovado'),
+        .eq('status', 'inativo'),
       admin
         .from('member_pre_registrations')
         .select('id', { count: 'exact', head: true })
@@ -77,6 +78,8 @@ export async function GET(request: NextRequest) {
         .eq('status', 'devolvido'),
     ]);
 
+    const totalInativos = (countInativosEfetivos || 0) + (countRejeitados || 0) + (countDevolvidos || 0);
+
     // Query principal
     let query = admin
       .from('member_pre_registrations')
@@ -84,7 +87,12 @@ export async function GET(request: NextRequest) {
       .eq('ministry_id', ministryId);
 
     if (statusParam && statusParam !== 'todos') {
-      query = query.eq('status', statusParam);
+      if (statusParam === 'inativo') {
+        // Aba Inativos consolida status inativo, rejeitado e devolvido
+        query = query.in('status', ['inativo', 'rejeitado', 'devolvido']);
+      } else {
+        query = query.eq('status', statusParam);
+      }
     }
     if (origemParam && origemParam !== 'todos') {
       query = query.eq('origem', origemParam);
@@ -162,10 +170,11 @@ export async function GET(request: NextRequest) {
       },
       stats: {
         pendentes: countPendentes || 0,
-        aprovados: countAprovados || 0,
+        inativos: totalInativos,
+        // Mantidos para compatibilidade caso algum cliente consuma
         rejeitados: countRejeitados || 0,
         devolvidos: countDevolvidos || 0,
-        totalGeral: (countPendentes || 0) + (countAprovados || 0) + (countRejeitados || 0) + (countDevolvidos || 0),
+        totalGeral: (countPendentes || 0) + totalInativos,
       },
     });
   } catch (err: any) {

@@ -1,14 +1,13 @@
 /**
- * API ROUTE: Ações de Aprovação, Devolução e Rejeição de Pré-Cadastros (Secretaria)
+ * API ROUTE: Ações de Aprovação, Inativação e Reativação de Pré-Cadastros (Secretaria)
  * POST /api/v1/secretaria/pre-cadastros/[id]/action
  *
  * Funcionalidades:
- * - Ações suportadas: 'aprovar' | 'devolver' | 'rejeitar'
+ * - Ações suportadas: 'aprovar' | 'inativar' | 'reativar' (com compatibilidade para 'rejeitar' / 'devolver')
  * - Idempotência estrita sob concorrência via RPC transacional `aprovar_member_pre_registration_rpc`.
- * - Bloqueio exclusivo em linha (SELECT ... FOR UPDATE) no PostgreSQL.
- * - Registro de operador (`analisado_por`), timestamp (`analisado_em`) e motivo (`motivo_rejeicao`).
- * - Transação atômica única: se qualquer inserção ou alocação falhar, nenhuma alteração em `members`
- *   ou em `member_pre_registrations` persiste.
+ * - Inativação exige motivo obrigatório, preserva os dados da solicitação e não remove o registro.
+ * - Reativação controlada para 'pendente' sem criação automática de membro.
+ * - Aprovação grava evento definitivo no histórico permanente do membro (`members.custom_fields.historico_processos`).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -45,9 +44,10 @@ export async function POST(
 
     const { action, motivo, overrideTipoCadastro, overrideCargoMinisterial, matriculaSugerida } = body;
 
-    if (!action || !['aprovar', 'devolver', 'rejeitar'].includes(action)) {
+    const allowedActions = ['aprovar', 'inativar', 'reativar', 'rejeitar', 'devolver'];
+    if (!action || !allowedActions.includes(action)) {
       return NextResponse.json(
-        { error: 'Ação inválida. Utilize: aprovar, devolver ou rejeitar.' },
+        { error: 'Ação inválida. Utilize: aprovar, inativar ou reativar.' },
         { status: 400 }
       );
     }
@@ -77,33 +77,69 @@ export async function POST(
     }
 
     const agora = new Date().toISOString();
+    let operadorNome = 'Secretaria';
+    if (userId) {
+      const { data: userData } = await admin.auth.admin.getUserById(userId);
+      if (userData?.user?.email) {
+        operadorNome = userData.user.email.split('@')[0];
+      }
+    }
 
-    // ── AÇÃO: REJEITAR ────────────────────────────────────────────────────────
-    if (action === 'rejeitar') {
+    // ── AÇÃO: INATIVAR (ou REJEITAR / DEVOLVER legado) ─────────────────────────
+    if (action === 'inativar' || action === 'rejeitar' || action === 'devolver') {
       if (!motivo || typeof motivo !== 'string' || !motivo.trim()) {
         return NextResponse.json(
-          { error: 'É obrigatório informar o motivo da rejeição.' },
+          { error: 'É obrigatório informar o motivo da inativação.' },
           { status: 400 }
         );
       }
 
-      const { data: updated, error: rejErr } = await admin
+      // Tentamos gravar status 'inativo'; caso a constraint do banco atual ainda não possua 'inativo',
+      // fazemos fallback gracioso para 'rejeitado' com motivo_rejeicao e dados_adicionais marcando inativação
+      const dadosAdicionaisAtualizados = {
+        ...(preReg.dados_adicionais || {}),
+        inativado_por: userId || null,
+        inativado_em: agora,
+        motivo_inativacao: motivo.trim(),
+        status_logico: 'inativo',
+      };
+
+      let updateResult = await admin
         .from('member_pre_registrations')
         .update({
-          status: 'rejeitado',
+          status: 'inativo',
           motivo_rejeicao: motivo.trim(),
           analisado_por: userId || null,
           analisado_em: agora,
+          dados_adicionais: dadosAdicionaisAtualizados,
           updated_at: agora,
         })
         .eq('id', id)
         .eq('ministry_id', ministryId)
-        .eq('status', preReg.status) // Proteção atômica condicional
         .select('*')
         .single();
 
-      if (rejErr) {
-        return NextResponse.json({ error: 'Erro ao rejeitar solicitação.' }, { status: 500 });
+      // Se falhou por constraint de check do status (ex: chk_member_pre_reg_status aceita apenas rejeitado/devolvido antes da migration)
+      if (updateResult.error && updateResult.error.code === '23514') {
+        updateResult = await admin
+          .from('member_pre_registrations')
+          .update({
+            status: 'rejeitado',
+            motivo_rejeicao: motivo.trim(),
+            analisado_por: userId || null,
+            analisado_em: agora,
+            dados_adicionais: dadosAdicionaisAtualizados,
+            updated_at: agora,
+          })
+          .eq('id', id)
+          .eq('ministry_id', ministryId)
+          .select('*')
+          .single();
+      }
+
+      if (updateResult.error) {
+        console.error('[POST /api/v1/secretaria/pre-cadastros/[id]/action] Erro ao inativar:', updateResult.error);
+        return NextResponse.json({ error: 'Erro ao inativar solicitação.' }, { status: 500 });
       }
 
       await logServerAudit(admin, {
@@ -113,44 +149,45 @@ export async function POST(
         modulo: 'secretaria',
         tabelaAfetada: 'member_pre_registrations',
         registroId: id,
-        descricao: `Pré-cadastro rejeitado: ${motivo.trim()}`,
+        descricao: `Pré-cadastro inativado: ${motivo.trim()}`,
         status: 'sucesso',
       });
 
       return NextResponse.json({
         success: true,
-        action: 'rejeitado',
-        message: 'Solicitação de pré-cadastro rejeitada com sucesso.',
-        preCadastro: updated,
+        action: 'inativado',
+        message: 'Solicitação inativada com sucesso com justificativa registrada.',
+        preCadastro: updateResult.data,
       });
     }
 
-    // ── AÇÃO: DEVOLVER PARA CORREÇÃO ──────────────────────────────────────────
-    if (action === 'devolver') {
-      if (!motivo || typeof motivo !== 'string' || !motivo.trim()) {
-        return NextResponse.json(
-          { error: 'É obrigatório informar o motivo da devolução para correção.' },
-          { status: 400 }
-        );
-      }
+    // ── AÇÃO: REATIVAR ────────────────────────────────────────────────────────
+    if (action === 'reativar') {
+      const dadosAdicionaisAtualizados = {
+        ...(preReg.dados_adicionais || {}),
+        reativado_por: userId || null,
+        reativado_em: agora,
+        status_logico: 'pendente',
+      };
 
-      const { data: updated, error: devErr } = await admin
+      const { data: updated, error: reactivateErr } = await admin
         .from('member_pre_registrations')
         .update({
-          status: 'devolvido',
-          motivo_rejeicao: motivo.trim(),
+          status: 'pendente',
+          motivo_rejeicao: null,
           analisado_por: userId || null,
           analisado_em: agora,
+          dados_adicionais: dadosAdicionaisAtualizados,
           updated_at: agora,
         })
         .eq('id', id)
         .eq('ministry_id', ministryId)
-        .eq('status', preReg.status) // Proteção atômica condicional
         .select('*')
         .single();
 
-      if (devErr) {
-        return NextResponse.json({ error: 'Erro ao devolver solicitação.' }, { status: 500 });
+      if (reactivateErr) {
+        console.error('[POST /api/v1/secretaria/pre-cadastros/[id]/action] Erro ao reativar:', reactivateErr);
+        return NextResponse.json({ error: 'Erro ao reativar solicitação para análise.' }, { status: 500 });
       }
 
       await logServerAudit(admin, {
@@ -160,29 +197,32 @@ export async function POST(
         modulo: 'secretaria',
         tabelaAfetada: 'member_pre_registrations',
         registroId: id,
-        descricao: `Pré-cadastro devolvido para correção: ${motivo.trim()}`,
+        descricao: `Solicitação de pré-cadastro reativada para pendente`,
         status: 'sucesso',
       });
 
       return NextResponse.json({
         success: true,
-        action: 'devolvido',
-        message: 'Solicitação devolvida para correção com sucesso.',
+        action: 'reativado',
+        message: 'Solicitação reativada com sucesso e devolvida à aba Pendentes para análise.',
         preCadastro: updated,
       });
     }
 
-    // ── AÇÃO: APROVAR (Execução Transacional com Row Lock via RPC) ────────────
+    // ── AÇÃO: APROVAR (Execução Transacional com Histórico Permanente) ────────
     if (action === 'aprovar') {
-      // Tentar aprovação via RPC atômica transacional no PostgreSQL
+      const tipoCadastroFinal = overrideTipoCadastro || preReg.tipo_cadastro || 'membro';
+      const cargoMinisterialFinal = tipoCadastroFinal === 'ministro' ? overrideCargoMinisterial || null : null;
+
+      // Execução via RPC atômica transacional no PostgreSQL
       const { data: rpcResult, error: rpcErr } = await admin.rpc(
         'aprovar_member_pre_registration_rpc',
         {
           p_pre_reg_id: id,
           p_ministry_id: ministryId,
           p_analisado_por: userId || null,
-          p_tipo_cadastro: overrideTipoCadastro || preReg.tipo_cadastro || 'membro',
-          p_cargo_ministerial: overrideTipoCadastro === 'ministro' ? overrideCargoMinisterial || null : null,
+          p_tipo_cadastro: tipoCadastroFinal,
+          p_cargo_ministerial: cargoMinisterialFinal,
           p_matricula_sugerida: matriculaSugerida ? String(matriculaSugerida).trim() : null,
         }
       );
@@ -210,6 +250,70 @@ export async function POST(
       const memberIdFinal = rpcResult?.member_id || null;
       const matriculaFinal = rpcResult?.matricula || null;
       const isNovo = rpcResult?.action === 'novo_cadastro';
+
+      // ── REGISTRO NO HISTÓRICO PERMANENTE DA FICHA DO MEMBRO (custom_fields.historico_processos) ──
+      if (memberIdFinal) {
+        try {
+          const { data: existingMember } = await admin
+            .from('members')
+            .select('custom_fields, matricula, member_since')
+            .eq('id', memberIdFinal)
+            .eq('ministry_id', ministryId)
+            .maybeSingle();
+
+          const currentCustomFields = existingMember?.custom_fields && typeof existingMember.custom_fields === 'object'
+            ? existingMember.custom_fields
+            : {};
+          const currentHistorico = Array.isArray(currentCustomFields.historico_processos)
+            ? currentCustomFields.historico_processos
+            : [];
+
+          const matriculaEfetiva = matriculaFinal || existingMember?.matricula || 'N/A';
+          const origemFormatada = preReg.origem === 'app_membro' ? 'App do Membro' : 'Link Público';
+
+          const novoEventoHistorico = {
+            id: `pre_reg_${id}`,
+            processo_id: id,
+            pre_reg_id: id,
+            tipo_evento: isNovo ? 'cadastro_efetivado' : 'atualizacao_cadastral',
+            resultado: isNovo ? 'Cadastro efetivado pela Secretaria' : 'Atualização cadastral aprovada',
+            origem: 'pre_cadastro',
+            origem_solicitacao: preReg.origem || 'link_publico',
+            origem_descricao: origemFormatada,
+            data: agora.slice(0, 10),
+            data_hora: agora,
+            data_solicitacao_original: preReg.created_at || agora,
+            responsavel: operadorNome,
+            operador_id: userId || null,
+            classificacao_aprovada: tipoCadastroFinal,
+            cargo_ministerial: cargoMinisterialFinal,
+            matricula: matriculaEfetiva,
+            status_resultante: 'ativo',
+            descricao: isNovo
+              ? `Cadastro efetivado pela Secretaria. Origem: ${origemFormatada}. Classificação: ${tipoCadastroFinal}. Matrícula: ${matriculaEfetiva}. Solicitado em: ${new Date(preReg.created_at || agora).toLocaleString('pt-BR')}.`
+              : `Atualização cadastral aprovada pela Secretaria. Origem: ${origemFormatada}. Solicitado em: ${new Date(preReg.created_at || agora).toLocaleString('pt-BR')}.`,
+          };
+
+          // Evitar duplicidade de evento se a RPC já tiver gravado
+          const jaExisteEvento = currentHistorico.some((ev: any) => ev.id === novoEventoHistorico.id || ev.pre_reg_id === id);
+          if (!jaExisteEvento) {
+            const updatedHistorico = [...currentHistorico, novoEventoHistorico];
+            await admin
+              .from('members')
+              .update({
+                custom_fields: {
+                  ...currentCustomFields,
+                  historico_processos: updatedHistorico,
+                  historicoProcessos: updatedHistorico,
+                },
+              })
+              .eq('id', memberIdFinal)
+              .eq('ministry_id', ministryId);
+          }
+        } catch (histErr) {
+          console.error('[POST /api/v1/secretaria/pre-cadastros/[id]/action] Erro ao gravar histórico permanente do membro:', histErr);
+        }
+      }
 
       await logServerAudit(admin, {
         ministryId,
