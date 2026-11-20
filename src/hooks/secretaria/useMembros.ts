@@ -90,6 +90,9 @@ export interface Membro {
     tipo?: string;
     matricula?: string;
   }>;
+  created_at?: string;
+  member_since?: string;
+  dataCadastro?: string;
 }
 
 export interface DivisaoOption {
@@ -555,6 +558,14 @@ export function useMembros() {
       fotoUrl: member.foto_url || (cf as any).fotoUrl || undefined,
       isDizimista: member.is_dizimista ?? (cf as any).isDizimista ?? false,
       filhos: Array.isArray((cf as any).filhos) ? (cf as any).filhos : [],
+      created_at: member.created_at || (cf as any).created_at || undefined,
+      member_since: member.member_since || (cf as any).member_since || undefined,
+      dataCadastro:
+        member.created_at ||
+        member.member_since ||
+        (cf as any).dataCadastro ||
+        (cf as any).data_cadastro ||
+        undefined,
     };
   };
 
@@ -626,7 +637,7 @@ export function useMembros() {
 
       const { data, error } = await supabase
         .from('members')
-        .select('id, name, status, role, tipo_cadastro, cargo_ministerial, data_nascimento, created_at, congregacao_id, matricula, custom_fields')
+        .select('id, name, status, role, tipo_cadastro, cargo_ministerial, data_nascimento, created_at, member_since, congregacao_id, matricula, custom_fields')
         .eq('ministry_id', ministryId);
 
       if (!error && data) {

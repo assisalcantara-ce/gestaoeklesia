@@ -262,83 +262,151 @@ export default function PreCadastroPage() {
     >
       {/* ── 1. CARDS DE STATUS / RESUMO ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {/* Card 1: Pendentes (Laranja / Âmbar) */}
         <button
           onClick={() => { setActiveTab('pendente'); setCurrentPage(1); }}
-          className={`p-5 rounded-2xl border text-left transition shadow-xs cursor-pointer ${
-            activeTab === 'pendente'
-              ? 'bg-amber-50/80 border-amber-300 ring-2 ring-amber-400/20'
-              : 'bg-white border-slate-200 hover:border-amber-200'
+          className={`bg-[#fff6ea] border border-[#fde4c4] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between text-left cursor-pointer ${
+            activeTab === 'pendente' ? 'ring-2 ring-[#ea580c]/40 ring-offset-2' : ''
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-amber-700">Pendentes</span>
-            <span className="p-2 bg-amber-100 text-amber-800 rounded-xl">⏳</span>
+          <div className="flex items-center gap-3.5 flex-1 min-w-0">
+            <div className="w-13 h-13 rounded-2xl bg-white text-[#ea580c] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#ffedd5]">
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="min-w-0">
+              <span className="text-xs font-bold text-slate-800 block truncate">
+                Pendentes
+              </span>
+              <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
+                {stats.pendentes}
+              </p>
+              <p className="text-[11px] font-semibold text-slate-700 mt-1 truncate">
+                Aguardando homologação
+              </p>
+            </div>
           </div>
-          <p className="text-3xl font-black text-amber-900 mt-2">{stats.pendentes}</p>
-          <p className="text-xs text-amber-700/80 mt-1">Aguardando homologação</p>
+
+          <div className="w-8 h-8 rounded-xl bg-[#ffedd5] text-[#ea580c] flex items-center justify-center flex-shrink-0 self-start font-bold text-xs">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3" />
+            </svg>
+          </div>
         </button>
 
+        {/* Card 2: Aprovados (Verde) */}
         <button
           onClick={() => { setActiveTab('aprovado'); setCurrentPage(1); }}
-          className={`p-5 rounded-2xl border text-left transition shadow-xs cursor-pointer ${
-            activeTab === 'aprovado'
-              ? 'bg-emerald-50/80 border-emerald-300 ring-2 ring-emerald-400/20'
-              : 'bg-white border-slate-200 hover:border-emerald-200'
+          className={`bg-[#ecfdf3] border border-[#cff7de] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between text-left cursor-pointer ${
+            activeTab === 'aprovado' ? 'ring-2 ring-[#16a34a]/40 ring-offset-2' : ''
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">Aprovados</span>
-            <span className="p-2 bg-emerald-100 text-emerald-800 rounded-xl">✅</span>
+          <div className="flex items-center gap-3.5 flex-1 min-w-0">
+            <div className="w-13 h-13 rounded-2xl bg-white text-[#16a34a] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#dcfce7]">
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="min-w-0">
+              <span className="text-xs font-bold text-slate-800 block truncate">
+                Aprovados
+              </span>
+              <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
+                {stats.aprovados}
+              </p>
+              <p className="text-[11px] font-semibold text-slate-700 mt-1 truncate">
+                Oficializados em Membros
+              </p>
+            </div>
           </div>
-          <p className="text-3xl font-black text-emerald-900 mt-2">{stats.aprovados}</p>
-          <p className="text-xs text-emerald-700/80 mt-1">Oficializados em Membros</p>
+
+          <div className="w-8 h-8 rounded-xl bg-[#dcfce7] text-[#16a34a] flex items-center justify-center flex-shrink-0 self-start">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
         </button>
 
+        {/* Card 3: Para Correção (Azul) */}
         <button
           onClick={() => { setActiveTab('devolvido'); setCurrentPage(1); }}
-          className={`p-5 rounded-2xl border text-left transition shadow-xs cursor-pointer ${
-            activeTab === 'devolvido'
-              ? 'bg-blue-50/80 border-blue-300 ring-2 ring-blue-400/20'
-              : 'bg-white border-slate-200 hover:border-blue-200'
+          className={`bg-[#ebf5ff] border border-[#d0e6ff] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between text-left cursor-pointer ${
+            activeTab === 'devolvido' ? 'ring-2 ring-[#2563eb]/40 ring-offset-2' : ''
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-blue-700">Para Correção</span>
-            <span className="p-2 bg-blue-100 text-blue-800 rounded-xl">↩️</span>
+          <div className="flex items-center gap-3.5 flex-1 min-w-0">
+            <div className="w-13 h-13 rounded-2xl bg-white text-[#2563eb] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#dbeafe]">
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+              </svg>
+            </div>
+            <div className="min-w-0">
+              <span className="text-xs font-bold text-slate-800 block truncate">
+                Para Correção
+              </span>
+              <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
+                {stats.devolvidos}
+              </p>
+              <p className="text-[11px] font-semibold text-slate-700 mt-1 truncate">
+                Devolvidos com pendência
+              </p>
+            </div>
           </div>
-          <p className="text-3xl font-black text-blue-900 mt-2">{stats.devolvidos}</p>
-          <p className="text-xs text-blue-700/80 mt-1">Devolvidos com pendência</p>
+
+          <div className="w-8 h-8 rounded-xl bg-[#dbeafe] text-[#2563eb] flex items-center justify-center flex-shrink-0 self-start">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+          </div>
         </button>
 
+        {/* Card 4: Rejeitados (Roxo / Violeta) */}
         <button
           onClick={() => { setActiveTab('rejeitado'); setCurrentPage(1); }}
-          className={`p-5 rounded-2xl border text-left transition shadow-xs cursor-pointer ${
-            activeTab === 'rejeitado'
-              ? 'bg-rose-50/80 border-rose-300 ring-2 ring-rose-400/20'
-              : 'bg-white border-slate-200 hover:border-rose-200'
+          className={`bg-[#f3f0ff] border border-[#e3dbff] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between text-left cursor-pointer ${
+            activeTab === 'rejeitado' ? 'ring-2 ring-[#7c3aed]/40 ring-offset-2' : ''
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-rose-700">Rejeitados</span>
-            <span className="p-2 bg-rose-100 text-rose-800 rounded-xl">❌</span>
+          <div className="flex items-center gap-3.5 flex-1 min-w-0">
+            <div className="w-13 h-13 rounded-2xl bg-white text-[#7c3aed] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#ede9fe]">
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="min-w-0">
+              <span className="text-xs font-bold text-slate-800 block truncate">
+                Rejeitados
+              </span>
+              <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
+                {stats.rejeitados}
+              </p>
+              <p className="text-[11px] font-semibold text-slate-700 mt-1 truncate">
+                Recusados pela Secretaria
+              </p>
+            </div>
           </div>
-          <p className="text-3xl font-black text-rose-900 mt-2">{stats.rejeitados}</p>
-          <p className="text-xs text-rose-700/80 mt-1">Recusados pela Secretaria</p>
+
+          <div className="w-8 h-8 rounded-xl bg-[#ede9fe] text-[#7c3aed] flex items-center justify-center flex-shrink-0 self-start">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </div>
         </button>
       </div>
 
       {/* ── 2. BARRA DE FILTROS INSTITUCIONAL ── */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs mb-6 space-y-3">
+      <div className="bg-white p-4 rounded-3xl border border-slate-200/90 shadow-sm mb-6 space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
           {/* Busca por Nome ou CPF */}
           <div className="lg:col-span-4 relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Buscar por nome ou CPF..."
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition"
+              className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition shadow-2xs"
             />
           </div>
 
@@ -347,7 +415,7 @@ export default function PreCadastroPage() {
             <select
               value={congregacaoFilter}
               onChange={(e) => { setCongregacaoFilter(e.target.value); setCurrentPage(1); }}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition cursor-pointer"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition cursor-pointer shadow-2xs"
             >
               <option value="todas">Todas as Congregações</option>
               {congregacoes.map((c) => (
@@ -361,7 +429,7 @@ export default function PreCadastroPage() {
             <select
               value={tipoSolicitacaoFilter}
               onChange={(e) => { setTipoSolicitacaoFilter(e.target.value); setCurrentPage(1); }}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition cursor-pointer"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition cursor-pointer shadow-2xs"
             >
               <option value="todos">Todos os Tipos</option>
               <option value="novo_cadastro">Novo Cadastro</option>
@@ -374,7 +442,7 @@ export default function PreCadastroPage() {
             <select
               value={origemFilter}
               onChange={(e) => { setOrigemFilter(e.target.value); setCurrentPage(1); }}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition cursor-pointer"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition cursor-pointer shadow-2xs"
             >
               <option value="todos">Todas as Origens</option>
               <option value="link_publico">Link Público</option>
@@ -394,14 +462,14 @@ export default function PreCadastroPage() {
                 setCurrentPage(1);
               }}
               title="Limpar Filtros"
-              className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition border border-slate-200 cursor-pointer"
+              className="p-2.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-2xl transition border border-slate-200 cursor-pointer shadow-2xs"
             >
               <RotateCcw className="w-4 h-4" />
             </button>
             <button
               onClick={fetchPreCadastros}
               title="Atualizar Lista"
-              className="p-2 text-teal-700 hover:text-teal-900 hover:bg-teal-50 rounded-xl transition border border-teal-200 cursor-pointer"
+              className="p-2.5 text-teal-700 hover:text-teal-900 hover:bg-teal-50 rounded-2xl transition border border-teal-200 cursor-pointer shadow-2xs"
             >
               <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
             </button>
@@ -410,7 +478,7 @@ export default function PreCadastroPage() {
       </div>
 
       {/* ── 3. LISTAGEM PRINCIPAL ── */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden">
         {isLoading ? (
           <div className="p-12 text-center text-slate-500 text-sm font-medium">
             <RefreshCw className="w-6 h-6 animate-spin mx-auto text-teal-600 mb-2" />

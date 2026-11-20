@@ -14,6 +14,7 @@ interface Membro {
   dataCadastro?: string | Date;
   cargoMinisterial?: string;
   created_at?: string;
+  member_since?: string;
 }
 
 interface MembrosOverviewProps {
@@ -56,9 +57,17 @@ export default function MembrosOverview({
   const anoAnterior = dataMesAnterior.getFullYear();
 
   const parseDataMembro = (membro: Membro): Date | null => {
-    const raw = membro.dataCadastro || membro.created_at;
+    const raw = membro.created_at || membro.dataCadastro || membro.member_since;
     if (!raw) return null;
-    const d = new Date(raw);
+    if (raw instanceof Date) return isNaN(raw.getTime()) ? null : raw;
+    const s = String(raw).trim();
+    if (!s) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const [y, m, d] = s.split('-').map(Number);
+      const date = new Date(y, m - 1, d, 12, 0, 0);
+      return isNaN(date.getTime()) ? null : date;
+    }
+    const d = new Date(s);
     return isNaN(d.getTime()) ? null : d;
   };
 
@@ -124,6 +133,9 @@ export default function MembrosOverview({
   };
 
   const dadosCadastros = gerarDadosCadastrosPorMes();
+  const totalCadastros12m = dadosCadastros.reduce((acc, d) => acc + d.cadastros, 0);
+  const mediaMensal12m = (totalCadastros12m / 12).toFixed(1);
+  const picoMensal12m = Math.max(0, ...dadosCadastros.map((d: any) => d.cadastros));
 
   return (
     <div className="space-y-6">
@@ -303,13 +315,13 @@ export default function MembrosOverview({
           <div className="bg-emerald-50 p-3.5 rounded-2xl border border-emerald-200">
             <p className="text-xs font-bold text-emerald-900 uppercase tracking-wider">Pico em 1 Mês</p>
             <p className="text-xl font-black text-emerald-800 mt-0.5">
-              {Math.max(0, ...dadosCadastros.map((d: any) => d.cadastros))}
+              {picoMensal12m}
             </p>
           </div>
           <div className="bg-blue-50 p-3.5 rounded-2xl border border-blue-200">
             <p className="text-xs font-bold text-blue-900 uppercase tracking-wider">Média Mensal (12m)</p>
             <p className="text-xl font-black text-blue-800 mt-0.5">
-              {(totalMembros / 12).toFixed(1)}
+              {mediaMensal12m}
             </p>
           </div>
         </div>
