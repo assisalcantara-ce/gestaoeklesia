@@ -48,10 +48,15 @@ export async function GET(request: NextRequest) {
     const tipoSolicitacaoParam = searchParams.get('tipo_solicitacao')?.trim() || '';
     const searchParam = searchParams.get('search')?.trim() || '';
 
-    // Contadores para as duas abas oficiais: Pendentes e Inativos
-    // Para backward compatibility com registros já existentes, 'inativos' inclui 'inativo', 'rejeitado' e 'devolvido'
+    // Contadores gerais para os 4 cards informativos e para as 2 abas:
+    // 1. Pendentes totais
+    // 2. Novos Cadastros (pendentes com tipo_solicitacao = 'novo_cadastro')
+    // 3. Atualizações (pendentes com tipo_solicitacao = 'atualizacao')
+    // 4. Inativos totais (inativo, rejeitado, devolvido)
     const [
       { count: countPendentes },
+      { count: countNovosCadastros },
+      { count: countAtualizacoes },
       { count: countInativosEfetivos },
       { count: countRejeitados },
       { count: countDevolvidos },
@@ -61,6 +66,18 @@ export async function GET(request: NextRequest) {
         .select('id', { count: 'exact', head: true })
         .eq('ministry_id', ministryId)
         .eq('status', 'pendente'),
+      admin
+        .from('member_pre_registrations')
+        .select('id', { count: 'exact', head: true })
+        .eq('ministry_id', ministryId)
+        .eq('status', 'pendente')
+        .eq('tipo_solicitacao', 'novo_cadastro'),
+      admin
+        .from('member_pre_registrations')
+        .select('id', { count: 'exact', head: true })
+        .eq('ministry_id', ministryId)
+        .eq('status', 'pendente')
+        .eq('tipo_solicitacao', 'atualizacao'),
       admin
         .from('member_pre_registrations')
         .select('id', { count: 'exact', head: true })
@@ -170,6 +187,8 @@ export async function GET(request: NextRequest) {
       },
       stats: {
         pendentes: countPendentes || 0,
+        novosCadastros: countNovosCadastros || 0,
+        atualizacoes: countAtualizacoes || 0,
         inativos: totalInativos,
         // Mantidos para compatibilidade caso algum cliente consuma
         rejeitados: countRejeitados || 0,

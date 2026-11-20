@@ -37,6 +37,8 @@ export default function PreCadastroPage() {
   const [totalCount, setTotalCount] = useState(0);
   const [stats, setStats] = useState({
     pendentes: 0,
+    novosCadastros: 0,
+    atualizacoes: 0,
     inativos: 0,
     totalGeral: 0,
   });
@@ -272,15 +274,10 @@ export default function PreCadastroPage() {
         </div>
 
         {/* ── 1. CARDS DE INDICADORES (PADRÃO LISTAGEM DE MEMBROS) ── */}
-        {/* Apenas duas abas: Pendentes (Laranja) e Inativos (Vermelho/Rosa) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        {/* Quatro cards compactos exclusivamente informativos (mesma altura, largura e proporção) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {/* Card 1: Pendentes (Laranja / Âmbar) */}
-          <button
-            onClick={() => { setActiveTab('pendente'); setCurrentPage(1); }}
-            className={`bg-[#fff6ea] border border-[#fde4c4] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between text-left cursor-pointer ${
-              activeTab === 'pendente' ? 'ring-2 ring-[#ea580c]/40 ring-offset-2' : ''
-            }`}
-          >
+          <div className="bg-[#fff6ea] border border-[#fde4c4] rounded-3xl p-5 relative overflow-hidden shadow-xs flex items-center justify-between">
             <div className="flex items-center gap-3.5 flex-1 min-w-0">
               <div className="w-13 h-13 rounded-2xl bg-white text-[#ea580c] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#ffedd5]">
                 <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -305,15 +302,66 @@ export default function PreCadastroPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3" />
               </svg>
             </div>
-          </button>
+          </div>
 
-          {/* Card 2: Inativos (Vermelho / Rosa) */}
-          <button
-            onClick={() => { setActiveTab('inativo'); setCurrentPage(1); }}
-            className={`bg-[#fff1f2] border border-[#fecdd3] rounded-3xl p-5 relative overflow-hidden shadow-xs hover:shadow-md transition-all flex items-center justify-between text-left cursor-pointer ${
-              activeTab === 'inativo' ? 'ring-2 ring-[#e11d48]/40 ring-offset-2' : ''
-            }`}
-          >
+          {/* Card 2: Novos Cadastros (Azul / Ciano) */}
+          <div className="bg-[#ebf5ff] border border-[#d0e6ff] rounded-3xl p-5 relative overflow-hidden shadow-xs flex items-center justify-between">
+            <div className="flex items-center gap-3.5 flex-1 min-w-0">
+              <div className="w-13 h-13 rounded-2xl bg-white text-[#2563eb] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#dbeafe]">
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-slate-800 block truncate">
+                  Novos Cadastros
+                </span>
+                <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
+                  {stats.novosCadastros}
+                </p>
+                <p className="text-[11px] font-semibold text-slate-700 mt-1 truncate">
+                  Ingressos no rol
+                </p>
+              </div>
+            </div>
+
+            <div className="w-8 h-8 rounded-xl bg-[#dbeafe] text-[#2563eb] flex items-center justify-center flex-shrink-0 self-start">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+              </svg>
+            </div>
+          </div>
+
+          {/* Card 3: Atualizações (Violeta / Roxo) */}
+          <div className="bg-[#f3f0ff] border border-[#e3dbff] rounded-3xl p-5 relative overflow-hidden shadow-xs flex items-center justify-between">
+            <div className="flex items-center gap-3.5 flex-1 min-w-0">
+              <div className="w-13 h-13 rounded-2xl bg-white text-[#7c3aed] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#ede9fe]">
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-slate-800 block truncate">
+                  Atualizações
+                </span>
+                <p className="text-3xl font-black text-slate-900 leading-tight mt-0.5">
+                  {stats.atualizacoes}
+                </p>
+                <p className="text-[11px] font-semibold text-slate-700 mt-1 truncate">
+                  Revisões de membros
+                </p>
+              </div>
+            </div>
+
+            <div className="w-8 h-8 rounded-xl bg-[#ede9fe] text-[#7c3aed] flex items-center justify-center flex-shrink-0 self-start">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </div>
+          </div>
+
+          {/* Card 4: Inativos (Rosa / Vermelho) */}
+          <div className="bg-[#fff1f2] border border-[#fecdd3] rounded-3xl p-5 relative overflow-hidden shadow-xs flex items-center justify-between">
             <div className="flex items-center gap-3.5 flex-1 min-w-0">
               <div className="w-13 h-13 rounded-2xl bg-white text-[#e11d48] shadow-xs flex items-center justify-center flex-shrink-0 border border-[#ffe4e6]">
                 <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -338,7 +386,7 @@ export default function PreCadastroPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </div>
-          </button>
+          </div>
         </div>
 
         {/* ── 2. BARRA DE FILTROS (PADRÃO LISTAGEM DE MEMBROS) ── */}
@@ -442,8 +490,61 @@ export default function PreCadastroPage() {
           </div>
         </div>
 
+      {/* ── 2.1 NAVEGAÇÃO DE ABAS INDEPENDENTES (TABS HORIZONTAIS) ── */}
+      <div className="flex items-center gap-2.5 mb-6 overflow-x-auto pb-1" role="tablist" aria-label="Abas de Pré-Cadastros">
+        {/* Aba 1: Pendentes */}
+        <button
+          role="tab"
+          id="tab-pendentes"
+          aria-selected={activeTab === 'pendente'}
+          aria-controls="panel-pre-cadastros"
+          tabIndex={activeTab === 'pendente' ? 0 : -1}
+          onClick={() => { setActiveTab('pendente'); setCurrentPage(1); }}
+          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTab === 'pendente'
+              ? 'bg-teal-700 text-white shadow-sm border border-teal-800 ring-2 ring-teal-600/30 ring-offset-1'
+              : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:text-slate-900 shadow-xs'
+          }`}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>Pendentes</span>
+          <span className={`ml-1 px-2 py-0.5 rounded-full text-[11px] font-black ${
+            activeTab === 'pendente' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700 border border-slate-200'
+          }`}>
+            {stats.pendentes}
+          </span>
+        </button>
+
+        {/* Aba 2: Inativos */}
+        <button
+          role="tab"
+          id="tab-inativos"
+          aria-selected={activeTab === 'inativo'}
+          aria-controls="panel-pre-cadastros"
+          tabIndex={activeTab === 'inativo' ? 0 : -1}
+          onClick={() => { setActiveTab('inativo'); setCurrentPage(1); }}
+          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTab === 'inativo'
+              ? 'bg-rose-700 text-white shadow-sm border border-rose-800 ring-2 ring-rose-600/30 ring-offset-1'
+              : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:text-slate-900 shadow-xs'
+          }`}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+          </svg>
+          <span>Inativos</span>
+          <span className={`ml-1 px-2 py-0.5 rounded-full text-[11px] font-black ${
+            activeTab === 'inativo' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700 border border-slate-200'
+          }`}>
+            {stats.inativos}
+          </span>
+        </button>
+      </div>
+
       {/* ── 3. LISTAGEM PRINCIPAL (PADRÃO LISTAGEM DE MEMBROS) ── */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden mb-8">
+      <div id="panel-pre-cadastros" role="tabpanel" aria-labelledby={activeTab === 'pendente' ? 'tab-pendentes' : 'tab-inativos'} className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden mb-8">
         {/* Cabeçalho Interno da Tabela com Ícone, Título e Contador */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5 border-b border-slate-200/80 bg-white">
           <div className="flex items-center gap-3">
