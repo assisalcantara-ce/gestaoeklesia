@@ -12,6 +12,7 @@ import {
   CelulaReuniaoItem, CelulaParticipanteItem, SalvarReuniaoInput, CelulaReuniaoStatus, CelulaParticipanteTipo
 } from '@/types/celulas';
 import { authenticatedFetch } from '@/lib/api-client';
+import { TabParticipantes } from '@/components/celulas/TabParticipantes';
 
 const DIAS_SEMANA = [
   'Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira',
@@ -50,7 +51,7 @@ interface ItemFrequenciaForm {
 }
 
 export default function CelulasPage() {
-  const [abaAtiva, setAbaAtiva] = useState<'celulas' | 'reunioes' | 'redes' | 'configuracoes'>('celulas');
+  const [abaAtiva, setAbaAtiva] = useState<'celulas' | 'reunioes' | 'participantes' | 'redes' | 'configuracoes'>('celulas');
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [mensagem, setMensagem] = useState<{ tipo: 'sucesso' | 'erro'; texto: string } | null>(null);
@@ -744,6 +745,19 @@ export default function CelulasPage() {
 
           <button
             type="button"
+            onClick={() => setAbaAtiva('participantes')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+              abaAtiva === 'participantes'
+                ? 'bg-teal-700 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Participantes & Vínculos</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setAbaAtiva('redes')}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
               abaAtiva === 'redes'
@@ -1245,6 +1259,15 @@ export default function CelulasPage() {
               )}
             </div>
           </div>
+        )}
+
+        {/* Conteúdo Aba Participantes (Lote 3) */}
+        {abaAtiva === 'participantes' && (
+          <TabParticipantes
+            celulas={celulas}
+            congregacoes={congregacoes}
+            termoCelula={config?.termo_celula || 'Célula'}
+          />
         )}
 
         {/* Conteúdo Aba Redes */}

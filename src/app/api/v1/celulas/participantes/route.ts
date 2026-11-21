@@ -81,3 +81,44 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message || 'Erro ao salvar participante' }, { status: 400 });
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  let ctx: Awaited<ReturnType<typeof resolveTenantAuth>>;
+  try {
+    ctx = await resolveTenantAuth(request);
+  } catch (err: any) {
+    const isUnauth = err?.message === 'UNAUTHORIZED';
+    return NextResponse.json(
+      { error: isUnauth ? 'Não autenticado.' : 'Acesso negado: sem ministério associado.' },
+      { status: isUnauth ? 401 : 403 }
+    );
+  }
+
+  const { admin, ministryId, nivel } = ctx;
+
+  if (!temAcessoEscrita(nivel, 'celulas') && !temAcessoEscrita(nivel, 'secretaria') && !temAcessoEscrita(nivel, 'secretaria_local')) {
+    return NextResponse.json({ error: 'Acesso negado para remover participante de célula.' }, { status: 403 });
+  }
+
+  try {
+    const searchParams = request.nextUrl.searchParams;
+    const id = searchParams.get('id');
+    if (!id) {
+      return NextResponse.json({ error: 'ID do participante é obrigatório.' }, { status: 400 });
+    }
+
+    const { error } = await admin
+      .from('celulas_participantes')
+      .delete()
+      .eq('id', id)
+      .eq('ministry_id', ministryId);
+
+    if (error) {
+      throw new Error(`Erro ao excluir participante: ${error.message}`);
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Erro ao remover participante' }, { status: 400 });
+  }
+}
