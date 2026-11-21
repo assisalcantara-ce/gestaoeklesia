@@ -111,9 +111,19 @@ export const NAVIGATION_STRUCTURE: NavigationGroup[] = [
     items: [
       { id: 'cultos', label: 'Cultos', icon: '⛪', path: '/secretaria/cultos', modulo: 'gestao' },
       { id: 'visitantes', label: 'Visitantes', icon: '👥', path: '/acolhimento/visitantes', modulo: 'secretaria_local' },
-      { id: 'discipulado', label: 'Discipulado', icon: '🌱', path: '/acolhimento/discipulado', modulo: 'secretaria_local' },
-      { id: 'celulas', label: 'Células', icon: '🏠', path: '/celulas', modulo: 'secretaria_local' },
       { id: 'relatorio-espiritual', label: 'Livro Espiritual', icon: '🕊️', path: '/secretaria/relatorio-espiritual', modulo: 'gestao' },
+    ]
+  },
+  {
+    groupName: "DISCIPULADO",
+    items: [
+      { id: 'discipulado', label: 'Discipulado', icon: '🌱', path: '/acolhimento/discipulado', modulo: 'secretaria_local' },
+    ]
+  },
+  {
+    groupName: "CÉLULAS",
+    items: [
+      { id: 'celulas', label: 'Células', icon: '🏠', path: '/celulas', modulo: 'secretaria_local' },
     ]
   },
   {

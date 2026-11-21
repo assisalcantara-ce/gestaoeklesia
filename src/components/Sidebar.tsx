@@ -37,6 +37,8 @@ import {
   Menu,
   X,
   LucideIcon,
+  GraduationCap,
+  Network,
 } from 'lucide-react';
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = '@gestaoeklesia/sidebar_collapsed';
@@ -193,8 +195,6 @@ export default function Sidebar() {
     'relatorios-acolhimento': 'acolhimento',
     'cultos': 'acolhimento',
     'visitantes': 'acolhimento',
-    'discipulado': 'acolhimento',
-    'celulas': 'acolhimento',
     'configuracoes': 'configuracoes',
     'certificados': 'configuracoes',
     'config-cartas': 'configuracoes',
@@ -263,11 +263,23 @@ export default function Sidebar() {
       submenu: [
         { id: 'cultos', label: 'Cultos', path: '/secretaria/cultos', modulo: 'gestao' },
         { id: 'visitantes', label: 'Visitantes', path: '/acolhimento/visitantes', modulo: 'secretaria_local' },
-        { id: 'discipulado', label: 'Discipulado', path: '/acolhimento/discipulado', modulo: 'secretaria_local' },
-        { id: 'celulas', label: 'Células', path: '/celulas', modulo: 'secretaria_local' },
         { id: 'relatorio-espiritual', label: 'Livro Espiritual', path: '/secretaria/relatorio-espiritual', modulo: 'gestao' },
         { id: 'relatorios-acolhimento', label: 'Relatórios', path: '/acolhimento/relatorios', modulo: 'gestao' },
       ],
+    },
+    {
+      id: 'discipulado',
+      label: 'Discipulado',
+      icon: GraduationCap,
+      path: '/acolhimento/discipulado',
+      modulo: 'secretaria_local',
+    },
+    {
+      id: 'celulas',
+      label: 'Células',
+      icon: Network,
+      path: '/celulas',
+      modulo: 'secretaria_local',
     },
     { id: 'agenda', label: 'Agenda', icon: CalendarDays, path: '/agenda', modulo: 'agenda', planFeature: 'has_modulo_agenda', featureFlag: 'agenda_module' },
     {

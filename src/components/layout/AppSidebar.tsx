@@ -60,6 +60,8 @@ const PATH_TO_MENU_ID: { path: string; id: string }[] = [
 const GROUP_ICONS: Record<string, string> = {
   "GERAL": "📊",
   "ACOLHIMENTO": "🤝",
+  "DISCIPULADO": "🌱",
+  "CÉLULAS": "🏠",
   "SECRETARIA": "👥",
   "FINANCEIRO": "💰",
   "ENSINO": "📖",

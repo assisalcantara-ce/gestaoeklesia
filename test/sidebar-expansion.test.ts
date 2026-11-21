@@ -18,6 +18,8 @@ const PATH_TO_MENU_ID: { path: string; id: string }[] = [
   { path: '/secretaria/casamento',             id: 'casamento'            },
   { path: '/secretaria/relatorio-espiritual',  id: 'relatorio-espiritual' },
   { path: '/acolhimento/visitantes',           id: 'visitantes'           },
+  { path: '/acolhimento/discipulado',          id: 'discipulado'          },
+  { path: '/celulas',                          id: 'celulas'              },
   { path: '/acolhimento/relatorios',           id: 'relatorios-acolhimento' },
   { path: '/secretaria/cultos',                id: 'cultos'               },
   { path: '/secretaria/relatorios',            id: 'relatorios-secretaria'},
@@ -271,6 +273,41 @@ describe('Comportamento de Expansão e Retração do Menu Lateral (Sidebar)', ()
 
     const actualLabels = EBD_TREE.map(node => node.label);
     assert.deepEqual(actualLabels, expectedLabels, 'A ordem e rótulos dos itens de EBD devem coincidir exatamente');
+  });
+
+  it('13. Discipulado e Células como menus independentes de 1º nível logo após Acolhimento', async () => {
+    // Verificar arquivo Sidebar.tsx (conteúdo e estrutura)
+    const fs = await import('node:fs');
+    const content = fs.readFileSync('src/components/Sidebar.tsx', 'utf-8');
+
+    // Garantir que Acolhimento NÃO contém discipulado ou celulas no submenu
+    const acolhimentoBlockMatch = content.match(/id:\s*'acolhimento'[\s\S]*?submenu:\s*\[([\s\S]*?)\]/);
+    assert.ok(acolhimentoBlockMatch, 'Bloco de Acolhimento deve existir');
+    const submenuAcolhimento = acolhimentoBlockMatch[1];
+    assert.equal(submenuAcolhimento.includes("id: 'discipulado'"), false, 'Discipulado não pode estar no submenu Acolhimento');
+    assert.equal(submenuAcolhimento.includes("id: 'celulas'"), false, 'Células não pode estar no submenu Acolhimento');
+    assert.ok(submenuAcolhimento.includes("id: 'cultos'"), 'Cultos deve permanecer em Acolhimento');
+    assert.ok(submenuAcolhimento.includes("id: 'visitantes'"), 'Visitantes deve permanecer em Acolhimento');
+    assert.ok(submenuAcolhimento.includes("id: 'relatorio-espiritual'"), 'Livro Espiritual deve permanecer em Acolhimento');
+    assert.ok(submenuAcolhimento.includes("id: 'relatorios-acolhimento'"), 'Relatórios deve permanecer em Acolhimento');
+
+    // Ordem no primeiro nível em allMenuItems: acolhimento -> discipulado -> celulas
+    const allMenuItemsBlock = content.slice(content.indexOf('const allMenuItems: MenuItemDef[]'));
+    const idxAcolhimento = allMenuItemsBlock.indexOf("id: 'acolhimento'");
+    const idxDiscipulado = allMenuItemsBlock.indexOf("id: 'discipulado'");
+    const idxCelulas = allMenuItemsBlock.indexOf("id: 'celulas'");
+
+    assert.ok(idxAcolhimento !== -1, 'Acolhimento deve existir');
+    assert.ok(idxDiscipulado !== -1, 'Discipulado deve existir');
+    assert.ok(idxCelulas !== -1, 'Células deve existir');
+    assert.ok(idxAcolhimento < idxDiscipulado, 'Acolhimento deve vir antes de Discipulado');
+    assert.ok(idxDiscipulado < idxCelulas, 'Discipulado deve vir antes de Células');
+
+    // Rotas ativas não devem colapsar ou apontar para o pai acolhimento
+    assert.equal(resolveExpandedMenuForRoute('/acolhimento/discipulado'), null, 'Discipulado não deve ter pai sanfonado');
+    assert.equal(resolveExpandedMenuForRoute('/celulas'), null, 'Células não deve ter pai sanfonado');
+    assert.equal(resolveActiveMenu('/acolhimento/discipulado'), 'discipulado', 'Rota /acolhimento/discipulado deve ativar menu discipulado');
+    assert.equal(resolveActiveMenu('/celulas'), 'celulas', 'Rota /celulas deve ativar menu celulas');
   });
 });
 
