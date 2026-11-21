@@ -738,6 +738,70 @@ export class CelulasService {
     };
   }
 
+  async registrarChamadaRapidaTransacional(rawToken: string, payload: {
+    tema_estudo?: string | null;
+    observacoes?: string | null;
+    presentes_membros?: number;
+    presentes_visitantes?: number;
+    presentes_criancas?: number;
+    conversoes_decisoes?: number;
+    reconciliacoes?: number;
+    testemunhos?: number;
+    pedidos_oracao?: number;
+    valor_oferta?: number;
+    frequencias?: Array<{
+      member_id?: string | null;
+      nome_participante: string;
+      tipo_participante?: string;
+      presente: boolean;
+      justificativa_ausencia?: string | null;
+    }>;
+    finalizar?: boolean;
+  }): Promise<{
+    reuniao_id: string;
+    status: string;
+    total_presentes: number;
+    finalizada: boolean;
+  }> {
+    if (!rawToken || rawToken.trim().length < 32) {
+      throw new Error('Token inválido ou com formato incorreto.');
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(rawToken.trim()).digest('hex');
+
+    // 1. Tentar executar a RPC transacional com bloqueio atômico (FOR UPDATE)
+    const { data: rpcData, error: rpcError } = await this.supabase.rpc('registrar_chamada_rapida_celula', {
+      p_token_hash: tokenHash,
+      p_tema_estudo: payload.tema_estudo || null,
+      p_observacoes: payload.observacoes || null,
+      p_presentes_membros: payload.presentes_membros || 0,
+      p_presentes_visitantes: payload.presentes_visitantes || 0,
+      p_presentes_criancas: payload.presentes_criancas || 0,
+      p_conversoes_decisoes: payload.conversoes_decisoes || 0,
+      p_reconciliacoes: payload.reconciliacoes || 0,
+      p_testemunhos: payload.testemunhos || 0,
+      p_pedidos_oracao: payload.pedidos_oracao || 0,
+      p_valor_oferta: payload.valor_oferta || 0,
+      p_frequencias: payload.frequencias || [],
+      p_finalizar: Boolean(payload.finalizar),
+    });
+
+    if (rpcError) {
+      throw new Error(rpcError.message || 'Erro ao registrar chamada rápida.');
+    }
+
+    if (!rpcData) {
+      throw new Error('Retorno inválido ao registrar chamada rápida.');
+    }
+
+    return rpcData as {
+      reuniao_id: string;
+      status: string;
+      total_presentes: number;
+      finalizada: boolean;
+    };
+  }
+
   // --------------------------------------------------------------------------
   // LOTE 3: PARTICIPANTES E TRANSFERÊNCIAS
   // --------------------------------------------------------------------------

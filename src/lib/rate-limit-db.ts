@@ -30,6 +30,7 @@ export async function consumeRateLimit(params: {
   limit: number
   windowMs: number
   now?: number
+  failClosedOnDbError?: boolean
 }): Promise<RateLimitResult> {
   const supabase = createServerClient()
 
@@ -42,6 +43,15 @@ export async function consumeRateLimit(params: {
   } as any)
 
   if (error) {
+    if (params.failClosedOnDbError) {
+      return {
+        allowed: false,
+        remaining: 0,
+        resetAt: Date.now() + params.windowMs,
+        retryAfterSeconds: Math.ceil(params.windowMs / 1000),
+        source: 'db',
+      }
+    }
     const fallback = checkRateLimit(params.bucketKey, params.limit, params.windowMs)
     if (fallback.allowed) {
       return { allowed: true, remaining: fallback.remaining, resetAt: fallback.resetAt, source: 'memory' }
@@ -51,6 +61,15 @@ export async function consumeRateLimit(params: {
 
   const row = Array.isArray(data) ? data[0] : data
   if (!row) {
+    if (params.failClosedOnDbError) {
+      return {
+        allowed: false,
+        remaining: 0,
+        resetAt: Date.now() + params.windowMs,
+        retryAfterSeconds: Math.ceil(params.windowMs / 1000),
+        source: 'db',
+      }
+    }
     const fallback = checkRateLimit(params.bucketKey, params.limit, params.windowMs)
     if (fallback.allowed) {
       return { allowed: true, remaining: fallback.remaining, resetAt: fallback.resetAt, source: 'memory' }
