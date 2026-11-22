@@ -492,7 +492,19 @@ export class ServosMigrationService {
     const templateKey = (templateJson.template_key || 'ministro-branco').trim();
     const name = (templateJson.name || 'Ministro Modelo 01').trim();
     const tipoCadastro = (templateJson.tipo_cadastro || 'ministro').trim();
-    const templateData = templateJson.template_data || templateJson;
+    const rawData = templateJson.template_data || templateJson;
+
+    // Normalizar propriedades estruturais do template para o motor Eklésia
+    const templateData = {
+      ...rawData,
+      largura: rawData.largura || 465,
+      altura: rawData.altura || 291,
+      orientacao: rawData.orientacao || 'landscape',
+      tipoImpressao: rawData.tipoImpressao || 'pvc',
+      elementos: rawData.elementos || rawData.elementosFrente || [],
+      elementosVerso: rawData.elementosVerso || [],
+      temVerso: rawData.temVerso ?? (Array.isArray(rawData.elementosVerso) && rawData.elementosVerso.length > 0),
+    };
 
     // Verificar se já existe template com essa chave no tenant
     const { data: existing } = await this.supabaseAdmin
