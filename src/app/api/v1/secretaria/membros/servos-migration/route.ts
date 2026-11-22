@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveTenantAuth } from '@/lib/tenant-auth';
+import { hasRole, temAcessoEscrita } from '@/lib/access-control';
 import { ServosMigrationService } from '@/lib/servos-migration/ServosMigrationService';
 import { TARGET_IEADMIM_MINISTRY_ID, parseCSVStream } from '@/lib/servos-migration/types';
 
@@ -8,7 +9,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   try {
     const auth = await resolveTenantAuth(request);
-    const { admin, ministryId, roles, permissions } = auth;
+    const { admin, ministryId, roles, nivel, isOwner } = auth;
 
     // 1. Validação estrita de Tenant
     if (ministryId !== TARGET_IEADMIM_MINISTRY_ID) {
@@ -20,12 +21,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Validação estrita de permissões administrativas
-    const isOwner = auth.isOwner;
-    const hasAdminRole = roles.includes('admin') || roles.includes('secretario') || roles.includes('pastor');
-    const hasPermission = permissions.includes('can_manage_members') || permissions.includes('admin');
+    // 2. Validação estrita de permissões administrativas conforme RBAC oficial do Gestão Eklésia
+    // Permite Owner, Administrador Geral, Secretário Geral ou qualquer perfil com escrita no módulo secretaria
+    const hasAdminPermission =
+      isOwner ||
+      hasRole(roles, ['ADMINISTRADOR', 'ADMIN', 'SECRETARIO_GERAL', 'PRESIDENCIA']) ||
+      temAcessoEscrita(nivel, 'secretaria');
 
-    if (!isOwner && !hasAdminRole && !hasPermission) {
+    if (!hasAdminPermission) {
       return NextResponse.json(
         { error: 'Acesso negado: permissão administrativa necessária para importar membros.' },
         { status: 403 }
