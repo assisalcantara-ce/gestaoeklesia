@@ -10,6 +10,7 @@ import { useUserContext } from '@/hooks/useUserContext';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
 import { normalizeMemberStatus } from '@/lib/member-status';
+import ServosMigrationTab from '@/components/ServosMigrationTab';
 
 interface RowError {
   line: number;
@@ -31,6 +32,7 @@ export default function ImportarMembrosPage() {
   const userCtx = useUserContext();
   const { registrarAcao } = useAuditLog();
   const supabase = createClient();
+  const [importTab, setImportTab] = useState<'convencional' | 'servos_ieadmim'>('convencional');
   const [nomeMinisterio, setNomeMinisterio] = useState<string>('Ministério');
   const [file, setFile] = useState<File | null>(null);
   const [parsing, setParsing] = useState(false);
@@ -848,6 +850,43 @@ export default function ImportarMembrosPage() {
     >
       <div className="max-w-6xl mx-auto space-y-6">
 
+        {/* Seletor de Modo de Importação */}
+        <div className="flex border-b border-gray-200 gap-4">
+          <button
+            type="button"
+            onClick={() => setImportTab('convencional')}
+            className={`pb-3 px-2 font-semibold text-sm transition border-b-2 flex items-center gap-2 ${
+              importTab === 'convencional'
+                ? 'border-teal-600 text-teal-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <FileText className="h-4 w-4" />
+            Importador Padrão (Planilha 59 Colunas)
+          </button>
+          <button
+            type="button"
+            onClick={() => setImportTab('servos_ieadmim')}
+            className={`pb-3 px-2 font-semibold text-sm transition border-b-2 flex items-center gap-2 ${
+              importTab === 'servos_ieadmim'
+                ? 'border-blue-600 text-blue-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <ShieldAlert className="h-4 w-4 text-blue-600" />
+            Migração Gestão Servos (IEADMIM - 64 Colunas & Carteirinha)
+          </button>
+        </div>
+
+        {importTab === 'servos_ieadmim' ? (
+          <ServosMigrationTab
+            currentMinistryId={userCtx.ministryId}
+            onSuccess={() => {
+              fetchPendingPhotosCount();
+            }}
+          />
+        ) : (
+          <>
         {/* Instruções */}
         <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
           <h2 className="text-lg font-bold text-teal-800 mb-4 flex items-center gap-2">
@@ -1306,6 +1345,8 @@ export default function ImportarMembrosPage() {
               </div>
             </div>
           </>
+        )}
+        </>
         )}
 
       </div>
