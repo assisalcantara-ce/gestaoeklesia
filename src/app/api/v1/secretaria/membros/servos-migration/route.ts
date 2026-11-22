@@ -89,6 +89,26 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    if (mode === 'reconcile-dry-run') {
+      const report = await migrationService.reconcileDryRun(rows as any);
+      return NextResponse.json({
+        success: true,
+        mode: 'reconcile-dry-run',
+        report,
+      });
+    }
+
+    if (mode === 'reconcile-execute') {
+      const result = await migrationService.executeReconcile(rows as any, {
+        batchSize: 5,
+      });
+      return NextResponse.json({
+        success: true,
+        mode: 'reconcile-execute',
+        result,
+      });
+    }
+
     if (mode === 'import') {
       const importResult = await migrationService.executeImport(rows as any, {
         importPhotos: true,

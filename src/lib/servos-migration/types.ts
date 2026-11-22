@@ -103,6 +103,41 @@ export interface ServosPreviewReport {
   preview_amostra: ServosRowValidation[];
 }
 
+export interface ServosReconcilePreviewReport {
+  target_ministry_id: string;
+  is_target_matched: boolean;
+  total_no_arquivo: number;
+  ja_importados_no_banco: number;
+  ministros_ausentes_count: number;
+  ministros_ausentes: {
+    origem_id: string;
+    name: string;
+    matricula: string;
+    cpf: string | null;
+    cargo: string | null;
+    has_foto: boolean;
+    conflito_matricula: boolean;
+    motivo_conflito?: string;
+  }[];
+  fotos_ja_persistidas_count: number;
+  fotos_pendentes_count: number;
+  fotos_pendentes: {
+    membro_id: string;
+    origem_id: string;
+    name: string;
+    matricula: string;
+    foto_bytes_approx: number;
+  }[];
+}
+
+export interface ServosReconcileResult {
+  ministros_inseridos: number;
+  ministros_ignorados: number;
+  fotos_enviadas: number;
+  falhas_fotos: number;
+  erros: { identificador: string; nome: string; motivo: string }[];
+}
+
 /**
  * Utilitário de parsing CSV RFC-4180 compatível com aspas e quebras de linha embutidas
  */

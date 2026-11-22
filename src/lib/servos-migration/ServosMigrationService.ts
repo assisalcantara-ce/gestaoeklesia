@@ -4,6 +4,8 @@ import {
   ServosRawMember,
   ServosRowValidation,
   ServosPreviewReport,
+  ServosReconcilePreviewReport,
+  ServosReconcileResult,
   generateServosUniqueId,
   parseDateSafe,
   parseBoolSafe,
@@ -530,5 +532,366 @@ export class ServosMigrationService {
       if (insertErr) throw new Error(`Falha ao inserir template: ${insertErr.message}`);
       return { template_key: templateKey, action: 'criado' };
     }
+  }
+
+  /**
+   * Prévia SOMENTE LEITURA para reconciliação:
+   * Cruza todos os registros do CSV com os já existentes em `members` (via custom_fields->>origem_servos_id).
+   * Identifica precisamente os ministros faltantes e as fotos que ainda não foram enviadas.
+   */
+  public async reconcileDryRun(rawMembers: ServosRawMember[]): Promise<ServosReconcilePreviewReport> {
+    this.validateTargetMinistry();
+
+    // 1. Buscar todos os membros já importados para o tenant IEADMIM
+    const { data: dbMembers, error: dbErr } = await this.supabaseAdmin
+      .from('members')
+      .select('id, name, cpf, matricula, foto_url, custom_fields')
+      .eq('ministry_id', this.targetMinistryId);
+
+    if (dbErr) {
+      throw new Error(`Erro ao consultar banco do tenant para reconciliação: ${dbErr.message}`);
+    }
+
+    const membersByOrigemId = new Map<string, any>();
+    const membersByCpf = new Map<string, any>();
+    const existingMatriculas = new Set<string>();
+
+    (dbMembers || []).forEach((m: any) => {
+      const origemId = m.custom_fields?.origem_servos_id;
+      if (origemId) {
+        membersByOrigemId.set(String(origemId).trim(), m);
+      }
+      const cpfClean = (m.cpf || '').replace(/\D/g, '');
+      if (cpfClean) {
+        membersByCpf.set(cpfClean, m);
+      }
+      if (m.matricula) {
+        existingMatriculas.add(String(m.matricula).trim());
+      }
+    });
+
+    const ministrosAusentes: ServosReconcilePreviewReport['ministros_ausentes'] = [];
+    const fotosPendentes: ServosReconcilePreviewReport['fotos_pendentes'] = [];
+    let fotosJaPersistidas = 0;
+
+    for (const rm of rawMembers) {
+      const origemId = (rm.id || '').trim();
+      const cpfClean = (rm.cpf || '').replace(/\D/g, '');
+      const rawFoto = (rm.foto_url || '').trim();
+      const hasFoto = rawFoto.startsWith('data:image');
+      const mat = (rm.matricula || '').trim();
+
+      const existingMember = membersByOrigemId.get(origemId) || (cpfClean ? membersByCpf.get(cpfClean) : null);
+
+      if (!existingMember) {
+        // Ministro ausente do banco
+        const conflitoMatricula = mat ? existingMatriculas.has(mat) : false;
+        ministrosAusentes.push({
+          origem_id: origemId,
+          name: (rm.name || '').trim(),
+          matricula: mat,
+          cpf: cpfClean || null,
+          cargo: (rm.cargo_ministerial || rm.role || 'Ministro').trim() || null,
+          has_foto: hasFoto,
+          conflito_matricula: conflitoMatricula,
+          motivo_conflito: conflitoMatricula
+            ? `A matrícula ${mat} coincide com outro registro ativo (duplicidade herdada do legado)`
+            : undefined,
+        });
+      } else {
+        // Ministro já cadastrado
+        if (hasFoto) {
+          if (existingMember.foto_url) {
+            fotosJaPersistidas++;
+          } else {
+            fotosPendentes.push({
+              membro_id: existingMember.id,
+              origem_id: origemId,
+              name: existingMember.name,
+              matricula: existingMember.matricula || mat,
+              foto_bytes_approx: Math.round((rawFoto.length * 3) / 4),
+            });
+          }
+        }
+      }
+    }
+
+    return {
+      target_ministry_id: this.targetMinistryId,
+      is_target_matched: true,
+      total_no_arquivo: rawMembers.length,
+      ja_importados_no_banco: (dbMembers || []).length,
+      ministros_ausentes_count: ministrosAusentes.length,
+      ministros_ausentes: ministrosAusentes,
+      fotos_ja_persistidas_count: fotosJaPersistidas,
+      fotos_pendentes_count: fotosPendentes.length,
+      fotos_pendentes: fotosPendentes,
+    };
+  }
+
+  /**
+   * Executa a reconciliação em MICROLOTES de no máximo 5 registros por vez.
+   * Não sobrescreve ministros já existentes e atua exclusivamente nas lacunas.
+   */
+  public async executeReconcile(
+    rawMembers: ServosRawMember[],
+    options?: { batchSize?: number }
+  ): Promise<ServosReconcileResult> {
+    this.validateTargetMinistry();
+
+    const MICRO_BATCH_SIZE = Math.min(5, Math.max(1, options?.batchSize || 5));
+
+    // 1. Carregar estado atual do banco
+    const { data: dbMembers, error: dbErr } = await this.supabaseAdmin
+      .from('members')
+      .select('id, name, cpf, matricula, foto_url, custom_fields')
+      .eq('ministry_id', this.targetMinistryId);
+
+    if (dbErr) {
+      throw new Error(`Erro ao consultar banco do tenant para reconciliação: ${dbErr.message}`);
+    }
+
+    const membersByOrigemId = new Map<string, any>();
+    const membersByCpf = new Map<string, any>();
+
+    (dbMembers || []).forEach((m: any) => {
+      const origemId = m.custom_fields?.origem_servos_id;
+      if (origemId) membersByOrigemId.set(String(origemId).trim(), m);
+      const cpfClean = (m.cpf || '').replace(/\D/g, '');
+      if (cpfClean) membersByCpf.set(cpfClean, m);
+    });
+
+    let ministrosInseridos = 0;
+    let ministrosIgnorados = 0;
+    let fotosEnviadas = 0;
+    let falhasFotos = 0;
+    const erros: ServosReconcileResult['erros'] = [];
+
+    // FASE A: Reconciliar Fotos Pendentes em Ministros Já Cadastrados
+    for (const rm of rawMembers) {
+      const origemId = (rm.id || '').trim();
+      const cpfClean = (rm.cpf || '').replace(/\D/g, '');
+      const rawFoto = (rm.foto_url || '').trim();
+      const hasFoto = rawFoto.startsWith('data:image');
+
+      if (!hasFoto) continue;
+
+      const existingMember = membersByOrigemId.get(origemId) || (cpfClean ? membersByCpf.get(cpfClean) : null);
+      if (existingMember && !existingMember.foto_url) {
+        try {
+          const publicUrl = await this.uploadBase64Photo(existingMember.id, rawFoto);
+          if (publicUrl) {
+            await this.supabaseAdmin
+              .from('members')
+              .update({ foto_url: publicUrl })
+              .eq('id', existingMember.id);
+            fotosEnviadas++;
+          }
+        } catch (fErr: any) {
+          falhasFotos++;
+          erros.push({
+            identificador: existingMember.id,
+            nome: existingMember.name,
+            motivo: `Falha ao enviar foto no Storage: ${fErr.message}`,
+          });
+        }
+      }
+    }
+
+    // FASE B: Identificar Registros Comprovadamente Ausentes
+    const missingMembers: ServosRawMember[] = [];
+    for (const rm of rawMembers) {
+      const origemId = (rm.id || '').trim();
+      const cpfClean = (rm.cpf || '').replace(/\D/g, '');
+      const exists = membersByOrigemId.has(origemId) || (cpfClean ? membersByCpf.has(cpfClean) : false);
+      if (!exists) {
+        missingMembers.push(rm);
+      } else {
+        ministrosIgnorados++;
+      }
+    }
+
+    // FASE C: Inserir Registros Ausentes em Microlotes de até 5
+    for (let i = 0; i < missingMembers.length; i += MICRO_BATCH_SIZE) {
+      const microBatch = missingMembers.slice(i, i + MICRO_BATCH_SIZE);
+      const recordsToInsert: Record<string, any>[] = [];
+      const batchPhotos: { memberTempIndex: number; base64: string }[] = [];
+
+      for (let j = 0; j < microBatch.length; j++) {
+        const rm = microBatch[j];
+        const origemId = (rm.id || '').trim();
+        const name = (rm.name || '').trim();
+
+        if (!name) {
+          erros.push({
+            identificador: origemId || `Linha ${i + j}`,
+            nome: '(sem nome)',
+            motivo: 'Nome obrigatório ausente',
+          });
+          continue;
+        }
+
+        let uniqueId = (rm.unique_id || '').trim();
+        if (!uniqueId) uniqueId = generateServosUniqueId();
+
+        let customFieldsOrigem: Record<string, any> = {};
+        if (typeof rm.custom_fields === 'string') {
+          try {
+            customFieldsOrigem = JSON.parse(rm.custom_fields);
+          } catch {
+            customFieldsOrigem = { raw: rm.custom_fields };
+          }
+        } else if (typeof rm.custom_fields === 'object' && rm.custom_fields !== null) {
+          customFieldsOrigem = rm.custom_fields;
+        }
+
+        const customFieldsFinal = {
+          ...customFieldsOrigem,
+          origem_servos_id: origemId || null,
+          migrado_em: new Date().toISOString(),
+          origem_sistema: 'gestao_servos',
+          reconciliado: true,
+        };
+
+        let dadosCargosFinal: Record<string, any> = {};
+        if (typeof rm.dados_cargos === 'string') {
+          try {
+            dadosCargosFinal = JSON.parse(rm.dados_cargos);
+          } catch {
+            dadosCargosFinal = {};
+          }
+        } else if (typeof rm.dados_cargos === 'object' && rm.dados_cargos !== null) {
+          dadosCargosFinal = rm.dados_cargos;
+        }
+
+        const cpfClean = (rm.cpf || '').replace(/\D/g, '') || null;
+        const rawFoto = (rm.foto_url || '').trim();
+        const hasFotoBase64 = rawFoto.startsWith('data:image');
+
+        const payload: Record<string, any> = {
+          ministry_id: this.targetMinistryId,
+          name,
+          cpf: cpfClean,
+          email: (rm.email || '').trim().toLowerCase() || null,
+          phone: (rm.phone || rm.celular || rm.whatsapp || '').trim() || null,
+          celular: (rm.celular || '').trim() || null,
+          whatsapp: (rm.whatsapp || '').trim() || null,
+          matricula: (rm.matricula || '').trim() || null,
+          unique_id: uniqueId,
+          tipo_cadastro: 'ministro',
+          status: normalizeMemberStatus(rm.status, true) || 'active',
+          role: (rm.role || 'ministro').toLowerCase(),
+          is_dizimista: true,
+          pastor_auxiliar: parseBoolSafe(rm.pastor_auxiliar),
+          tem_funcao_igreja: parseBoolSafe(rm.tem_funcao_igreja),
+          qual_funcao: (rm.qual_funcao || '').trim() || null,
+          cargo_ministerial: (rm.cargo_ministerial || 'Pastor').trim() || null,
+          setor_departamento: (rm.setor_departamento || '').trim() || null,
+          observacoes_ministeriais: (rm.observacoes_ministeriais || '').trim() || null,
+          observacoes: (rm.observacoes || '').trim() || null,
+          curso_teologico: (rm.curso_teologico || '').trim() || null,
+          instituicao_teologica: (rm.instituicao_teologica || '').trim() || null,
+          procedencia: (rm.procedencia || '').trim() || null,
+          procedencia_local: (rm.procedencia_local || '').trim() || null,
+          rg: (rm.rg || '').trim() || null,
+          orgao_emissor: (rm.orgao_emissor || '').trim() || null,
+          nacionalidade: (rm.nacionalidade || 'BRASILEIRO').trim() || null,
+          naturalidade: (rm.naturalidade || '').trim() || null,
+          uf_naturalidade: (rm.uf_naturalidade || '').trim() || null,
+          sexo: (rm.sexo || '').trim().toUpperCase() || null,
+          estado_civil: (rm.estado_civil || '').trim().toUpperCase() || null,
+          profissao: (rm.profissao || '').trim() || null,
+          tipo_sanguineo: (rm.tipo_sanguineo || '').trim() || null,
+          escolaridade: (rm.escolaridade || '').trim() || null,
+          nome_pai: (rm.nome_pai || '').trim() || null,
+          nome_mae: (rm.nome_mae || '').trim() || null,
+          nome_conjuge: (rm.nome_conjuge || '').trim() || null,
+          cpf_conjuge: (rm.cpf_conjuge || '').replace(/\D/g, '') || null,
+          titulo_eleitoral: (rm.titulo_eleitoral || '').trim() || null,
+          zona_eleitoral: (rm.zona_eleitoral || '').trim() || null,
+          secao_eleitoral: (rm.secao_eleitoral || '').trim() || null,
+          logradouro: (rm.logradouro || '').trim() || null,
+          numero: (rm.numero || '').trim() || null,
+          complemento: (rm.complemento || '').trim() || null,
+          bairro: (rm.bairro || '').trim() || null,
+          cidade: (rm.cidade || '').trim() || null,
+          estado: (rm.estado || '').trim() || null,
+          cep: (rm.cep || '').trim() || null,
+          data_nascimento: parseDateSafe(rm.data_nascimento),
+          data_nascimento_conjuge: parseDateSafe(rm.data_nascimento_conjuge),
+          data_batismo_aguas: parseDateSafe(rm.data_batismo_aguas),
+          data_batismo_espirito_santo: parseDateSafe(rm.data_batismo_espirito_santo),
+          data_consagracao: parseDateSafe(rm.data_consagracao),
+          data_emissao: parseDateSafe(rm.data_emissao),
+          data_validade_credencial: parseDateSafe(rm.data_validade_credencial),
+          member_since: parseDateSafe(rm.member_since),
+          custom_fields: customFieldsFinal,
+          dados_cargos: dadosCargosFinal,
+          foto_url: null,
+          congregacao_id: null,
+        };
+
+        const currentPos = recordsToInsert.length;
+        recordsToInsert.push(payload);
+
+        if (hasFotoBase64) {
+          batchPhotos.push({
+            memberTempIndex: currentPos,
+            base64: rawFoto,
+          });
+        }
+      }
+
+      if (recordsToInsert.length === 0) continue;
+
+      const { data: insertedMembers, error: insertErr } = await this.supabaseAdmin
+        .from('members')
+        .insert(recordsToInsert)
+        .select('id, name');
+
+      if (insertErr) {
+        erros.push({
+          identificador: `Microlote ${Math.floor(i / MICRO_BATCH_SIZE) + 1}`,
+          nome: microBatch.map((m) => m.name).join(', '),
+          motivo: insertErr.message,
+        });
+        continue;
+      }
+
+      ministrosInseridos += insertedMembers?.length || 0;
+
+      // Upload de fotos dos recém inseridos se houver
+      if (insertedMembers && batchPhotos.length > 0) {
+        for (const bp of batchPhotos) {
+          const createdMember = insertedMembers[bp.memberTempIndex];
+          if (!createdMember?.id) continue;
+          try {
+            const publicUrl = await this.uploadBase64Photo(createdMember.id, bp.base64);
+            if (publicUrl) {
+              await this.supabaseAdmin
+                .from('members')
+                .update({ foto_url: publicUrl })
+                .eq('id', createdMember.id);
+              fotosEnviadas++;
+            }
+          } catch (pErr: any) {
+            falhasFotos++;
+            erros.push({
+              identificador: createdMember.id,
+              nome: createdMember.name,
+              motivo: `Foto recém inserida falhou: ${pErr.message}`,
+            });
+          }
+        }
+      }
+    }
+
+    return {
+      ministros_inseridos: ministrosInseridos,
+      ministros_ignorados: ministrosIgnorados,
+      fotos_enviadas: fotosEnviadas,
+      falhas_fotos: falhasFotos,
+      erros,
+    };
   }
 }
