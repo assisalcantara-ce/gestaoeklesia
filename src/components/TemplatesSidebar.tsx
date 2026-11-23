@@ -28,13 +28,13 @@ export function TemplatesSidebar({
     const todosTemplates = templatesDisponiveis.map((nativo: any) => {
         // Tentar encontrar uma versão "salva" deste modelo no estado pelo ID
         const salvo = templates.find((t: any) => t.id === nativo.id);
-        // Se encontrou uma versão salva, mesclar com os dados nativos (especialmente previewImage)
-        // para garantir que propriedades novas do nativo não se percam
+        // Se encontrou uma versão salva, mesclar preservando dados customizados (especialmente backgrounds e elementos salvos)
         if (salvo) {
             return {
                 ...salvo,
-                previewImage: nativo.previewImage || salvo.previewImage, // Priorizar nativo
-                backgroundUrl: nativo.backgroundUrl || salvo.backgroundUrl // Priorizar nativo
+                previewImage: salvo.previewImage || salvo.backgroundUrl || nativo.previewImage,
+                backgroundUrl: salvo.backgroundUrl || nativo.backgroundUrl,
+                backgroundUrlVerso: salvo.backgroundUrlVerso || nativo.backgroundUrlVerso
             };
         }
         return nativo;

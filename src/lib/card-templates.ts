@@ -374,6 +374,10 @@ export function converterParaTemplateEditavel(template: CardTemplate): any {
     // Modelo em Branco (Template Editável) - Agora inclui TODOS os de Ministro e TODOS de Membro
     if (template.id === 'membro-branco' || template.id === 'congregado-branco' ||
         template.id === 'ministro-branco' || template.id === 'membro-01') {
+        const tAny = template as any;
+        const temElementos = Array.isArray(tAny.elementos) && tAny.elementos.length > 0;
+        const temBackground = typeof tAny.backgroundUrl === 'string' && tAny.backgroundUrl.length > 0 && tAny.backgroundUrl !== '/img/card_branco.png';
+        
         return {
             id: template.id,
             nome: template.nome,
@@ -382,10 +386,10 @@ export function converterParaTemplateEditavel(template: CardTemplate): any {
             temVerso: true,
             criadoEm: new Date(),
             atualizadoEm: new Date(),
-            backgroundUrl: '/img/card_branco.png',
-            elementos: [],
-            elementosVerso: [],
-            backgroundUrlVerso: '/img/card_branco.png'
+            backgroundUrl: temBackground ? tAny.backgroundUrl : '/img/card_branco.png',
+            elementos: temElementos ? tAny.elementos : [],
+            elementosVerso: Array.isArray(tAny.elementosVerso) ? tAny.elementosVerso : [],
+            backgroundUrlVerso: (typeof tAny.backgroundUrlVerso === 'string' && tAny.backgroundUrlVerso.length > 0) ? tAny.backgroundUrlVerso : '/img/card_branco.png'
         };
     }
 

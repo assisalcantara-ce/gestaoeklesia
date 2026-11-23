@@ -334,15 +334,36 @@ export async function loadTemplatesForCurrentUser(
 
   const fromDb = await fetchCartoesTemplatesFromSupabase(supabase, ministryId);
   const fromDbFiltrado = fromDb.filter((t: any) => TIPOS_HABILITADOS.includes((t?.tipoCadastro || t?.tipo) as TipoCartao));
+  
+  // Obter snapshot padrão de todos os tipos e modelos
+  const defaultTemplates = buildDefaultTemplatesSnapshot();
+  const templateMap = new Map<string, any>();
+
+  // Inserir os defaults primeiro
+  defaultTemplates.forEach(t => {
+    templateMap.set(String(t.id), t);
+  });
+
+  // Se houver templates customizados salvos no Supabase para este tenant, sobrescrever os defaults
   if (fromDbFiltrado.length > 0) {
-    const ensured = ensureDefaultActives(fromDbFiltrado);
-    if (ensured.changed) {
-      const tipos: TipoCartao[] = TIPOS_HABILITADOS;
-      for (const tipo of tipos) {
-        // eslint-disable-next-line no-await-in-loop
-        await persistTemplatesSnapshotToSupabase(supabase, ministryId, tipo, ensured.next);
+    fromDbFiltrado.forEach((dbTemplate: any) => {
+      const existing = templateMap.get(String(dbTemplate.id));
+      if (existing) {
+        templateMap.set(String(dbTemplate.id), {
+          ...existing,
+          ...dbTemplate,
+          // Preservar backgroundUrl do banco se existir, não deixar vazio
+          backgroundUrl: dbTemplate.backgroundUrl || existing.backgroundUrl,
+          backgroundUrlVerso: dbTemplate.backgroundUrlVerso || existing.backgroundUrlVerso,
+          previewImage: dbTemplate.previewImage || dbTemplate.backgroundUrl || existing.previewImage,
+        });
+      } else {
+        templateMap.set(String(dbTemplate.id), dbTemplate);
       }
-    }
+    });
+
+    const mergedList = Array.from(templateMap.values());
+    const ensured = ensureDefaultActives(mergedList);
     return { templates: ensured.next, ministryId };
   }
 
