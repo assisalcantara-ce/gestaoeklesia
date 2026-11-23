@@ -5,14 +5,17 @@ import {
   Plus, Search, Home, Calendar, MapPin, 
   Settings, Network, ChevronRight, CheckCircle2, AlertCircle, RefreshCw, X,
   Users, Link as LinkIcon, Check, Clock, UserCheck, ShieldAlert,
-  Copy, CalendarDays, FileText
+  Copy, CalendarDays, FileText, BookOpen, ClipboardCheck
 } from 'lucide-react';
 import { 
   CelulaItem, CelulaRede, CelulaConfiguracao, SalvarCelulaInput,
-  CelulaReuniaoItem, CelulaParticipanteItem, SalvarReuniaoInput, CelulaReuniaoStatus, CelulaParticipanteTipo
+  CelulaReuniaoItem, CelulaParticipanteItem, SalvarReuniaoInput, CelulaReuniaoStatus, CelulaParticipanteTipo,
+  CelulaEstudoItem
 } from '@/types/celulas';
 import { authenticatedFetch } from '@/lib/api-client';
 import { TabParticipantes } from '@/components/celulas/TabParticipantes';
+import { TabEstudos } from '@/components/celulas/TabEstudos';
+import { TabSupervisao } from '@/components/celulas/TabSupervisao';
 
 const DIAS_SEMANA = [
   'Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira',
@@ -51,7 +54,7 @@ interface ItemFrequenciaForm {
 }
 
 export default function CelulasPage() {
-  const [abaAtiva, setAbaAtiva] = useState<'celulas' | 'reunioes' | 'participantes' | 'redes' | 'configuracoes'>('celulas');
+  const [abaAtiva, setAbaAtiva] = useState<'celulas' | 'reunioes' | 'participantes' | 'estudos' | 'supervisao' | 'redes' | 'configuracoes'>('celulas');
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [mensagem, setMensagem] = useState<{ tipo: 'sucesso' | 'erro'; texto: string } | null>(null);
@@ -104,6 +107,7 @@ export default function CelulasPage() {
   // Modal Reunião (Criar / Editar)
   const [modalReuniaoAberto, setModalReuniaoAberto] = useState(false);
   const [reuniaoSendoEditada, setReuniaoSendoEditada] = useState<CelulaReuniaoItem | null>(null);
+  const [estudosPublicados, setEstudosPublicados] = useState<CelulaEstudoItem[]>([]);
   const [formReuniao, setFormReuniao] = useState<FormReuniaoState>({
     celula_id: '',
     congregacao_id: '',
@@ -151,11 +155,12 @@ export default function CelulasPage() {
   const carregarDados = async () => {
     try {
       setLoading(true);
-      const [resCel, resRedes, resCfg, resCong] = await Promise.all([
+      const [resCel, resRedes, resCfg, resCong, resEstudos] = await Promise.all([
         authenticatedFetch('/api/v1/celulas'),
         authenticatedFetch('/api/v1/celulas/redes'),
         authenticatedFetch('/api/v1/celulas/configuracoes'),
         authenticatedFetch('/api/v1/congregacoes'),
+        authenticatedFetch('/api/v1/celulas/estudos?status=publicado'),
       ]);
 
       if (resCel.ok) {
@@ -173,6 +178,10 @@ export default function CelulasPage() {
       if (resCong.ok) {
         const jsonCong = await resCong.json();
         setCongregacoes(jsonCong.data || []);
+      }
+      if (resEstudos.ok) {
+        const jsonEst = await resEstudos.json();
+        setEstudosPublicados(jsonEst.data || []);
       }
     } catch (err: any) {
       setMensagem({ tipo: 'erro', texto: 'Falha ao carregar dados do módulo Células.' });
@@ -758,6 +767,32 @@ export default function CelulasPage() {
 
           <button
             type="button"
+            onClick={() => setAbaAtiva('estudos')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+              abaAtiva === 'estudos'
+                ? 'bg-teal-700 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+            }`}
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>Estudos & Conteúdo</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAbaAtiva('supervisao')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+              abaAtiva === 'supervisao'
+                ? 'bg-teal-700 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+            }`}
+          >
+            <ClipboardCheck className="w-4 h-4" />
+            <span>Supervisão Pastoral</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setAbaAtiva('redes')}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
               abaAtiva === 'redes'
@@ -1270,6 +1305,24 @@ export default function CelulasPage() {
           />
         )}
 
+        {/* Conteúdo Aba Estudos & Conteúdo (Lote 4) */}
+        {abaAtiva === 'estudos' && (
+          <TabEstudos
+            redes={redes}
+            congregacoes={congregacoes}
+            termoCelula={config?.termo_celula || 'Célula'}
+          />
+        )}
+
+        {/* Conteúdo Aba Supervisão Pastoral (Lote 4) */}
+        {abaAtiva === 'supervisao' && (
+          <TabSupervisao
+            celulas={celulas}
+            congregacoes={congregacoes}
+            termoCelula={config?.termo_celula || 'Célula'}
+          />
+        )}
+
         {/* Conteúdo Aba Redes */}
         {abaAtiva === 'redes' && (
           <div className="space-y-6">
@@ -1639,9 +1692,16 @@ export default function CelulasPage() {
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Tema do Estudo / Ministração
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                      Tema do Estudo / Ministração
+                    </label>
+                    {estudosPublicados.length > 0 && (
+                      <span className="text-[11px] text-teal-700 font-semibold">
+                        Ou selecione da biblioteca de estudos abaixo
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={formReuniao.tema_estudo}
@@ -1649,6 +1709,26 @@ export default function CelulasPage() {
                     placeholder="Ex: Fruto do Espírito, Vivendo em Comunhão..."
                     className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 shadow-2xs"
                   />
+                  {estudosPublicados.length > 0 && (
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Sugeridos:</span>
+                      {estudosPublicados.slice(0, 4).map(est => (
+                        <button
+                          key={est.id}
+                          type="button"
+                          onClick={() => setFormReuniao({ ...formReuniao, tema_estudo: est.titulo })}
+                          className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border transition cursor-pointer ${
+                            formReuniao.tema_estudo === est.titulo
+                              ? 'bg-teal-700 text-white border-teal-700'
+                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                          }`}
+                          title={est.referencias_biblicas ? `${est.titulo} (${est.referencias_biblicas})` : est.titulo}
+                        >
+                          {est.titulo}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="sm:col-span-2">
