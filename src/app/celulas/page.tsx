@@ -5,7 +5,7 @@ import {
   Plus, Search, Home, Calendar, MapPin, 
   Settings, Network, ChevronRight, CheckCircle2, AlertCircle, RefreshCw, X,
   Users, Link as LinkIcon, Check, Clock, UserCheck, ShieldAlert,
-  Copy, CalendarDays, FileText, BookOpen, ClipboardCheck, GitFork
+  Copy, CalendarDays, FileText, BookOpen, ClipboardCheck, GitFork, MessageSquare
 } from 'lucide-react';
 import { 
   CelulaItem, CelulaRede, CelulaConfiguracao, SalvarCelulaInput,
@@ -17,6 +17,7 @@ import { TabParticipantes } from '@/components/celulas/TabParticipantes';
 import { TabEstudos } from '@/components/celulas/TabEstudos';
 import { TabSupervisao } from '@/components/celulas/TabSupervisao';
 import TabMultiplicacao from '@/components/celulas/TabMultiplicacao';
+import { TabComunicacao } from '@/components/celulas/TabComunicacao';
 
 const DIAS_SEMANA = [
   'Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira',
@@ -55,7 +56,7 @@ interface ItemFrequenciaForm {
 }
 
 export default function CelulasPage() {
-  const [abaAtiva, setAbaAtiva] = useState<'celulas' | 'reunioes' | 'participantes' | 'estudos' | 'supervisao' | 'multiplicacao' | 'redes' | 'configuracoes'>('celulas');
+  const [abaAtiva, setAbaAtiva] = useState<'celulas' | 'reunioes' | 'participantes' | 'estudos' | 'supervisao' | 'multiplicacao' | 'comunicacao' | 'redes' | 'configuracoes'>('celulas');
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [mensagem, setMensagem] = useState<{ tipo: 'sucesso' | 'erro'; texto: string } | null>(null);
@@ -807,6 +808,19 @@ export default function CelulasPage() {
 
           <button
             type="button"
+            onClick={() => setAbaAtiva('comunicacao')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+              abaAtiva === 'comunicacao'
+                ? 'bg-teal-700 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4" />
+            <span>Comunicação & Notificações</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setAbaAtiva('redes')}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
               abaAtiva === 'redes'
@@ -1340,6 +1354,16 @@ export default function CelulasPage() {
         {/* Conteúdo Aba Multiplicação Assistida (Lote 5) */}
         {abaAtiva === 'multiplicacao' && (
           <TabMultiplicacao
+            celulas={celulas}
+            redes={redes}
+            congregacoes={congregacoes}
+            termoCelula={config?.termo_celula || 'Célula'}
+          />
+        )}
+
+        {/* Conteúdo Aba Comunicação & Notificações (Lote 6) */}
+        {abaAtiva === 'comunicacao' && (
+          <TabComunicacao
             celulas={celulas}
             redes={redes}
             congregacoes={congregacoes}
