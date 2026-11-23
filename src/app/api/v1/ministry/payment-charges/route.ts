@@ -235,13 +235,15 @@ export async function GET(request: NextRequest) {
       .eq('ministry_id', ctx.ministryId)
       .in('status', ['pago', 'paid', 'concluida', 'received', 'confirmed']);
 
-    // Aplicar os mesmos filtros temporais na agregação
+    // Aplicar os mesmos filtros temporais na agregação, usando paid_at (data de pagamento)
+    // para coincidir com o filtro da tabela no frontend, que filtra pela data civil do pagamento.
+    // Registros sem paid_at (pendentes/expirados) são excluídos do summary pelo filtro de status acima.
     if (dataInicioParam && dataFimParam) {
-      summaryQuery = summaryQuery.gte('created_at', `${dataInicioParam}T00:00:00.000-03:00`).lte('created_at', `${dataFimParam}T23:59:59.999-03:00`);
+      summaryQuery = summaryQuery.gte('paid_at', `${dataInicioParam}T00:00:00.000-03:00`).lte('paid_at', `${dataFimParam}T23:59:59.999-03:00`);
     } else if (dataInicioParam) {
-      summaryQuery = summaryQuery.gte('created_at', `${dataInicioParam}T00:00:00.000-03:00`);
+      summaryQuery = summaryQuery.gte('paid_at', `${dataInicioParam}T00:00:00.000-03:00`);
     } else if (dataFimParam) {
-      summaryQuery = summaryQuery.lte('created_at', `${dataFimParam}T23:59:59.999-03:00`);
+      summaryQuery = summaryQuery.lte('paid_at', `${dataFimParam}T23:59:59.999-03:00`);
     } else if (mesParam && /^\d{4}-\d{2}$/.test(mesParam)) {
       const [anoStr, mesStr] = mesParam.split('-');
       const ano = parseInt(anoStr, 10);
@@ -251,7 +253,7 @@ export async function GET(request: NextRequest) {
       const nextMonth = mes === 12 ? 1 : mes + 1;
       const nextMonthStr = String(nextMonth).padStart(2, '0');
       const endIso = new Date(new Date(`${nextYear}-${nextMonthStr}-01T00:00:00.000-03:00`).getTime() - 1).toISOString();
-      summaryQuery = summaryQuery.gte('created_at', startIso).lte('created_at', endIso);
+      summaryQuery = summaryQuery.gte('paid_at', startIso).lte('paid_at', endIso);
     }
 
     if (destinationParam) {

@@ -608,8 +608,10 @@ export default function ArrecadacaoDigitalContent({
     cobrancasFiltradas.map((c) => c.destination_id).filter(Boolean)
   ).size;
 
-  // Se houver busca textual ativa no frontend (ou tipo de movimento não tratado no backend), respeita os itens em tela
-  const hasLocalFilters = Boolean(buscaExtrato.trim() || extratoTipoMovimento === 'saidas');
+  // Se houver busca textual ativa no frontend (ou tipo de movimento não tratado no backend), respeita os itens em tela.
+  // Filtros de data também são locais: mesmo que o backend já filtre por paid_at,
+  // incluímos aqui para garantir que os cards usem valores locais como fallback em caso de divergência.
+  const hasLocalFilters = Boolean(buscaExtrato.trim() || extratoTipoMovimento === 'saidas' || extratoDataInicio || extratoDataFim);
 
   const totalArrecadadoCalculado = isExtrato
     ? (hasLocalFilters
