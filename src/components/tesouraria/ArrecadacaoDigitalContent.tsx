@@ -176,6 +176,12 @@ function formatExtratoDateTime(dateStr: string | null | undefined): string {
 // Extrai data civil YYYY-MM-DD no fuso institucional para comparação sem corte UTC
 function getChargeLocalDateStr(dateStr: string | null | undefined): string {
   if (!dateStr) return '';
+  // Se for uma data pura (YYYY-MM-DD) ou timestamp com meia-noite UTC (ex: paymentDate Asaas "YYYY-MM-DDT00:00:00Z"),
+  // preserva o dia civil original para não subtrair fuso indevidamente
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+  if (/^\d{4}-\d{2}-\d{2}T00:00:00(?:\.000)?(?:\+00:00|Z)$/.test(dateStr)) {
+    return dateStr.slice(0, 10);
+  }
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return typeof dateStr === 'string' ? dateStr.split('T')[0] : '';
@@ -590,10 +596,12 @@ export default function ArrecadacaoDigitalContent({
     });
 
   // Métricas Computadas
-  // Quando estamos na subAba 'extrato', os cards refletem a agregação oficial do backend (ou filtro local se ativo)
+  // Quando estamos na subAba 'extrato', os cards refletem sempre a agregação oficial do backend (summary),
+  // garantindo que os cards NUNCA dependam apenas da página atual em tela (limit=25),
+  // mesmo quando houver busca textual, congregação, destino ou período selecionados.
   const isExtrato = subAba === 'extrato';
 
-  // Cálculos no conjunto filtrado de cobranças
+  // Cálculos de fallback no conjunto de cobranças
   const cobrancasPagasFiltradas = cobrancasFiltradas.filter((c) => {
     const st = String(c.status || '').toLowerCase().trim();
     return st === 'pago' || st === 'paid' || st === 'concluida' || st === 'received' || st === 'confirmed';
@@ -608,14 +616,15 @@ export default function ArrecadacaoDigitalContent({
     cobrancasFiltradas.map((c) => c.destination_id).filter(Boolean)
   ).size;
 
-  // Se houver busca textual ativa no frontend (ou tipo de movimento não tratado no backend), respeita os itens em tela.
-  // Filtros de data também são locais: mesmo que o backend já filtre por paid_at,
-  // incluímos aqui para garantir que os cards usem valores locais como fallback em caso de divergência.
-  const hasLocalFilters = Boolean(buscaExtrato.trim() || extratoTipoMovimento === 'saidas' || extratoDataInicio || extratoDataFim);
+  // Quando o backend retorna o summary oficial, usamos sempre o summary para evitar corte de paginação.
+  // Caso o usuário filtre especificamente por busca textual na API e o summary da API esteja disponível,
+  // ele é retornado já filtrado pelo parâmetro 'q' no backend.
+  // Se o filtro 'saidas' for selecionado (como PIX é só entrada), o total de entradas é 0.
+  const isApenasSaidas = extratoTipoMovimento === 'saidas';
 
   const totalArrecadadoCalculado = isExtrato
-    ? (hasLocalFilters
-        ? totalArrecadadoExtratoLocal
+    ? (isApenasSaidas
+        ? 0
         : (summary.totalArrecadado !== undefined && summary.totalArrecadado !== null
             ? summary.totalArrecadado
             : totalArrecadadoExtratoLocal))
@@ -624,12 +633,12 @@ export default function ArrecadacaoDigitalContent({
         : destinos.reduce((acc, d) => acc + (d.total_arrecadado ?? 0), 0));
 
   const destinosAtivosCount = isExtrato
-    ? (hasLocalFilters ? distinctDestinosExtrato : (summary.destinosDistintos ?? distinctDestinosExtrato))
+    ? (isApenasSaidas ? 0 : (summary.destinosDistintos ?? distinctDestinosExtrato))
     : destinos.filter((d) => d.is_ativo).length;
 
   const transacoesPagasCount = isExtrato
-    ? (hasLocalFilters
-        ? cobrancasPagasFiltradas.length
+    ? (isApenasSaidas
+        ? 0
         : (summary.transacoesPagas !== undefined && summary.transacoesPagas !== null
             ? summary.transacoesPagas
             : cobrancasPagasFiltradas.length))
@@ -1728,18 +1737,18 @@ export default function ArrecadacaoDigitalContent({
               const st = String(c.status || '').toLowerCase().trim();
               return st === 'pago' || st === 'paid' || st === 'concluida' || st === 'received' || st === 'confirmed';
             });
-            const printTotalPagasCount = hasLocalFilters
-              ? printListPagas.length
+            const printTotalPagasCount = isApenasSaidas
+              ? 0
               : (summary.transacoesPagas !== undefined && summary.transacoesPagas !== null
                   ? summary.transacoesPagas
                   : printListPagas.length);
-            const printTotalArrecadado = hasLocalFilters
-              ? printListPagas.reduce((acc, c) => acc + Number(c.valor_pago ?? c.valor_solicitado ?? 0), 0)
+            const printTotalArrecadado = isApenasSaidas
+              ? 0
               : (summary.totalArrecadado !== undefined && summary.totalArrecadado !== null
                   ? summary.totalArrecadado
                   : printListPagas.reduce((acc, c) => acc + Number(c.valor_pago ?? c.valor_solicitado ?? 0), 0));
-            const printDestinosCount = hasLocalFilters
-              ? new Set(printList.map((c) => c.destination_id).filter(Boolean)).size
+            const printDestinosCount = isApenasSaidas
+              ? 0
               : (summary.destinosDistintos ?? new Set(printList.map((c) => c.destination_id).filter(Boolean)).size);
 
             return (
