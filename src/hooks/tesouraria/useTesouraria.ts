@@ -10,6 +10,7 @@ import { fetchConfiguracaoIgrejaFromSupabase } from '@/lib/igreja-config-utils';
 import type { ConfiguracaoIgreja } from '@/lib/igreja-config-utils';
 import { resolveMinistryId } from '@/lib/cartoes-templates-sync';
 import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
+import { computeCanonicalIndicators } from '@/lib/financial-indicators-service';
 
 // Types
 export interface Congregacao { id: string; nome: string; is_sede?: boolean }
@@ -959,13 +960,12 @@ export function useTesouraria() {
     });
   }, [lancamentosRelMes, relCong, relDept, relTipoRel]);
 
-  const entradasRelatorio = useMemo(() => {
-    return lancsRelatorioFiltrados.filter(l => l.tipo_movimento === 'entrada').reduce((s, l) => s + Number(l.valor), 0);
+  const indicadoresRelatorio = useMemo(() => {
+    return computeCanonicalIndicators(lancsRelatorioFiltrados);
   }, [lancsRelatorioFiltrados]);
 
-  const saidasRelatorio = useMemo(() => {
-    return lancsRelatorioFiltrados.filter(l => l.tipo_movimento === 'saida').reduce((s, l) => s + Number(l.valor), 0);
-  }, [lancsRelatorioFiltrados]);
+  const entradasRelatorio = indicadoresRelatorio.totalReceitas;
+  const saidasRelatorio = indicadoresRelatorio.totalDespesas;
 
   // Lançamentos filtrados
   const lancsFiltrados = useMemo(() => {
@@ -991,13 +991,12 @@ export function useTesouraria() {
     });
   }, [lancamentosMes, filtroMovimento, filtroTipo, filtroCategoria, filtroCong, filtroDept, filtroOrigem, filtroDataInicio, filtroDataFim]);
 
-  const entradasFiltradas = useMemo(() => {
-    return lancsFiltrados.filter(l => l.tipo_movimento === 'entrada').reduce((s, l) => s + Number(l.valor), 0);
+  const indicadoresFiltrados = useMemo(() => {
+    return computeCanonicalIndicators(lancsFiltrados);
   }, [lancsFiltrados]);
 
-  const saidasFiltradas = useMemo(() => {
-    return lancsFiltrados.filter(l => l.tipo_movimento === 'saida').reduce((s, l) => s + Number(l.valor), 0);
-  }, [lancsFiltrados]);
+  const entradasFiltradas = indicadoresFiltrados.totalReceitas;
+  const saidasFiltradas = indicadoresFiltrados.totalDespesas;
 
   // Handlers CRUD Lançamento
   const handleNovoLancamento = useCallback(async () => {

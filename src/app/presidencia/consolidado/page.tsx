@@ -11,6 +11,8 @@ import {
   ResponsiveContainer, Cell,
 } from 'recharts';
 import { TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircle2, Wifi, WifiOff } from 'lucide-react';
+import { computeCanonicalIndicators } from '@/lib/financial-indicators-service';
+import { roundCurrency } from '@/lib/financial-balance-service';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -108,13 +110,12 @@ function dateRange(ym: string): [string, string] {
 }
 
 function computeResumo(lancs: RawLancSimples[]): Resumo {
-  let entradas = 0, saidas = 0;
-  lancs.forEach(l => {
-    const v = Number(l.valor);
-    if (l.tipo_movimento === 'entrada') entradas += v;
-    else saidas += v;
-  });
-  return { entradas, saidas, saldo: entradas - saidas };
+  const ind = computeCanonicalIndicators(lancs);
+  return {
+    entradas: ind.totalReceitas,
+    saidas: ind.totalDespesas,
+    saldo: ind.resultadoOperacional,
+  };
 }
 
 function aggregateByCong(lancs: RawLancSimples[], congs: Congregacao[]): CongAggregate[] {
@@ -125,10 +126,10 @@ function aggregateByCong(lancs: RawLancSimples[], congs: Congregacao[]): CongAgg
   lancs.forEach(l => {
     const key = l.congregacao_id ?? null;
     const entry = map.get(key) ?? map.get(null)!;
-    const v = Number(l.valor);
-    if (l.tipo_movimento === 'entrada') entry.entradas += v;
-    else entry.saidas += v;
-    entry.saldo = entry.entradas - entry.saidas;
+    const v = roundCurrency(Number(l.valor) || 0);
+    if (l.tipo_movimento === 'entrada') entry.entradas = roundCurrency(entry.entradas + v);
+    else entry.saidas = roundCurrency(entry.saidas + v);
+    entry.saldo = roundCurrency(entry.entradas - entry.saidas);
   });
 
   // Remove Sede se sem movimento

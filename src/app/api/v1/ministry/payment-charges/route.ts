@@ -11,6 +11,8 @@ import { resolveTenantAuth } from '@/lib/tenant-auth';
 import { isArrecadacaoDigitalAllowedForTenant } from '@/lib/plan-permissions';
 import { temAcesso } from '@/lib/access-control';
 import { buildPeriodFilterBounds } from '@/lib/financial-date-utils';
+import { fetchAllRowsInBatches } from '@/lib/financial-query-helper';
+import { computeCanonicalPixSummary } from '@/lib/financial-indicators-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -286,26 +288,25 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data: summaryData } = await summaryQuery;
+    // Agregação canônica integral em lotes (sem truncamento silencioso no teto de 1.000 linhas)
+    const { data: summaryData } = await fetchAllRowsInBatches<{
+      destination_id: string | null;
+      valor_pago: number | null;
+      valor_solicitado: number | null;
+      status: string;
+    }>(async (rangeStart, rangeEnd) => {
+      return summaryQuery.range(rangeStart, rangeEnd);
+    }, { pageSize: 1000 });
 
-    const totalArrecadado = (summaryData ?? []).reduce(
-      (acc: number, item: any) => acc + Number(item.valor_pago ?? item.valor_solicitado ?? 0),
-      0
-    );
-    const transacoesPagas = (summaryData ?? []).length;
-
-    // Quantidade de destinos distintos presentes no conjunto filtrado
-    const distinctDestinos = new Set(
-      (summaryData ?? []).map((item: any) => item.destination_id).filter(Boolean)
-    );
-    const destinosFiltradosDistintos = distinctDestinos.size;
+    const pixSummary = computeCanonicalPixSummary(summaryData);
 
     return NextResponse.json({
       data: charges ?? [],
       summary: {
-        totalArrecadado,
-        transacoesPagas,
-        destinosDistintos: destinosFiltradosDistintos,
+        totalArrecadado: pixSummary.totalArrecadadoBruto,
+        transacoesPagas: pixSummary.totalTransacoesPagas,
+        destinosDistintos: pixSummary.destinosDistintos,
+        ticketMedio: pixSummary.ticketMedio,
       },
       meta: {
         page,

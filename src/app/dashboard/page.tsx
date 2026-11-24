@@ -10,6 +10,8 @@ import { useCurrentMinistry } from '@/providers/CurrentMinistryProvider';
 import { obterEstruturaOrganizacionalService } from '@/services/estrutura-organizacional-service';
 import { ProductExperienceService } from '@/lib/services/product-experience';
 import { ExperienceCenter } from '@/services/experience/ExperienceCenter';
+import { fetchAllRowsInBatches } from '@/lib/financial-query-helper';
+import { computeCanonicalIndicators } from '@/lib/financial-indicators-service';
 import Link from 'next/link';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -264,10 +266,6 @@ export default function DashboardPage() {
         if (scopeSupId)  return (q as any).eq('supervisao_id', scopeSupId);
         return q;
       };
-      const withScopeLanc = (q: ReturnType<typeof supabase.from>) => {
-        if (scopeCongId) return (q as any).eq('congregacao_id', scopeCongId);
-        return q;
-      };
 
       const [
         membrosRes, fluxosRes, cartasRes, congsRes, deptsRes,
@@ -295,17 +293,43 @@ export default function DashboardPage() {
         safeQuery(supabase.from('departamentos').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId)),
         safeQuery(
           temFinanceiro
-            ? withScopeLanc(supabase.from('tesouraria_lancamentos').select('tipo_movimento, tipo_recebimento, valor, forma_pagamento, congregacao_id').eq('ministry_id', ministryId).gte('data_lancamento', `${mesRef}-01`).lte('data_lancamento', dataFimRef))
+            ? fetchAllRowsInBatches(async (start, end) => {
+                let q = supabase
+                  .from('tesouraria_lancamentos')
+                  .select('tipo_movimento, tipo_recebimento, valor, forma_pagamento, congregacao_id')
+                  .eq('ministry_id', ministryId)
+                  .gte('data_lancamento', `${mesRef}-01`)
+                  .lte('data_lancamento', dataFimRef);
+                if (scopeCongId) q = q.eq('congregacao_id', scopeCongId);
+                return q.range(start, end).order('data_lancamento', { ascending: false }).order('id', { ascending: true });
+              }, { pageSize: 1000 })
             : Promise.resolve({ data: [] })
         ),
         safeQuery(
           temFinanceiro
-            ? withScopeLanc(supabase.from('tesouraria_lancamentos').select('tipo_movimento, valor').eq('ministry_id', ministryId).gte('data_lancamento', `${mesAnterior}-01`).lte('data_lancamento', dataFimAnterior))
+            ? fetchAllRowsInBatches(async (start, end) => {
+                let q = supabase
+                  .from('tesouraria_lancamentos')
+                  .select('tipo_movimento, valor')
+                  .eq('ministry_id', ministryId)
+                  .gte('data_lancamento', `${mesAnterior}-01`)
+                  .lte('data_lancamento', dataFimAnterior);
+                if (scopeCongId) q = q.eq('congregacao_id', scopeCongId);
+                return q.range(start, end).order('data_lancamento', { ascending: false }).order('id', { ascending: true });
+              }, { pageSize: 1000 })
             : Promise.resolve({ data: [] })
         ),
         safeQuery(
           temFinanceiro
-            ? withScopeLanc(supabase.from('tesouraria_lancamentos').select('tipo_movimento, valor, data_lancamento').eq('ministry_id', ministryId).gte('data_lancamento', `${ultimos6[0]}-01`))
+            ? fetchAllRowsInBatches(async (start, end) => {
+                let q = supabase
+                  .from('tesouraria_lancamentos')
+                  .select('tipo_movimento, valor, data_lancamento')
+                  .eq('ministry_id', ministryId)
+                  .gte('data_lancamento', `${ultimos6[0]}-01`);
+                if (scopeCongId) q = q.eq('congregacao_id', scopeCongId);
+                return q.range(start, end).order('data_lancamento', { ascending: false }).order('id', { ascending: true });
+              }, { pageSize: 1000 })
             : Promise.resolve({ data: [] })
         ),
         safeQuery(supabase.from('ebd_turmas').select('id', { count: 'exact', head: true }).eq('ministry_id', ministryId).eq('ativo', true)),
@@ -412,11 +436,13 @@ export default function DashboardPage() {
       const lancMes   = lancMesRes.data   ?? [];
       const lancAnter = lancAnteriorRes.data ?? [];
 
-      const entradasMes = lancMes.filter((l: any) => l.tipo_movimento === 'entrada').reduce((s: number, l: any) => s + Number(l.valor), 0);
-      const saidasMes   = lancMes.filter((l: any) => l.tipo_movimento === 'saida').reduce((s: number, l: any) => s + Number(l.valor), 0);
-      const saldoMes    = entradasMes - saidasMes;
+      const indMes = computeCanonicalIndicators(lancMes);
+      const entradasMes = indMes.totalReceitas;
+      const saidasMes   = indMes.totalDespesas;
+      const saldoMes    = indMes.resultadoOperacional;
 
-      const entradasAnterior = lancAnter.filter((l: any) => l.tipo_movimento === 'entrada').reduce((s: number, l: any) => s + Number(l.valor), 0);
+      const indAnterior = computeCanonicalIndicators(lancAnter);
+      const entradasAnterior = indAnterior.totalReceitas;
       const variacao = entradasAnterior > 0
         ? Math.round(((entradasMes - entradasAnterior) / entradasAnterior) * 100)
         : 0;
@@ -1249,7 +1275,7 @@ export default function DashboardPage() {
 
                 <div className={`bg-white rounded-2xl shadow-2xs border p-5 flex flex-col justify-between ${dash.saldoMes >= 0 ? 'border-emerald-200/80' : 'border-rose-200/80'}`}>
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Saldo do Mês</p>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Resultado do Mês</p>
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${dash.saldoMes >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                       <Wallet size={18} />
                     </div>

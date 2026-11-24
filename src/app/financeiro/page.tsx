@@ -12,6 +12,10 @@ import {
   Legend, ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
 import type { PieLabelRenderProps } from 'recharts';
+import {
+  computeCanonicalIndicators,
+  computeCanonicalAccountBalances,
+} from '@/lib/financial-indicators-service';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -356,58 +360,22 @@ export default function FinanceiroPage() {
   useEffect(() => { if (ministryId) loadLancamentos(filtroMes); }, [filtroMes, ministryId, loadLancamentos]);
   useEffect(() => { if (ministryId) loadContasHistorico(filtroMes); }, [filtroMes, ministryId, loadContasHistorico]);
 
-  // ── Derivados ─────────────────────────────────────────────────────────────
+  // ── Derivados Canônicos (Lote 4) ──────────────────────────────────────────
   const resumo = useMemo(() => {
-    let entradas = 0, saidas = 0, dizimos = 0;
-    lancamentos.forEach(l => {
-      const v = Number(l.valor);
-      if (l.tipo_movimento === 'entrada') {
-        entradas += v;
-        if (l.tipo_recebimento === 'dizimo') dizimos += v;
-      } else {
-        saidas += v;
-      }
-    });
-    return { entradas, saidas, saldo: entradas - saidas, dizimos };
+    return computeCanonicalIndicators(lancamentos);
   }, [lancamentos]);
 
   const contasSaldo = useMemo((): ContaSaldo[] => {
-    const map = new Map<string | null, ContaSaldo>();
-    // Inicializa contas com saldo_inicial como base do saldo acumulado
-    contas.forEach(c => {
-      map.set(c.id, {
-        id: c.id,
-        nome: c.nome,
-        tipo: c.tipo,
-        saldo_inicial: Number(c.saldo_inicial),
-        entradas: 0,
-        saidas: 0,
-        saldo_estimado: Number(c.saldo_inicial), // base = saldo_inicial; será acumulado abaixo
-        is_ativa: c.is_ativa,
-      });
-    });
-    // Bucket "sem conta"
-    map.set(null, { id: null, nome: 'Sem conta vinculada', tipo: '—', saldo_inicial: 0, entradas: 0, saidas: 0, saldo_estimado: 0, is_ativa: true });
-    // Saldo acumulado histórico (todos os lançamentos até o fim do mês selecionado)
-    lancamentosHistorico.forEach(l => {
-      const key = l.conta_id ?? null;
-      const entry = map.get(key) ?? map.get(null)!;
-      const v = Number(l.valor);
-      if (l.tipo_movimento === 'entrada') entry.saldo_estimado += v;
-      else entry.saldo_estimado -= v;
-    });
-    // Entradas e saídas do MÊS selecionado (para referência no período)
-    lancamentos.forEach(l => {
-      const key = l.conta_id ?? null;
-      const entry = map.get(key) ?? map.get(null)!;
-      const v = Number(l.valor);
-      if (l.tipo_movimento === 'entrada') entry.entradas += v;
-      else entry.saidas += v;
-    });
-    // Remove "sem conta" se vazio
-    const semConta = map.get(null)!;
-    if (semConta.entradas === 0 && semConta.saidas === 0 && semConta.saldo_estimado === 0) map.delete(null);
-    return Array.from(map.values());
+    return computeCanonicalAccountBalances(contas, lancamentosHistorico, lancamentos).map(c => ({
+      id: c.contaId,
+      nome: c.nome,
+      tipo: c.tipo,
+      saldo_inicial: c.saldoInicial,
+      entradas: c.entradasPeriodo,
+      saidas: c.saidasPeriodo,
+      saldo_estimado: c.saldoEstimado,
+      is_ativa: c.isAtiva,
+    }));
   }, [contas, lancamentos, lancamentosHistorico]);
 
   const categoriasEntrada = useMemo((): CategoriaTotal[] => {
@@ -491,25 +459,26 @@ export default function FinanceiroPage() {
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
         <KpiCard
           icon="💚" label="Entradas do mês"
-          value={fmtBRL(resumo.entradas)}
+          value={fmtBRL(resumo.totalReceitas)}
           colorClass="text-green-700"
           borderColor="border-green-400"
         />
         <KpiCard
           icon="🔴" label="Saídas do mês"
-          value={fmtBRL(resumo.saidas)}
+          value={fmtBRL(resumo.totalDespesas)}
           colorClass="text-red-700"
           borderColor="border-red-400"
         />
         <KpiCard
-          icon="⚖️" label="Saldo do mês"
-          value={fmtBRL(resumo.saldo)}
-          colorClass={resumo.saldo >= 0 ? 'text-teal-700' : 'text-red-700'}
-          borderColor={resumo.saldo >= 0 ? 'border-teal-400' : 'border-red-400'}
+          icon="⚖️" label="Resultado do mês"
+          value={fmtBRL(resumo.resultadoOperacional)}
+          sub={resumo.isSuperavit ? 'Superávit no período' : 'Déficit no período'}
+          colorClass={resumo.isSuperavit ? 'text-teal-700' : 'text-red-700'}
+          borderColor={resumo.isSuperavit ? 'border-teal-400' : 'border-red-400'}
         />
         <KpiCard
           icon="🙏" label="Dízimos recebidos"
-          value={fmtBRL(resumo.dizimos)}
+          value={fmtBRL(resumo.totalDizimos)}
           colorClass="text-purple-700"
           borderColor="border-purple-400"
         />
@@ -521,8 +490,8 @@ export default function FinanceiroPage() {
         />
         <KpiCard
           icon="📊" label="Resultado s/ entradas"
-          value={resumo.entradas > 0 ? `${((resumo.saldo / resumo.entradas) * 100).toFixed(1)}%` : '—'}
-          colorClass={resumo.saldo >= 0 ? 'text-teal-700' : 'text-red-700'}
+          value={resumo.totalReceitas > 0 ? `${resumo.margemOperacionalPercentual.toFixed(1)}%` : '—'}
+          colorClass={resumo.isSuperavit ? 'text-teal-700' : 'text-red-700'}
           borderColor="border-gray-300"
         />
       </div>
@@ -668,9 +637,9 @@ export default function FinanceiroPage() {
               <tfoot>
                 <tr className="border-t-2 border-gray-200 font-bold">
                   <td colSpan={3} className="pt-2 text-gray-600 text-xs uppercase">Totais do mês</td>
-                  <td className="pt-2 text-right text-green-700">{fmtBRL(resumo.entradas)}</td>
-                  <td className="pt-2 text-right text-red-700">{fmtBRL(resumo.saidas)}</td>
-                  <td className={`pt-2 text-right ${resumo.saldo >= 0 ? 'text-teal-700' : 'text-red-700'}`}>{fmtBRL(resumo.saldo)}</td>
+                  <td className="pt-2 text-right text-green-700">{fmtBRL(resumo.totalReceitas)}</td>
+                  <td className="pt-2 text-right text-red-700">{fmtBRL(resumo.totalDespesas)}</td>
+                  <td className={`pt-2 text-right ${resumo.isSuperavit ? 'text-teal-700' : 'text-red-700'}`}>{fmtBRL(resumo.resultadoOperacional)}</td>
                 </tr>
               </tfoot>
             </table>
