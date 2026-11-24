@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { resolveTenantAuth } from '@/lib/tenant-auth';
 import { isArrecadacaoDigitalAllowedForTenant } from '@/lib/plan-permissions';
 import { temAcesso } from '@/lib/access-control';
+import { buildPeriodFilterBounds } from '@/lib/financial-date-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -97,22 +98,13 @@ export async function GET(request: NextRequest) {
       .eq('ministry_id', ctx.ministryId);
 
     // Filtro por Período de Datas ou Mês de Referência (YYYY-MM) no fuso institucional UTC-3
-    if (dataInicioParam && dataFimParam) {
-      query = query.gte('created_at', `${dataInicioParam}T00:00:00.000-03:00`).lte('created_at', `${dataFimParam}T23:59:59.999-03:00`);
-    } else if (dataInicioParam) {
-      query = query.gte('created_at', `${dataInicioParam}T00:00:00.000-03:00`);
-    } else if (dataFimParam) {
-      query = query.lte('created_at', `${dataFimParam}T23:59:59.999-03:00`);
-    } else if (mesParam && /^\d{4}-\d{2}$/.test(mesParam)) {
-      const [anoStr, mesStr] = mesParam.split('-');
-      const ano = parseInt(anoStr, 10);
-      const mes = parseInt(mesStr, 10);
-      const startIso = new Date(`${anoStr}-${mesStr}-01T00:00:00.000-03:00`).toISOString();
-      const nextYear = mes === 12 ? ano + 1 : ano;
-      const nextMonth = mes === 12 ? 1 : mes + 1;
-      const nextMonthStr = String(nextMonth).padStart(2, '0');
-      const endIso = new Date(new Date(`${nextYear}-${nextMonthStr}-01T00:00:00.000-03:00`).getTime() - 1).toISOString();
-      query = query.gte('created_at', startIso).lte('created_at', endIso);
+    const bounds = buildPeriodFilterBounds(dataInicioParam, dataFimParam, mesParam);
+    if (bounds.startIso && bounds.endIso) {
+      query = query.gte('created_at', bounds.startIso).lte('created_at', bounds.endIso);
+    } else if (bounds.startIso) {
+      query = query.gte('created_at', bounds.startIso);
+    } else if (bounds.endIso) {
+      query = query.lte('created_at', bounds.endIso);
     }
 
     // Filtros
@@ -238,22 +230,12 @@ export async function GET(request: NextRequest) {
     // Aplicar os mesmos filtros temporais na agregação, usando paid_at (data de pagamento)
     // para coincidir com o filtro da tabela no frontend, que filtra pela data civil do pagamento.
     // Registros sem paid_at (pendentes/expirados) são excluídos do summary pelo filtro de status acima.
-    if (dataInicioParam && dataFimParam) {
-      summaryQuery = summaryQuery.gte('paid_at', `${dataInicioParam}T00:00:00.000-03:00`).lte('paid_at', `${dataFimParam}T23:59:59.999-03:00`);
-    } else if (dataInicioParam) {
-      summaryQuery = summaryQuery.gte('paid_at', `${dataInicioParam}T00:00:00.000-03:00`);
-    } else if (dataFimParam) {
-      summaryQuery = summaryQuery.lte('paid_at', `${dataFimParam}T23:59:59.999-03:00`);
-    } else if (mesParam && /^\d{4}-\d{2}$/.test(mesParam)) {
-      const [anoStr, mesStr] = mesParam.split('-');
-      const ano = parseInt(anoStr, 10);
-      const mes = parseInt(mesStr, 10);
-      const startIso = new Date(`${anoStr}-${mesStr}-01T00:00:00.000-03:00`).toISOString();
-      const nextYear = mes === 12 ? ano + 1 : ano;
-      const nextMonth = mes === 12 ? 1 : mes + 1;
-      const nextMonthStr = String(nextMonth).padStart(2, '0');
-      const endIso = new Date(new Date(`${nextYear}-${nextMonthStr}-01T00:00:00.000-03:00`).getTime() - 1).toISOString();
-      summaryQuery = summaryQuery.gte('paid_at', startIso).lte('paid_at', endIso);
+    if (bounds.startIso && bounds.endIso) {
+      summaryQuery = summaryQuery.gte('paid_at', bounds.startIso).lte('paid_at', bounds.endIso);
+    } else if (bounds.startIso) {
+      summaryQuery = summaryQuery.gte('paid_at', bounds.startIso);
+    } else if (bounds.endIso) {
+      summaryQuery = summaryQuery.lte('paid_at', bounds.endIso);
     }
 
     if (destinationParam) {

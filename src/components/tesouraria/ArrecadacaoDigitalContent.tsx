@@ -23,6 +23,10 @@ import {
 import { authenticatedFetch } from '@/lib/api-client';
 import ConfirmDeleteModal from '@/components/tesouraria/modals/ConfirmDeleteModal';
 import { usePlanFeatures } from '@/hooks/usePlanFeatures';
+import {
+  formatFinancialDateTime,
+  getFinancialCivilDateStr,
+} from '@/lib/financial-date-utils';
 
 interface Congregacao { id: string; nome: string }
 
@@ -152,49 +156,9 @@ interface ArrecadacaoDigitalContentProps {
   congNome?: (id?: string | null) => string;
 }
 
-// Formatação amigável para data e hora no padrão brasileiro (dd/MM/yyyy HH:mm) no fuso institucional UTC-3
-function formatExtratoDateTime(dateStr: string | null | undefined): string {
-  if (!dateStr) return '—';
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    const formatted = new Intl.DateTimeFormat('pt-BR', {
-      timeZone: 'America/Belem',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).format(d);
-    return formatted.replace(', ', ' ');
-  } catch {
-    return dateStr;
-  }
-}
-
-// Extrai data civil YYYY-MM-DD no fuso institucional para comparação sem corte UTC
-function getChargeLocalDateStr(dateStr: string | null | undefined): string {
-  if (!dateStr) return '';
-  // Se for uma data pura (YYYY-MM-DD) ou timestamp com meia-noite UTC (ex: paymentDate Asaas "YYYY-MM-DDT00:00:00Z"),
-  // preserva o dia civil original para não subtrair fuso indevidamente
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-  if (/^\d{4}-\d{2}-\d{2}T00:00:00(?:\.000)?(?:\+00:00|Z)$/.test(dateStr)) {
-    return dateStr.slice(0, 10);
-  }
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return typeof dateStr === 'string' ? dateStr.split('T')[0] : '';
-    return new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Belem',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(d);
-  } catch {
-    return typeof dateStr === 'string' ? dateStr.split('T')[0] : '';
-  }
-}
+// Utilitários canônicos compartilhados de data e hora financeira
+const formatExtratoDateTime = formatFinancialDateTime;
+const getChargeLocalDateStr = getFinancialCivilDateStr;
 
 export default function ArrecadacaoDigitalContent({
   congregacoes,
