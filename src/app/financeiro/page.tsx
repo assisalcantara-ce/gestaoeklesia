@@ -221,41 +221,75 @@ export default function FinanceiroPage() {
     }
   }, [ministryId, supabase]);
 
-  // ── Load lançamentos do mês selecionado ───────────────────────────────────
+  // ── Load lançamentos do mês selecionado (com paginação segura em lotes) ──
   const loadLancamentos = useCallback(async (mes: string) => {
     if (!ministryId) return;
     setLoadingMes(true);
     try {
-      let q = supabase
-        .from('tesouraria_lancamentos')
-        .select('tipo_movimento, valor, tipo_recebimento, conta_id, categoria_id, congregacao_id')
-        .eq('ministry_id', ministryId)
-        .gte('data_lancamento', `${mes}-01`)
-        .lt('data_lancamento', `${mesProximo(mes)}-01`);
-      if (isFinanceiroLocal && congregacaoId) {
-        q = q.eq('congregacao_id', congregacaoId);
+      let allRows: Lancamento[] = [];
+      let page = 0;
+      const pageSize = 1000;
+
+      while (true) {
+        let q = supabase
+          .from('tesouraria_lancamentos')
+          .select('tipo_movimento, valor, tipo_recebimento, conta_id, categoria_id, congregacao_id')
+          .eq('ministry_id', ministryId)
+          .gte('data_lancamento', `${mes}-01`)
+          .lt('data_lancamento', `${mesProximo(mes)}-01`);
+
+        if (isFinanceiroLocal && congregacaoId) {
+          q = q.eq('congregacao_id', congregacaoId);
+        }
+
+        const { data, error } = await q
+          .range(page * pageSize, (page + 1) * pageSize - 1)
+          .order('data_lancamento', { ascending: false })
+          .order('id', { ascending: true });
+
+        if (error || !data || data.length === 0) break;
+        allRows = allRows.concat(data as Lancamento[]);
+        if (data.length < pageSize) break;
+        page++;
       }
-      const { data } = await q;
-      setLancamentos((data ?? []) as Lancamento[]);
+
+      setLancamentos(allRows);
     } finally {
       setLoadingMes(false);
     }
   }, [ministryId, supabase, isFinanceiroLocal, congregacaoId]);
 
-  // ── Load histórico de lançamentos até o mês selecionado (para saldo acumulado) ──
+  // ── Load histórico de lançamentos até o mês selecionado (para saldo acumulado, com paginação segura) ──
   const loadContasHistorico = useCallback(async (mes: string) => {
     if (!ministryId) return;
     try {
-      let q = supabase
-        .from('tesouraria_lancamentos')
-        .select('tipo_movimento, valor, tipo_recebimento, conta_id, categoria_id, congregacao_id')
-        .eq('ministry_id', ministryId)
-        .lt('data_lancamento', `${mesProximo(mes)}-01`);
-      if (isFinanceiroLocal && congregacaoId) {
-        q = q.eq('congregacao_id', congregacaoId);
+      let allHistRows: Lancamento[] = [];
+      let page = 0;
+      const pageSize = 1000;
+
+      while (true) {
+        let q = supabase
+          .from('tesouraria_lancamentos')
+          .select('tipo_movimento, valor, tipo_recebimento, conta_id, categoria_id, congregacao_id')
+          .eq('ministry_id', ministryId)
+          .lt('data_lancamento', `${mesProximo(mes)}-01`);
+
+        if (isFinanceiroLocal && congregacaoId) {
+          q = q.eq('congregacao_id', congregacaoId);
+        }
+
+        const { data, error } = await q
+          .range(page * pageSize, (page + 1) * pageSize - 1)
+          .order('data_lancamento', { ascending: true })
+          .order('id', { ascending: true });
+
+        if (error || !data || data.length === 0) break;
+        allHistRows = allHistRows.concat(data as Lancamento[]);
+        if (data.length < pageSize) break;
+        page++;
       }
-      const { data } = await q;
-      setLancamentosHistorico((data ?? []) as Lancamento[]);
+
+      setLancamentosHistorico(allHistRows);
     } catch {
       // silencioso — contasSaldo usará os dados que tiver
     }
@@ -274,17 +308,34 @@ export default function FinanceiroPage() {
         const label = `${MESES_LABEL[d.getMonth()].slice(0, 3)}/${String(d.getFullYear()).slice(2)}`;
         meses.push({ mes, label, entradas: 0, saidas: 0, saldo: 0 });
       }
-      let q = supabase
-        .from('tesouraria_lancamentos')
-        .select('data_lancamento, tipo_movimento, valor')
-        .eq('ministry_id', ministryId)
-        .gte('data_lancamento', `${meses[0].mes}-01`);
-      if (isFinanceiroLocal && congregacaoId) {
-        q = q.eq('congregacao_id', congregacaoId);
+      let allGraficoRows: { data_lancamento: string; tipo_movimento: string; valor: number }[] = [];
+      let page = 0;
+      const pageSize = 1000;
+
+      while (true) {
+        let q = supabase
+          .from('tesouraria_lancamentos')
+          .select('data_lancamento, tipo_movimento, valor')
+          .eq('ministry_id', ministryId)
+          .gte('data_lancamento', `${meses[0].mes}-01`);
+
+        if (isFinanceiroLocal && congregacaoId) {
+          q = q.eq('congregacao_id', congregacaoId);
+        }
+
+        const { data, error } = await q
+          .range(page * pageSize, (page + 1) * pageSize - 1)
+          .order('data_lancamento', { ascending: true })
+          .order('id', { ascending: true });
+
+        if (error || !data || data.length === 0) break;
+        allGraficoRows = allGraficoRows.concat(data as any);
+        if (data.length < pageSize) break;
+        page++;
       }
-      const { data } = await q;
-      if (data) {
-        (data as { data_lancamento: string; tipo_movimento: string; valor: number }[]).forEach(l => {
+
+      if (allGraficoRows.length > 0) {
+        allGraficoRows.forEach(l => {
           const idx = meses.findIndex(x => x.mes === l.data_lancamento.slice(0, 7));
           if (idx >= 0) {
             if (l.tipo_movimento === 'entrada') meses[idx].entradas += Number(l.valor);

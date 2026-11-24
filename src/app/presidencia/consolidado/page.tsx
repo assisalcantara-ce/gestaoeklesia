@@ -294,51 +294,49 @@ export default function ConsolidadoFinanceiroPage() {
       const inicioAnoAnt = `${anoNum - 1}-01-01`;
       const fimAnoAnt    = `${anoNum}-01-01`;
 
+      // Helper para buscar lançamentos com paginação segura contra o teto de 1000
+      const fetchLancsPeriodo = async (dataIni: string, dataFim: string, selectFields: string) => {
+        let allRows: any[] = [];
+        let page = 0;
+        const pageSize = 1000;
+        while (true) {
+          const { data, error } = await supabase
+            .from('tesouraria_lancamentos')
+            .select(selectFields)
+            .eq('ministry_id', ministryId)
+            .gte('data_lancamento', dataIni)
+            .lt('data_lancamento', dataFim)
+            .range(page * pageSize, (page + 1) * pageSize - 1)
+            .order('data_lancamento', { ascending: true })
+            .order('id', { ascending: true });
+
+          if (error || !data || data.length === 0) break;
+          allRows = allRows.concat(data);
+          if (data.length < pageSize) break;
+          page++;
+        }
+        return allRows;
+      };
+
       const [
         orgService,
-        resLancMes,
-        resLancMesAnt,
-        resLancAno,
-        resLancAnoAnt,
+        lancsMesData,
+        lancsMesAntData,
+        lancsAnoData,
+        lancsAnoAntData,
         resCats,
         resDestinos,
       ] = await Promise.all([
         obterEstruturaOrganizacionalService(ministryId, supabase),
-
-        supabase
-          .from('tesouraria_lancamentos')
-          .select('congregacao_id, tipo_movimento, valor, categoria_id')
-          .eq('ministry_id', ministryId)
-          .gte('data_lancamento', inicioMes)
-          .lt('data_lancamento', fimMes),
-
-        supabase
-          .from('tesouraria_lancamentos')
-          .select('congregacao_id, tipo_movimento, valor')
-          .eq('ministry_id', ministryId)
-          .gte('data_lancamento', inicioMesAnt)
-          .lt('data_lancamento', fimMesAnt),
-
-        supabase
-          .from('tesouraria_lancamentos')
-          .select('congregacao_id, tipo_movimento, valor, categoria_id')
-          .eq('ministry_id', ministryId)
-          .gte('data_lancamento', inicioAno)
-          .lt('data_lancamento', fimAno),
-
-        supabase
-          .from('tesouraria_lancamentos')
-          .select('congregacao_id, tipo_movimento, valor')
-          .eq('ministry_id', ministryId)
-          .gte('data_lancamento', inicioAnoAnt)
-          .lt('data_lancamento', fimAnoAnt),
-
+        fetchLancsPeriodo(inicioMes, fimMes, 'congregacao_id, tipo_movimento, valor, categoria_id'),
+        fetchLancsPeriodo(inicioMesAnt, fimMesAnt, 'congregacao_id, tipo_movimento, valor'),
+        fetchLancsPeriodo(inicioAno, fimAno, 'congregacao_id, tipo_movimento, valor, categoria_id'),
+        fetchLancsPeriodo(inicioAnoAnt, fimAnoAnt, 'congregacao_id, tipo_movimento, valor'),
         supabase
           .from('fin_categorias')
           .select('id, nome, tipo_movimento')
           .or(`ministry_id.is.null,ministry_id.eq.${ministryId}`)
           .eq('is_ativa', true),
-
         supabase
           .from('fin_payment_destinations')
           .select('congregacao_id, label')
@@ -349,10 +347,10 @@ export default function ConsolidadoFinanceiroPage() {
 
       const div1Options = orgService.getOptionsFormatadas(1);
       setCongregacoes(div1Options.map((opt) => ({ id: opt.id, nome: opt.nome })));
-      setLancMes((resLancMes.data ?? []) as RawLanc[]);
-      setLancMesAnt((resLancMesAnt.data ?? []) as RawLancSimples[]);
-      setLancAno((resLancAno.data ?? []) as RawLanc[]);
-      setLancAnoAnt((resLancAnoAnt.data ?? []) as RawLancSimples[]);
+      setLancMes(lancsMesData as RawLanc[]);
+      setLancMesAnt(lancsMesAntData as RawLancSimples[]);
+      setLancAno(lancsAnoData as RawLanc[]);
+      setLancAnoAnt(lancsAnoAntData as RawLancSimples[]);
       setCategorias((resCats.data ?? []) as FinCategoria[]);
       setDestinosDigitais((resDestinos.data ?? []) as DestinoDigital[]);
     } finally {

@@ -628,57 +628,76 @@ export function useTesouraria() {
     return `${y}-${String(m + 1).padStart(2, '0')}`;
   }, []);
 
-  // Carregar lançamentos do mês selecionado via Supabase Client
+  // Carregar lançamentos do mês selecionado via Supabase Client (com paginação em lotes seguros contra o teto de 1000)
   const loadLancamentosMes = useCallback(async (mes: string, dataInicio?: string, dataFim?: string) => {
     if (!ministryId) return;
     try {
       setLoadingMes(true);
-      let q = supabase
-        .from('tesouraria_lancamentos')
-        .select('*, congregacoes(nome), departamentos(nome, sigla), members(id, name, cpf, matricula)')
-        .eq('ministry_id', ministryId);
-
       const dInicio = dataInicio !== undefined ? dataInicio : filtroDataInicio;
       const dFim = dataFim !== undefined ? dataFim : filtroDataFim;
 
-      if (dInicio && dFim) {
-        q = q.gte('data_lancamento', dInicio).lte('data_lancamento', dFim);
-      } else if (dInicio) {
-        const limiteFim = `${mesProximo(mes)}-01`;
-        if (dInicio < limiteFim) {
-          q = q.gte('data_lancamento', dInicio).lt('data_lancamento', limiteFim);
+      let allRawRows: any[] = [];
+      let page = 0;
+      const pageSize = 1000;
+
+      while (true) {
+        let q = supabase
+          .from('tesouraria_lancamentos')
+          .select('*, congregacoes(nome), departamentos(nome, sigla), members(id, name, cpf, matricula)')
+          .eq('ministry_id', ministryId);
+
+        if (dInicio && dFim) {
+          q = q.gte('data_lancamento', dInicio).lte('data_lancamento', dFim);
+        } else if (dInicio) {
+          const limiteFim = `${mesProximo(mes)}-01`;
+          if (dInicio < limiteFim) {
+            q = q.gte('data_lancamento', dInicio).lt('data_lancamento', limiteFim);
+          } else {
+            q = q.gte('data_lancamento', dInicio);
+          }
+        } else if (dFim) {
+          const limiteInicio = `${mes}-01`;
+          if (dFim >= limiteInicio) {
+            q = q.gte('data_lancamento', limiteInicio).lte('data_lancamento', dFim);
+          } else {
+            q = q.lte('data_lancamento', dFim);
+          }
         } else {
-          q = q.gte('data_lancamento', dInicio);
+          q = q.gte('data_lancamento', `${mes}-01`).lt('data_lancamento', `${mesProximo(mes)}-01`);
         }
-      } else if (dFim) {
-        const limiteInicio = `${mes}-01`;
-        if (dFim >= limiteInicio) {
-          q = q.gte('data_lancamento', limiteInicio).lte('data_lancamento', dFim);
+
+        if (scope.isFinanceiroLocal && scope.congregacaoId) {
+          q = q.eq('congregacao_id', scope.congregacaoId);
+        }
+
+        const { data, error } = await q
+          .range(page * pageSize, (page + 1) * pageSize - 1)
+          .order('data_lancamento', { ascending: false })
+          .order('id', { ascending: true }); // Ordenação determinística
+
+        if (error) {
+          console.error('Erro ao buscar lançamentos do mês:', error);
+          break;
+        }
+
+        if (data && data.length > 0) {
+          allRawRows = allRawRows.concat(data);
+          if (data.length < pageSize) break;
+          page++;
         } else {
-          q = q.lte('data_lancamento', dFim);
+          break;
         }
-      } else {
-        q = q.gte('data_lancamento', `${mes}-01`).lt('data_lancamento', `${mesProximo(mes)}-01`);
       }
 
-      if (scope.isFinanceiroLocal && scope.congregacaoId) {
-        q = q.eq('congregacao_id', scope.congregacaoId);
-      }
-
-      const { data, error } = await q;
-      if (error) {
-        console.error('Erro ao buscar lançamentos do mês:', error);
-      } else if (data) {
-        const formatados: Lancamento[] = data.map((item: any) => ({
-          ...item,
-          congregacao_nome: item.congregacoes?.nome ?? 'Sede / Geral',
-          departamento_nome: item.departamentos?.nome ?? item.departamentos?.sigla ?? '—',
-          member_nome: item.members?.name ?? null,
-          member_cpf: item.members?.cpf ?? null,
-          member_matricula: item.members?.matricula ?? null,
-        }));
-        setLancamentosMes(formatados);
-      }
+      const formatados: Lancamento[] = allRawRows.map((item: any) => ({
+        ...item,
+        congregacao_nome: item.congregacoes?.nome ?? 'Sede / Geral',
+        departamento_nome: item.departamentos?.nome ?? item.departamentos?.sigla ?? '—',
+        member_nome: item.members?.name ?? null,
+        member_cpf: item.members?.cpf ?? null,
+        member_matricula: item.members?.matricula ?? null,
+      }));
+      setLancamentosMes(formatados);
     } catch (err) {
       console.error('Erro ao carregar lançamentos do mês:', err);
     } finally {
@@ -719,37 +738,56 @@ export function useTesouraria() {
     };
   }, [ministryId, filtroMes, loadLancamentosMes, supabase]);
 
-  // Buscar lançamentos quando o mês de referência do Relatório (relMes) alterar
+  // Buscar lançamentos quando o mês de referência do Relatório (relMes) alterar (com paginação em lotes seguros)
   const [lancamentosRelMes, setLancamentosRelMes] = useState<Lancamento[]>([]);
 
   const loadLancamentosRelatorio = useCallback(async (mes: string) => {
     if (!ministryId) return;
     try {
-      let q = supabase
-        .from('tesouraria_lancamentos')
-        .select('*, congregacoes(nome), departamentos(nome, sigla), members(id, name, cpf, matricula)')
-        .eq('ministry_id', ministryId)
-        .gte('data_lancamento', `${mes}-01`)
-        .lt('data_lancamento', `${mesProximo(mes)}-01`);
+      let allRelRows: any[] = [];
+      let page = 0;
+      const pageSize = 1000;
 
-      if (scope.isFinanceiroLocal && scope.congregacaoId) {
-        q = q.eq('congregacao_id', scope.congregacaoId);
+      while (true) {
+        let q = supabase
+          .from('tesouraria_lancamentos')
+          .select('*, congregacoes(nome), departamentos(nome, sigla), members(id, name, cpf, matricula)')
+          .eq('ministry_id', ministryId)
+          .gte('data_lancamento', `${mes}-01`)
+          .lt('data_lancamento', `${mesProximo(mes)}-01`);
+
+        if (scope.isFinanceiroLocal && scope.congregacaoId) {
+          q = q.eq('congregacao_id', scope.congregacaoId);
+        }
+
+        const { data, error } = await q
+          .range(page * pageSize, (page + 1) * pageSize - 1)
+          .order('data_lancamento', { ascending: false })
+          .order('id', { ascending: true });
+
+        if (error) {
+          console.error('Erro ao buscar lançamentos do relatório:', error);
+          break;
+        }
+
+        if (data && data.length > 0) {
+          allRelRows = allRelRows.concat(data);
+          if (data.length < pageSize) break;
+          page++;
+        } else {
+          break;
+        }
       }
 
-      const { data, error } = await q;
-      if (error) {
-        console.error('Erro ao buscar lançamentos do relatório:', error);
-      } else if (data) {
-        const formatados: Lancamento[] = data.map((item: any) => ({
-          ...item,
-          congregacao_nome: item.congregacoes?.nome ?? 'Sede / Geral',
-          departamento_nome: item.departamentos?.nome ?? item.departamentos?.sigla ?? '—',
-          member_nome: item.members?.name ?? null,
-          member_cpf: item.members?.cpf ?? null,
-          member_matricula: item.members?.matricula ?? null,
-        }));
-        setLancamentosRelMes(formatados);
-      }
+      const formatados: Lancamento[] = allRelRows.map((item: any) => ({
+        ...item,
+        congregacao_nome: item.congregacoes?.nome ?? 'Sede / Geral',
+        departamento_nome: item.departamentos?.nome ?? item.departamentos?.sigla ?? '—',
+        member_nome: item.members?.name ?? null,
+        member_cpf: item.members?.cpf ?? null,
+        member_matricula: item.members?.matricula ?? null,
+      }));
+      setLancamentosRelMes(formatados);
     } catch (err) {
       console.error('Erro ao carregar lançamentos do relatório:', err);
     }

@@ -690,13 +690,6 @@ export default function PrestacaoContasOficialPage() {
 
     const [inicio, fim] = dateRange(filtroMes);
 
-    const lancQuery = supabase
-      .from('tesouraria_lancamentos')
-      .select('congregacao_id, tipo_movimento, valor, categoria_id')
-      .eq('ministry_id', ministryId)
-      .gte('data_lancamento', inicio)
-      .lt('data_lancamento', fim);
-
     const fechQuery = supabase
       .from('tesouraria_fechamentos')
       .select('id, congregacao_id, mes_referencia, saldo_inicial, total_entradas, total_saidas, saldo_final, status, fechado_em')
@@ -710,7 +703,6 @@ export default function PrestacaoContasOficialPage() {
       .eq('mes_referencia', filtroMes);
 
     if (filtroCong) {
-      lancQuery.eq('congregacao_id', filtroCong);
       fechQuery.eq('congregacao_id', filtroCong);
       reviewQuery.eq('congregacao_id', filtroCong);
     } else {
@@ -718,14 +710,41 @@ export default function PrestacaoContasOficialPage() {
       reviewQuery.is('congregacao_id', null);
     }
 
-    const [resLanc, resCats, resFech, resReview] = await Promise.all([
-      lancQuery,
+    // Busca de lançamentos com paginação em lotes seguros para garantir totalidade contábil
+    let allLancsRows: RawLanc[] = [];
+    let page = 0;
+    const pageSize = 1000;
+
+    while (true) {
+      let lq = supabase
+        .from('tesouraria_lancamentos')
+        .select('congregacao_id, tipo_movimento, valor, categoria_id')
+        .eq('ministry_id', ministryId)
+        .gte('data_lancamento', inicio)
+        .lt('data_lancamento', fim);
+
+      if (filtroCong) {
+        lq = lq.eq('congregacao_id', filtroCong);
+      }
+
+      const { data: pageData, error: pageErr } = await lq
+        .range(page * pageSize, (page + 1) * pageSize - 1)
+        .order('data_lancamento', { ascending: true })
+        .order('id', { ascending: true });
+
+      if (pageErr || !pageData || pageData.length === 0) break;
+      allLancsRows = allLancsRows.concat(pageData as RawLanc[]);
+      if (pageData.length < pageSize) break;
+      page++;
+    }
+
+    const [resCats, resFech, resReview] = await Promise.all([
       supabase.from('financeiro_categorias').select('id, nome, tipo_movimento').eq('ministry_id', ministryId),
       fechQuery,
       reviewQuery,
     ]);
 
-    const lancs = (resLanc.data ?? []) as RawLanc[];
+    const lancs = allLancsRows;
     setLancamentos(lancs);
     setCategorias((resCats.data ?? []) as FinCategoria[]);
 
