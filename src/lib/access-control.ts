@@ -81,6 +81,7 @@ export function temAcessoAdmin(role: string | null | undefined, modulo: string):
 
 export type NivelAcesso =
   | 'administrador'
+  | 'equipe_ti'
   | 'financeiro'
   | 'secretario_geral'
   | 'tesoureiro_geral'
@@ -122,6 +123,25 @@ export const MODULOS_ACESSO: Record<NivelAcesso, string[]> = {
     'presidencia',
     'consolidado_financeiro',
     'conselho_fiscal',
+    'suporte',
+    'geolocalizacao',
+    'comissao',
+    'gestao',
+    'agenda',
+    'celulas',
+  ],
+  equipe_ti: [
+    'dashboard',
+    'secretaria',
+    'secretaria_local',
+    'ebd',
+    'usuarios',
+    'configuracoes',
+    'auditoria',
+    'eventos',
+    'reunioes',
+    'missoes',
+    'patrimonio',
     'suporte',
     'geolocalizacao',
     'comissao',
@@ -267,6 +287,25 @@ export const MODULOS_ESCRITA: Record<NivelAcesso, string[]> = {
     'gestao',
     'celulas',
   ],
+  equipe_ti: [
+    'secretaria',
+    'secretaria_local',
+    'ebd',
+    'usuarios',
+    'configuracoes',
+    'auditoria',
+    'dashboard',
+    'eventos',
+    'reunioes',
+    'missoes',
+    'patrimonio',
+    'suporte',
+    'geolocalizacao',
+    'agenda',
+    'comissao',
+    'gestao',
+    'celulas',
+  ],
   financeiro: [
     'tesouraria',
   ],
@@ -368,6 +407,7 @@ export function resolveNivel(role: string | null | undefined, permissions: unkno
   let resolved: NivelAcesso | null = null;
 
   if (perms.includes('ADMINISTRADOR')) resolved = 'administrador';
+  else if (perms.includes('EQUIPE_TI')) resolved = 'equipe_ti';
   else if (perms.includes('SECRETARIO_GERAL')) resolved = 'secretario_geral';
   else if (perms.includes('TESOUREIRO_GERAL')) resolved = 'tesoureiro_geral';
   else if (perms.includes('AUXILIAR_SECRETARIA')) resolved = 'auxiliar_secretaria';
@@ -389,6 +429,9 @@ export function resolveNivel(role: string | null | undefined, permissions: unkno
     const map: Record<string, NivelAcesso> = {
       admin: 'administrador',
       administrador: 'administrador',
+      equipe_ti: 'equipe_ti',
+      equipeti: 'equipe_ti',
+      ti: 'equipe_ti',
       manager: 'financeiro',
       financeiro: 'financeiro',
       financial: 'financeiro',
@@ -433,6 +476,8 @@ export function mapRoleAndPermissions(nivel: NivelAcesso): RoleConfig {
   switch (nivel) {
     case 'administrador':
       return { role: 'admin', permissions: ['ADMINISTRADOR'] };
+    case 'equipe_ti':
+      return { role: 'operator', permissions: ['EQUIPE_TI'] };
     case 'financeiro':
       return { role: 'manager', permissions: ['FINANCEIRO'] };
     case 'secretario_geral':
@@ -475,6 +520,12 @@ export function hasRole(roles: string[], required: string[] | string): boolean {
   const requiredList = Array.isArray(required) ? required : [required];
   const set = new Set(roles.map(role => role.toUpperCase()));
   return requiredList.some(role => set.has(String(role).toUpperCase())) || set.has('ADMINISTRADOR');
+}
+
+export function isEquipeTI(nivel: NivelAcesso | string | null | undefined): boolean {
+  if (!nivel) return false;
+  const n = String(nivel).toLowerCase();
+  return n === 'equipe_ti';
 }
 
 export function isLocalNivel(nivel: NivelAcesso): boolean {

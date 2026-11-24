@@ -13,7 +13,7 @@ import {
 } from '@/lib/access-control';
 
 export type { NivelAcesso } from '@/lib/access-control';
-export { temAcesso, temAcessoEscrita, isSecretariaGeral, isSecretariaLocal, podeAcessarModuloFuncionarios } from '@/lib/access-control';
+export { temAcesso, temAcessoEscrita, isEquipeTI, isSecretariaGeral, isSecretariaLocal, podeAcessarModuloFuncionarios } from '@/lib/access-control';
 
 export function getModulosAcessiveis(nivel: NivelAcesso): string[] {
   return MODULOS_ACESSO[nivel] ?? [];
@@ -25,6 +25,10 @@ export function getModulosEditaveis(nivel: NivelAcesso): string[] {
 
 export function isAdmin(nivel: NivelAcesso): boolean {
   return nivel === 'administrador';
+}
+
+export function isPerfilEquipeTI(nivel: NivelAcesso): boolean {
+  return nivel === 'equipe_ti';
 }
 
 export function isSecretarioGeral(nivel: NivelAcesso): boolean {

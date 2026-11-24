@@ -111,6 +111,14 @@ export default function UsuariosPage() {
       cor: 'bg-purple-100 border-purple-300',
     },
     {
+      id: 'equipe_ti',
+      nome: 'Equipe de TI',
+      categoria: 'Administração',
+      descricao: 'Acesso técnico aos módulos contratados, exceto financeiro',
+      icon: '🛡️',
+      cor: 'bg-cyan-100 border-cyan-300',
+    },
+    {
       id: 'financeiro',
       nome: 'Financeiro',
       categoria: 'Administração',
@@ -180,10 +188,10 @@ export default function UsuariosPage() {
   const getNivelInfo = (nivel: string) => {
     return nivelAcessoInfo.find(n => n.id === nivel) || {
       id: nivel,
-      nome: nivel === 'secretario_geral' ? 'Secretário Geral' : nivel === 'auxiliar_secretaria' ? 'Auxiliar de Secretaria' : nivel === 'tesoureiro_geral' ? 'Tesoureiro Geral' : nivel === 'operador' ? 'Operador Local (Legado)' : nivel === 'admin_local' ? 'Admin Local (Legado)' : nivel === 'financeiro_local' ? 'Financeiro Local (Legado)' : nivel === 'superintendente' ? 'Superintendente EBD (Legado)' : nivel === 'coordenador' ? 'Coordenador EBD (Legado)' : nivel,
-      descricao: '',
-      icon: '👤',
-      cor: 'bg-gray-50 border-gray-200',
+      nome: nivel === 'equipe_ti' ? 'Equipe de TI' : nivel === 'secretario_geral' ? 'Secretário Geral' : nivel === 'auxiliar_secretaria' ? 'Auxiliar de Secretaria' : nivel === 'tesoureiro_geral' ? 'Tesoureiro Geral' : nivel === 'operador' ? 'Operador Local (Legado)' : nivel === 'admin_local' ? 'Admin Local (Legado)' : nivel === 'financeiro_local' ? 'Financeiro Local (Legado)' : nivel === 'superintendente' ? 'Superintendente EBD (Legado)' : nivel === 'coordenador' ? 'Coordenador EBD (Legado)' : nivel,
+      descricao: nivel === 'equipe_ti' ? 'Acesso técnico aos módulos contratados, exceto financeiro' : '',
+      icon: nivel === 'equipe_ti' ? '🛡️' : '👤',
+      cor: nivel === 'equipe_ti' ? 'bg-cyan-100 border-cyan-300' : 'bg-gray-50 border-gray-200',
     };
   };
 
@@ -722,8 +730,16 @@ export default function UsuariosPage() {
               {/* Nível de acesso */}
               <div className="mb-4 space-y-4">
                 <label className="block text-sm font-semibold text-[#123b63]">Nível de Acesso *</label>
-                {['Administração', 'Secretaria', 'Tesouraria', 'EBD'].map((cat) => {
-                  const items = nivelAcessoInfo.filter(n => n.categoria === cat && !n.legacy);
+                {['Administração', 'Secretaria', 'Tesouraria', 'EBD']
+                  .filter(cat => !(userCtx.nivel === 'equipe_ti' && cat === 'Tesouraria'))
+                  .map((cat) => {
+                  const items = nivelAcessoInfo.filter(n => {
+                    if (n.legacy) return false;
+                    if (n.categoria !== cat) return false;
+                    if (userCtx.nivel === 'equipe_ti' && (n.id === 'administrador' || n.categoria === 'Tesouraria')) return false;
+                    return true;
+                  });
+                  if (items.length === 0) return null;
                   return (
                     <div key={cat} className="space-y-1.5">
                       <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">{cat}</h4>
@@ -1062,15 +1078,26 @@ export default function UsuariosPage() {
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#0284c7]"
                     >
                       <option value="">Selecione</option>
-                      {['Administração', 'Secretaria', 'Tesouraria', 'EBD'].map((cat) => (
-                        <optgroup key={cat} label={cat}>
-                          {nivelAcessoInfo.filter(n => n.categoria === cat && (!n.legacy || editData.nivel === n.id)).map(nivel => (
-                            <option key={nivel.id} value={nivel.id}>
-                              {nivel.icon} {nivel.nome} {nivel.legacy ? '(Legado)' : ''}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))}
+                      {['Administração', 'Secretaria', 'Tesouraria', 'EBD']
+                        .filter(cat => !(userCtx.nivel === 'equipe_ti' && cat === 'Tesouraria'))
+                        .map((cat) => {
+                          const items = nivelAcessoInfo.filter(n => {
+                            if (n.categoria !== cat) return false;
+                            if (n.legacy && editData.nivel !== n.id) return false;
+                            if (userCtx.nivel === 'equipe_ti' && (n.id === 'administrador' || n.categoria === 'Tesouraria')) return false;
+                            return true;
+                          });
+                          if (items.length === 0) return null;
+                          return (
+                            <optgroup key={cat} label={cat}>
+                              {items.map(nivel => (
+                                <option key={nivel.id} value={nivel.id}>
+                                  {nivel.icon} {nivel.nome} {nivel.legacy ? '(Legado)' : ''}
+                                </option>
+                              ))}
+                            </optgroup>
+                          );
+                      })}
                     </select>
                   </div>
                   <div>

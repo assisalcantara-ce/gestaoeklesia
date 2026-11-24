@@ -4,6 +4,17 @@ import { createServerClient } from '@/lib/supabase-server';
 import { requireFlowAuth, hasRole } from '@/lib/flows/flow-auth';
 import { mapRoleAndPermissions, resolveNivel, type NivelAcesso } from '@/lib/access-control';
 
+// Perfis com privilégios financeiros ou administrativos que 'equipe_ti' não pode conceder, editar ou excluir
+const RESTRICTED_ROLES_FOR_TI: NivelAcesso[] = [
+  'administrador',
+  'financeiro',
+  'tesoureiro_geral',
+  'tesouraria_local',
+  'financeiro_local',
+  'presidencia',
+  'conselho_fiscal',
+];
+
 type UsuarioResponse = {
   id: string;
   nome: string;
@@ -56,7 +67,7 @@ function resolveEmailConfirmed(user: any): boolean {
 export async function GET(request: NextRequest) {
   try {
     const { ministryId, roles } = await requireFlowAuth(request);
-    if (!hasRole(roles, ['ADMINISTRADOR'])) {
+    if (!hasRole(roles, ['ADMINISTRADOR', 'EQUIPE_TI'])) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -153,9 +164,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { ministryId, roles } = await requireFlowAuth(request);
-    if (!hasRole(roles, ['ADMINISTRADOR'])) {
+    if (!hasRole(roles, ['ADMINISTRADOR', 'EQUIPE_TI'])) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    const isOperatorTI = !hasRole(roles, ['ADMINISTRADOR']) && hasRole(roles, ['EQUIPE_TI']);
 
     const body = (await request.json()) as Partial<UsuarioCreateBody>;
     const nome = String(body?.nome || '').trim();
@@ -209,6 +222,13 @@ export async function POST(request: NextRequest) {
     if ((totalUsuarios ?? 0) >= limite) {
       return NextResponse.json(
         { error: `Limite de usuários atingido para o plano ${planoNome} (máximo: ${limite}). Faça upgrade para adicionar mais usuários.` },
+        { status: 403 }
+      );
+    }
+
+    if (isOperatorTI && RESTRICTED_ROLES_FOR_TI.includes(nivel)) {
+      return NextResponse.json(
+        { error: 'Equipe de TI não tem permissão para conceder perfil de Administrador ou perfis financeiros.' },
         { status: 403 }
       );
     }
@@ -285,10 +305,12 @@ function resolveBannedUntil(status: UsuarioResponse['status'] | undefined) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const { ministryId, roles } = await requireFlowAuth(request);
-    if (!hasRole(roles, ['ADMINISTRADOR'])) {
+    const { ministryId, roles, userId: operatorUserId } = await requireFlowAuth(request);
+    if (!hasRole(roles, ['ADMINISTRADOR', 'EQUIPE_TI'])) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    const isOperatorTI = !hasRole(roles, ['ADMINISTRADOR']) && hasRole(roles, ['EQUIPE_TI']);
 
     const body = (await request.json()) as Partial<UsuarioUpdateBody>;
     const userId = String(body?.user_id || '').trim();
@@ -317,6 +339,40 @@ export async function PUT(request: NextRequest) {
     }
 
     const admin = createServerClient();
+
+    if (isOperatorTI) {
+      if (userId === operatorUserId && nivel !== 'equipe_ti') {
+        return NextResponse.json(
+          { error: 'Você não pode alterar seu próprio nível de acesso.' },
+          { status: 403 }
+        );
+      }
+
+      if (RESTRICTED_ROLES_FOR_TI.includes(nivel)) {
+        return NextResponse.json(
+          { error: 'Equipe de TI não tem permissão para conceder perfil de Administrador ou perfis financeiros.' },
+          { status: 403 }
+        );
+      }
+
+      const { data: targetMu } = await admin
+        .from('ministry_users')
+        .select('role, permissions')
+        .eq('ministry_id', ministryId)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (targetMu) {
+        const targetNivel = resolveNivel(targetMu.role, targetMu.permissions);
+        if (targetNivel && RESTRICTED_ROLES_FOR_TI.includes(targetNivel)) {
+          return NextResponse.json(
+            { error: 'Equipe de TI não tem permissão para alterar usuários Administradores ou Financeiros.' },
+            { status: 403 }
+          );
+        }
+      }
+    }
+
     const roleConfig = mapRoleAndPermissions(nivel);
     const banned_until = resolveBannedUntil(status);
 
@@ -429,9 +485,11 @@ export async function PUT(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const { ministryId, roles, userId: currentUserId } = await requireFlowAuth(request);
-    if (!hasRole(roles, ['ADMINISTRADOR'])) {
+    if (!hasRole(roles, ['ADMINISTRADOR', 'EQUIPE_TI'])) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    const isOperatorTI = !hasRole(roles, ['ADMINISTRADOR']) && hasRole(roles, ['EQUIPE_TI']);
 
     const userId = String(request.nextUrl.searchParams.get('user_id') || '').trim();
     if (!userId) {
@@ -460,13 +518,23 @@ export async function DELETE(request: NextRequest) {
 
     const { data: existing, error: checkError } = await admin
       .from('ministry_users')
-      .select('user_id')
+      .select('user_id, role, permissions')
       .eq('ministry_id', ministryId)
       .eq('user_id', userId)
       .single();
 
     if (checkError || !existing) {
       return NextResponse.json({ error: 'Usuário não encontrado neste ministério' }, { status: 404 });
+    }
+
+    if (isOperatorTI) {
+      const targetNivel = resolveNivel(existing.role, existing.permissions);
+      if (targetNivel && RESTRICTED_ROLES_FOR_TI.includes(targetNivel)) {
+        return NextResponse.json(
+          { error: 'Equipe de TI não tem permissão para excluir usuários Administradores ou Financeiros.' },
+          { status: 403 }
+        );
+      }
     }
 
     const { error: deleteRelError } = await admin
