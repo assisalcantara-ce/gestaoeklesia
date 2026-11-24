@@ -600,32 +600,41 @@ export default function TesourariaPage() {
               fechamentos={t.fechamentos}
               filtroMes={t.filtroMes}
               fmtBRL={t.fmtBRL}
-              onAbrirModalFechamento={(congId) => {
+              onAbrirModalFechamento={async (congId) => {
                 const [ano, mes] = t.filtroMes.split('-');
                 const ultDiaObj = new Date(Number(ano), Number(mes), 0);
                 const ultDiaDefault = `${ano}-${mes}-${String(ultDiaObj.getDate()).padStart(2, '0')}`;
+                const dataInicioDefault = `${ano}-${mes}-01`;
 
-                const fechamentoAnterior = t.fechamentos.find(
-                  (f) => (f.congregacao_id === congId || (f as any).cong_id === congId)
-                );
-
-                if (fechamentoAnterior && (fechamentoAnterior as any).data_fim) {
-                  const dataFimAnt = new Date((fechamentoAnterior as any).data_fim + 'T00:00:00');
-                  dataFimAnt.setDate(dataFimAnt.getDate() + 1);
-                  const proxDiaStr = dataFimAnt.toISOString().split('T')[0];
-                  t.setFechaDataInicio(proxDiaStr);
-
-                  if (fechamentoAnterior.saldo_final !== undefined) {
-                    t.setFechaSaldoInicial(String(fechamentoAnterior.saldo_final));
-                  }
-                } else {
-                  t.setFechaDataInicio(`${ano}-${mes}-01`);
-                  t.setFechaSaldoInicial('0,00');
-                }
-
+                t.setFechaDataInicio(dataInicioDefault);
                 t.setFechaDataFim(ultDiaDefault);
                 t.setFechaCongId(congId);
                 t.setShowFechaModal(true);
+
+                // Consulta saldo inicial canônico apurado
+                try {
+                  const congParam = congId ? `&congregacao_id=${congId}` : '';
+                  const res = await fetch(`/api/v1/tesouraria/fechamento?action=calcular_saldo&mes=${t.filtroMes}&data_inicio=${dataInicioDefault}&data_fim=${ultDiaDefault}${congParam}`);
+                  if (res.ok) {
+                    const json = await res.json();
+                    if (json.ok && json.data) {
+                      t.setFechaSaldoInicial(Number(json.data.saldoInicial).toFixed(2).replace('.', ','));
+                      return;
+                    }
+                  }
+                } catch (e) {
+                  console.error('Erro ao calcular saldo inicial canônico:', e);
+                }
+
+                // Fallback local se a API não responder
+                const fechamentoAnterior = t.fechamentos.find(
+                  (f) => (f.congregacao_id === congId || (f as any).cong_id === congId)
+                );
+                if (fechamentoAnterior && fechamentoAnterior.saldo_final !== undefined) {
+                  t.setFechaSaldoInicial(String(fechamentoAnterior.saldo_final));
+                } else {
+                  t.setFechaSaldoInicial('0,00');
+                }
               }}
               onImprimirFechamento={() => {
                 window.print();

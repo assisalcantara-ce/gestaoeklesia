@@ -1243,6 +1243,18 @@ export function useTesouraria() {
         return;
       }
 
+      // Recarrega lista atualizada de fechamentos
+      if (ministryId) {
+        const { data: updatedFechs } = await supabase
+          .from('tesouraria_fechamentos')
+          .select('*')
+          .eq('ministry_id', ministryId)
+          .order('mes_referencia', { ascending: false });
+        if (updatedFechs) {
+          setFechamentos(updatedFechs);
+        }
+      }
+
       showModal('Caixa Fechado!', 'O período financeiro foi encerrado.');
       setShowFechaModal(false);
       setFechaCongId(null);

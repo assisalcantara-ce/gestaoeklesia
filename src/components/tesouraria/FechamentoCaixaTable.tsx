@@ -168,13 +168,23 @@ export default function FechamentoCaixaTable({
                     {/* Coluna 2: Status do Mês Selecionado */}
                     <td className="py-3.5 px-5">
                       {item.isFechado ? (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-900 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full shadow-2xs">
-                          <Lock className="h-3 w-3 text-amber-700" /> Fechado
-                        </span>
+                        <div className="flex flex-col gap-1 items-start">
+                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-900 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full shadow-2xs">
+                            <Lock className="h-3 w-3 text-emerald-700" /> Período Fechado
+                          </span>
+                          <span className="text-[10px] text-emerald-700 font-semibold uppercase tracking-wider pl-1">
+                            Saldo Homologado
+                          </span>
+                        </div>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-900 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full shadow-2xs">
-                          <CheckCircle className="h-3 w-3 text-emerald-700" /> Aberto
-                        </span>
+                        <div className="flex flex-col gap-1 items-start">
+                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-900 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full shadow-2xs">
+                            <CheckCircle className="h-3 w-3 text-amber-700" /> Período em Aberto
+                          </span>
+                          <span className="text-[10px] text-amber-700 font-semibold uppercase tracking-wider pl-1">
+                            Saldo Apurado
+                          </span>
+                        </div>
                       )}
                     </td>
 
@@ -182,8 +192,11 @@ export default function FechamentoCaixaTable({
                     <td className="py-3.5 px-5 text-xs">
                       {item.ultFechamento ? (
                         <div>
-                          <p className="font-bold text-slate-800">
+                          <p className="font-bold text-slate-800 flex items-center gap-1">
                             {item.ultFechamento.mes_referencia}
+                            <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded border border-slate-200 font-normal">
+                              Homologado
+                            </span>
                           </p>
                           <p className="text-slate-500 font-medium mt-0.5">
                             Saldo Final:{' '}

@@ -590,6 +590,11 @@ export default function PrestacaoContasOficialPage() {
   const [lancamentos, setLancamentos]   = useState<RawLanc[]>([]);
   const [categorias, setCategorias]     = useState<FinCategoria[]>([]);
   const [fechamento, setFechamento]     = useState<Fechamento | null>(null);
+  const [saldoApurado, setSaldoApurado] = useState<{ saldoInicial: number; saldoFinal: number; tipo: 'homologado' | 'apurado' }>({
+    saldoInicial: 0,
+    saldoFinal: 0,
+    tipo: 'apurado',
+  });
   const [fiscalReview, setFiscalReview] = useState<FiscalReview | null>(null);
   const [signatures, setSignatures]     = useState<FiscalSignature[]>([]);
 
@@ -629,8 +634,8 @@ export default function PrestacaoContasOficialPage() {
   );
 
   const saldoInicial = useMemo(
-    () => (fechamento ? Number(fechamento.saldo_inicial) : 0),
-    [fechamento],
+    () => (fechamento ? Number(fechamento.saldo_inicial) : saldoApurado.saldoInicial),
+    [fechamento, saldoApurado.saldoInicial],
   );
 
   const saldoFinal = useMemo(
@@ -725,7 +730,34 @@ export default function PrestacaoContasOficialPage() {
     setCategorias((resCats.data ?? []) as FinCategoria[]);
 
     const fechs = (resFech.data ?? []) as Fechamento[];
-    setFechamento(fechs.length > 0 ? fechs[0] : null);
+    const fechAtual = fechs.length > 0 ? fechs[0] : null;
+    setFechamento(fechAtual);
+
+    // Se não houver fechamento oficial para o mês, calcular o saldo canônico apurado
+    if (fechAtual && fechAtual.status === 'fechado') {
+      setSaldoApurado({
+        saldoInicial: Number(fechAtual.saldo_inicial) || 0,
+        saldoFinal: Number(fechAtual.saldo_final) || 0,
+        tipo: 'homologado',
+      });
+    } else {
+      try {
+        const congParam = filtroCong ? `&congregacao_id=${filtroCong}` : '';
+        const resBalance = await fetch(`/api/v1/tesouraria/fechamento?action=calcular_saldo&mes=${filtroMes}${congParam}`);
+        if (resBalance.ok) {
+          const jsonBalance = await resBalance.json();
+          if (jsonBalance.ok && jsonBalance.data) {
+            setSaldoApurado({
+              saldoInicial: Number(jsonBalance.data.saldoInicial) || 0,
+              saldoFinal: Number(jsonBalance.data.saldoFinal) || 0,
+              tipo: 'apurado',
+            });
+          }
+        }
+      } catch (e) {
+        console.error('Erro ao consultar saldo canônico apurado:', e);
+      }
+    }
 
     const reviews = (resReview.data ?? []) as FiscalReview[];
     const review = reviews.length > 0 ? reviews[0] : null;
@@ -960,7 +992,18 @@ export default function PrestacaoContasOficialPage() {
 
           {/* ── Resumo Financeiro ────────────────────────────────────────────── */}
           <div className="bg-white rounded-2xl border border-gray-200 p-5">
-            <h3 className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-4">Resumo Financeiro</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xs font-bold uppercase tracking-wide text-gray-400">Resumo Financeiro</h3>
+              <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full border ${
+                fechamento && fechamento.status === 'fechado'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : 'bg-amber-50 text-amber-800 border-amber-200'
+              }`}>
+                {fechamento && fechamento.status === 'fechado'
+                  ? '🔒 Saldo Homologado (Período Fechado)'
+                  : '🔓 Saldo Apurado (Período em Aberto)'}
+              </span>
+            </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div className="border-l-4 border-gray-300 pl-3">
                 <p className="text-xs text-gray-400">Saldo Inicial</p>
@@ -1115,7 +1158,7 @@ export default function PrestacaoContasOficialPage() {
                   <div>
                     <p className="text-xs text-gray-400">Status</p>
                     <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold mt-0.5 ${fechamento.status === 'fechado' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                      {fechamento.status === 'fechado' ? '✓ Fechado' : '⚠ Aberto'}
+                      {fechamento.status === 'fechado' ? '✓ Fechado (Homologado)' : '⚠ Aberto'}
                     </span>
                   </div>
                   <div>
@@ -1144,7 +1187,19 @@ export default function PrestacaoContasOficialPage() {
                   )}
                 </div>
               )
-              : <p className="text-gray-400 text-sm">Sem fechamento registrado para este período</p>
+              : (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-slate-600 text-sm font-medium">Período sem fechamento formal homologado.</p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Os indicadores acima refletem o <strong>Saldo Apurado Canônico</strong> com base nos lançamentos anteriores e saldos de implantação.
+                    </p>
+                  </div>
+                  <span className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full">
+                    Aberto (Saldo Apurado)
+                  </span>
+                </div>
+              )
             }
           </div>
 
