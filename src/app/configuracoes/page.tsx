@@ -12,6 +12,7 @@ import type { SubscriptionPlan } from '@/types/admin';
 import { NOMENCLATURAS_SCHEMA_VERSION, NOMENCLATURAS_SCHEMA_VERSION_KEY } from '@/lib/org-nomenclaturas';
 import { useRequireModulo } from '@/hooks/useRequireModulo';
 import { useUserContext } from '@/hooks/useUserContext';
+import { podeAcessarGatewaysPagamento, podeAcessarPlanoMinisterio } from '@/lib/access-control';
 import { fetchConfiguracaoIgrejaFromSupabase, updateConfiguracaoIgrejaInSupabase, formatarEnderecoCompleto } from '@/lib/igreja-config-utils';
 import { EnderecoForm } from '@/components/configuracoes/EnderecoForm';
 import AppMembroLinkModal from '@/components/configuracoes/AppMembroLinkModal';
@@ -29,15 +30,34 @@ export default function ConfiguracoesPage() {
     type: 'success' | 'error' | 'warning' | 'info';
   }>({ isOpen: false, title: '', message: '', type: 'success' });
 
+  const canAccessGateways = ctx.isAdmin && podeAcessarGatewaysPagamento(ctx.nivel);
+  const canAccessPlano = podeAcessarPlanoMinisterio(ctx.nivel);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab');
       if (tabParam && ['perfil', 'nomenclaturas', 'identidade', 'gateways', 'plano'].includes(tabParam)) {
-        setActiveTab(tabParam);
+        if (tabParam === 'gateways' && !canAccessGateways) {
+          setActiveTab('perfil');
+        } else if (tabParam === 'plano' && !canAccessPlano) {
+          setActiveTab('perfil');
+        } else {
+          setActiveTab(tabParam);
+        }
       }
     }
-  }, []);
+  }, [canAccessGateways, canAccessPlano]);
+
+  // Se por qualquer motivo a aba ativa for proibida para o perfil, redireciona para 'perfil'
+  useEffect(() => {
+    if (activeTab === 'gateways' && !canAccessGateways) {
+      setActiveTab('perfil');
+    }
+    if (activeTab === 'plano' && !canAccessPlano) {
+      setActiveTab('perfil');
+    }
+  }, [activeTab, canAccessGateways, canAccessPlano]);
 
   if (ctx.loading) return <div className="p-8">Carregando...</div>;
   if (bloqueado) return null;
@@ -86,7 +106,7 @@ export default function ConfiguracoesPage() {
             >
               🎨 Identidade Visual
             </button>
-            {ctx.isAdmin && (
+            {canAccessGateways && (
               <button
                 onClick={() => setActiveTab('gateways')}
                 className={`px-6 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 ${activeTab === 'gateways'
@@ -97,15 +117,17 @@ export default function ConfiguracoesPage() {
                 💳 Gateways de Pagamento
               </button>
             )}
-            <button
-              onClick={() => setActiveTab('plano')}
-              className={`px-6 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 ${activeTab === 'plano'
-                ? 'text-teal-700 border-teal-600'
-                : 'text-gray-600 border-transparent hover:text-teal-600'
-                }`}
-            >
-              📋 Plano
-            </button>
+            {canAccessPlano && (
+              <button
+                onClick={() => setActiveTab('plano')}
+                className={`px-6 py-3 font-semibold transition whitespace-nowrap text-sm border-b-3 ${activeTab === 'plano'
+                  ? 'text-teal-700 border-teal-600'
+                  : 'text-gray-600 border-transparent hover:text-teal-600'
+                  }`}
+              >
+                📋 Plano
+              </button>
+            )}
           </div>
 
           {/* Conteúdo das Abas */}
@@ -126,12 +148,12 @@ export default function ConfiguracoesPage() {
             )}
 
             {/* Aba: Gateways de Pagamento */}
-            {activeTab === 'gateways' && ctx.isAdmin && (
+            {activeTab === 'gateways' && canAccessGateways && (
               <GatewaysContent onNotification={(title, message, type) => setNotification({ isOpen: true, title, message, type })} />
             )}
 
             {/* Aba: Plano */}
-            {activeTab === 'plano' && (
+            {activeTab === 'plano' && canAccessPlano && (
               <PlanoContent onNotification={(title, message, type) => setNotification({ isOpen: true, title, message, type })} />
             )}
           </div>
@@ -1035,6 +1057,11 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
   };
 
   useEffect(() => {
+    if (userCtx.loading) return;
+    if (!podeAcessarPlanoMinisterio(userCtx.nivel)) {
+      setLoading(false);
+      return;
+    }
     const supabase = createClient();
 
     const load = async () => {
@@ -1089,7 +1116,7 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
     };
 
     load();
-  }, []);
+  }, [userCtx.loading, userCtx.nivel, userCtx.ministryId]);
 
   const handleUpgradeClick = (plano: SubscriptionPlan) => {
     setPlanoSelecionado(plano);
@@ -1097,6 +1124,10 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
   };
 
   const handleConfirmUpgrade = async () => {
+    if (!podeAcessarPlanoMinisterio(userCtx.nivel)) {
+      await dialog.alert({ title: 'Acesso Negado', type: 'error', message: 'Você não tem permissão para alterar ou solicitar upgrade de plano.' });
+      return;
+    }
     try {
       setCriandoTicket(true);
       const supabase = createClient();
@@ -1149,6 +1180,15 @@ function PlanoContent({ onNotification }: { onNotification: (title: string, mess
     const idx = planosDB.findIndex(p => p.id === planoAtual.id);
     return idx >= 0 && idx < planosDB.length - 1 ? planosDB[idx + 1].id : null;
   })();
+
+  if (!podeAcessarPlanoMinisterio(userCtx.nivel)) {
+    return (
+      <div className="p-8 text-center text-gray-500">
+        <p className="font-semibold text-lg text-gray-700">Acesso Restrito</p>
+        <p className="text-sm mt-1">A visualização e gerenciamento do plano institucional são restritos a Administradores e à Presidência.</p>
+      </div>
+    );
+  }
 
   return (
     <div>

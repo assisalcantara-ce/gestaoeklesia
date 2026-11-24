@@ -8,7 +8,7 @@ import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { FeatureFlag } from '@/lib/feature-flags';
 import EbdSidebarMenu, { ALL_EBD_IDS } from '@/components/EbdSidebarMenu';
 import { useUserContext } from '@/hooks/useUserContext';
-import { isSecretariaGeral, isSecretariaLocal } from '@/lib/access-control';
+import { isSecretariaGeral, isSecretariaLocal, podeAcessarMeuContrato } from '@/lib/access-control';
 import {
   LayoutDashboard,
   FileText,
@@ -577,6 +577,10 @@ export default function Sidebar() {
                       }
                       // Secretaria Local não deve visualizar a página de emissão direta / editor da Secretaria Geral
                       if (sub.id === 'cartas' && isSecretariaLocal(userCtx.nivel)) {
+                        return false;
+                      }
+                      // Meu Contrato: apenas Administrador Geral e Presidência (oculto para Equipe de TI e demais)
+                      if (sub.id === 'meu-contrato' && !podeAcessarMeuContrato(userCtx.nivel)) {
                         return false;
                       }
                       return true;

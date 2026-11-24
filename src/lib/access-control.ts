@@ -563,3 +563,34 @@ export function podeAcessarModuloFuncionarios(nivel: NivelAcesso | string | null
   // Outros perfis operacionais locais / supervisores não têm acesso
   return false;
 }
+
+/**
+ * Gateways de pagamento: apenas Administrador Geral (e funções financeiras autorizadas se aplicável).
+ * Equipe de TI NÃO pode acessar Gateways de Pagamento.
+ */
+export function podeAcessarGatewaysPagamento(nivel: NivelAcesso | string | null | undefined): boolean {
+  if (!nivel) return false;
+  const n = String(nivel).toLowerCase();
+  return n === 'administrador';
+}
+
+/**
+ * Aba Plano / Assinatura: apenas Administrador Geral e Presidência autorizados.
+ * Equipe de TI NÃO pode acessar nem visualizar Plano.
+ */
+export function podeAcessarPlanoMinisterio(nivel: NivelAcesso | string | null | undefined): boolean {
+  if (!nivel) return false;
+  const n = String(nivel).toLowerCase();
+  return n === 'administrador' || n === 'presidencia';
+}
+
+/**
+ * Meu Contrato / Gestão Jurídica: acesso exclusivo à Presidência autorizada.
+ * Administrador Geral (salvo se possuir perfil de Presidência), Equipe de TI e demais operacionais são negados.
+ */
+export function podeAcessarMeuContrato(nivel: NivelAcesso | string | null | undefined): boolean {
+  if (!nivel) return false;
+  const n = String(nivel).toLowerCase();
+  return n === 'presidencia';
+}
+

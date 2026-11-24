@@ -3,8 +3,10 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { authenticatedFetch } from '@/lib/api-client';
 import { useUserContext } from '@/hooks/useUserContext';
+import { podeAcessarMeuContrato } from '@/lib/access-control';
 import {
   FileText,
   ShieldCheck,
@@ -27,6 +29,7 @@ import type {
 } from '@/types/juridico';
 
 export default function MeuContratoPage() {
+  const router = useRouter();
   const userCtx = useUserContext();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +41,11 @@ export default function MeuContratoPage() {
 
   useEffect(() => {
     if (userCtx.loading) return;
+
+    if (!podeAcessarMeuContrato(userCtx.nivel)) {
+      router.replace('/acesso-negado');
+      return;
+    }
 
     const carregarContrato = async () => {
       try {
@@ -65,7 +73,7 @@ export default function MeuContratoPage() {
     };
 
     carregarContrato();
-  }, [userCtx.loading]);
+  }, [userCtx.loading, userCtx.nivel, router]);
 
   const contrato: TenantContrato | null = detalhes?.contrato || null;
 

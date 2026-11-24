@@ -3,14 +3,17 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-client';
 import { PLANOS_DISPONIBLES, formatarPreco } from '@/config/plans';
 import type { PlanType } from '@/types/ministry';
 import { useAppDialog } from '@/providers/AppDialogProvider';
 import { useAuditLog } from '@/hooks/useAuditLog';
 import { useUserContext } from '@/hooks/useUserContext';
+import { podeAcessarPlanoMinisterio } from '@/lib/access-control';
 
 export default function PlanoPage() {
+  const router = useRouter();
   const userCtx = useUserContext();
 
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -43,6 +46,12 @@ export default function PlanoPage() {
 
   useEffect(() => {
     if (userCtx.loading) return;
+
+    if (!podeAcessarPlanoMinisterio(userCtx.nivel)) {
+      router.replace('/acesso-negado');
+      return;
+    }
+
     const supabase = createClient();
 
     const resolveMinistryId = async () => {
@@ -83,7 +92,7 @@ export default function PlanoPage() {
     };
 
     loadPlanoAtual();
-  }, []);
+  }, [userCtx.loading, userCtx.nivel, router]);
 
   const handleUpgradeClick = (targetPlano: PlanType) => {
     setPlanoSelecionado(targetPlano);
@@ -91,6 +100,14 @@ export default function PlanoPage() {
   };
 
   const handleConfirmUpgrade = async () => {
+    if (!podeAcessarPlanoMinisterio(userCtx.nivel)) {
+      await dialog.alert({
+        title: 'Acesso Negado',
+        type: 'error',
+        message: 'Você não tem permissão para alterar ou solicitar upgrade de plano.'
+      });
+      return;
+    }
     try {
       setCriandoTicket(true);
       const supabase = createClient();

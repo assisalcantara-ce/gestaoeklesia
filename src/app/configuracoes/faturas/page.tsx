@@ -3,9 +3,10 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-client';
 import { ExternalLink, Copy, Check, Filter, RefreshCw, AlertCircle, FileText, Calendar } from 'lucide-react';
-
+import { podeAcessarPlanoMinisterio } from '@/lib/access-control';
 import { useUserContext } from '@/hooks/useUserContext';
 
 interface BillingInvoice {
@@ -23,6 +24,7 @@ interface BillingInvoice {
 }
 
 export default function FaturasPage() {
+  const router = useRouter();
   const userCtx = useUserContext();
   const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,6 +38,11 @@ export default function FaturasPage() {
   };
 
   const loadInvoices = async () => {
+    if (!podeAcessarPlanoMinisterio(userCtx.nivel)) {
+      setError('Acesso negado: visualização de faturas restrita a Administradores e Presidência.');
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       setError('');
@@ -72,8 +79,13 @@ export default function FaturasPage() {
   };
 
   useEffect(() => {
+    if (userCtx.loading) return;
+    if (!podeAcessarPlanoMinisterio(userCtx.nivel)) {
+      router.replace('/acesso-negado');
+      return;
+    }
     loadInvoices();
-  }, [statusFilter]);
+  }, [userCtx.loading, userCtx.nivel, statusFilter, router]);
 
   const handleCopyLink = async (url: string, id: string) => {
     try {

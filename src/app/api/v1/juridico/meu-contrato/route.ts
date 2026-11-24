@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { ContratosService } from '@/services/ContratosService';
+import { resolveNivel, podeAcessarMeuContrato } from '@/lib/access-control';
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,24 +31,34 @@ export async function GET(request: NextRequest) {
     // 1. Resolver o ministério vinculado ao usuário autenticado (nunca aceita ministry_id livre)
     const { data: ministryUser } = await supabaseAdmin
       .from('ministry_users')
-      .select('ministry_id')
+      .select('ministry_id, role, permissions')
       .eq('user_id', userId)
       .limit(1)
       .maybeSingle();
 
     let ministryId: string | null = ministryUser?.ministry_id ? String(ministryUser.ministry_id) : null;
 
-    if (!ministryId) {
-      const { data: ownedMinistry } = await supabaseAdmin
-        .from('ministries')
-        .select('id')
-        .eq('user_id', userId)
-        .limit(1)
-        .maybeSingle();
+    const { data: ownedMinistry } = await supabaseAdmin
+      .from('ministries')
+      .select('id')
+      .eq('user_id', userId)
+      .limit(1)
+      .maybeSingle();
 
-      if (ownedMinistry?.id) {
+    if (ownedMinistry?.id) {
+      if (!ministryId) {
         ministryId = String(ownedMinistry.id);
       }
+    }
+
+    // Autorização estrita: Contratos institucionais são restritos exclusivamente à Presidência autorizada.
+    // Administrador Geral (não-presidência), Equipe de TI e demais perfis operacionais são negados.
+    const nivelResolvido = resolveNivel(ministryUser?.role, ministryUser?.permissions);
+    if (!podeAcessarMeuContrato(nivelResolvido)) {
+      return NextResponse.json(
+        { success: false, error: 'Acesso negado: visualização de contratos restrita exclusivamente à Presidência autorizada.' },
+        { status: 403 }
+      );
     }
 
     if (!ministryId) {

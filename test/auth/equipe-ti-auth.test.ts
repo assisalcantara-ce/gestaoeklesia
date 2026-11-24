@@ -9,6 +9,9 @@ import {
   hasRole,
   isEquipeTI,
   podeAcessarModuloFuncionarios,
+  podeAcessarGatewaysPagamento,
+  podeAcessarPlanoMinisterio,
+  podeAcessarMeuContrato,
   NivelAcesso,
 } from '../../src/lib/access-control.js';
 
@@ -124,5 +127,106 @@ describe('Validação Direcionada de Segurança e Autorização — Perfil Equip
         `Módulo operacional ${mod} deve ser acessível para suporte técnico da equipe_ti`
       );
     }
+  });
+
+  it('5. Bloqueio estrito de Gateways de Pagamento, Plano e Meu Contrato para Equipe de TI', () => {
+    // Equipe de TI NÃO pode acessar Gateways de Pagamento
+    assert.equal(
+      podeAcessarGatewaysPagamento('equipe_ti'),
+      false,
+      'Equipe de TI não deve ter acesso a Gateways de Pagamento'
+    );
+    // Administrador tem acesso a Gateways de Pagamento
+    assert.equal(
+      podeAcessarGatewaysPagamento('administrador'),
+      true,
+      'Administrador deve ter acesso a Gateways de Pagamento'
+    );
+
+    // Equipe de TI NÃO pode acessar Plano
+    assert.equal(
+      podeAcessarPlanoMinisterio('equipe_ti'),
+      false,
+      'Equipe de TI não deve ter acesso à aba Plano'
+    );
+    // Administrador e Presidência têm acesso a Plano
+    assert.equal(
+      podeAcessarPlanoMinisterio('administrador'),
+      true,
+      'Administrador deve ter acesso a Plano'
+    );
+    assert.equal(
+      podeAcessarPlanoMinisterio('presidencia'),
+      true,
+      'Presidência deve ter acesso a Plano'
+    );
+
+    // Equipe de TI NÃO pode acessar Meu Contrato
+    assert.equal(
+      podeAcessarMeuContrato('equipe_ti'),
+      false,
+      'Equipe de TI não deve ter acesso ao submenu Meu Contrato'
+    );
+    // Acesso a Meu Contrato é EXCLUSIVO da Presidência autorizada
+    assert.equal(
+      podeAcessarMeuContrato('administrador'),
+      false,
+      'Administrador Geral não deve ter acesso direto a Meu Contrato (exclusivo da Presidência)'
+    );
+    assert.equal(
+      podeAcessarMeuContrato('presidencia'),
+      true,
+      'Presidência deve ter acesso exclusivo a Meu Contrato'
+    );
+  });
+
+  it('6. Preservação integral dos acessos operacionais não financeiros e itens de configurações', () => {
+    // Equipe de TI tem acesso amplo aos módulos operacionais do ministério
+    const modulosPermitidos = [
+      'configuracoes',
+      'usuarios',
+      'secretaria',
+      'secretaria_local',
+      'gestao',
+      'ebd',
+      'auditoria',
+      'agenda',
+      'eventos',
+      'reunioes',
+      'missoes',
+      'patrimonio',
+      'geolocalizacao',
+      'suporte',
+      'celulas',
+    ];
+
+    for (const mod of modulosPermitidos) {
+      assert.equal(
+        temAcesso('equipe_ti', mod),
+        true,
+        `Módulo ${mod} deve ser mantido liberado para equipe_ti`
+      );
+    }
+  });
+
+  it('7. Preservação das permissões legítimas dos demais perfis no sistema', () => {
+    // Presidência tem acesso a Plano, Meu Contrato e Presidência
+    assert.equal(podeAcessarPlanoMinisterio('presidencia'), true);
+    assert.equal(podeAcessarMeuContrato('presidencia'), true);
+    assert.equal(temAcesso('presidencia', 'presidencia'), true);
+    assert.equal(temAcesso('presidencia', 'consolidado_financeiro'), true);
+
+    // Administrador tem acesso a Gateways e Plano, mas Meu Contrato é exclusivo da Presidência
+    assert.equal(podeAcessarGatewaysPagamento('administrador'), true);
+    assert.equal(podeAcessarPlanoMinisterio('administrador'), true);
+    assert.equal(podeAcessarMeuContrato('administrador'), false);
+    assert.equal(temAcesso('administrador', 'financeiro'), true);
+    assert.equal(temAcesso('administrador', 'tesouraria'), true);
+
+    // Tesouraria e Financeiro não têm Meu Contrato nem Gateways (salvo Admin)
+    assert.equal(podeAcessarMeuContrato('financeiro'), false);
+    assert.equal(podeAcessarMeuContrato('tesoureiro_geral'), false);
+    assert.equal(podeAcessarGatewaysPagamento('financeiro'), false);
+    assert.equal(podeAcessarGatewaysPagamento('tesoureiro_geral'), false);
   });
 });
