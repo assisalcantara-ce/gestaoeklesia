@@ -8,7 +8,7 @@ import {
   Plus, Calendar as CalendarIcon,
   AlertTriangle, Check, Archive,
   LayoutDashboard, BookOpen, CheckCircle2, Gavel, ShieldCheck, Lock, Clock, Calendar,
-  CalendarRange, Filter
+  CalendarRange, Filter, Sparkles
 } from 'lucide-react';
 import { useAgenda } from '@/hooks/agenda/useAgenda';
 
@@ -22,6 +22,7 @@ import AgendaTimeline from '@/components/agenda/AgendaTimeline';
 import EventoFormModal from '@/components/agenda/EventoFormModal';
 import ConfirmDeleteModal from '@/components/agenda/ConfirmDeleteModal';
 import RevistaPublicaButton from '@/components/agenda/RevistaPublicaButton';
+import PersonalizarRevistaModal from '@/components/agenda/PersonalizarRevistaModal';
 
 export default function AgendaPage() {
   const {
@@ -204,6 +205,9 @@ export default function AgendaPage() {
               )}
 
               <RevistaPublicaButton ministryId={ctx?.ministryId} />
+              {ctx?.podeEscrever?.('agenda') && (
+                <PersonalizarRevistaTrigger currentYear={currentYear} />
+              )}
             </div>
           </div>
 
@@ -597,5 +601,28 @@ export default function AgendaPage() {
         />
       </div>
     </div>
+  );
+}
+
+function PersonalizarRevistaTrigger({ currentYear }: { currentYear: number }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="px-3.5 py-2.5 rounded-xl border border-teal-200 bg-teal-50/70 hover:bg-teal-100 text-teal-800 text-xs sm:text-sm font-semibold transition-colors flex items-center gap-2 shadow-sm cursor-pointer"
+        title="Personalizar Palavra do Pastor e capa editorial da Revista Digital"
+      >
+        <Sparkles className="h-4 w-4 text-teal-700" />
+        <span>Personalizar Revista</span>
+      </button>
+      <PersonalizarRevistaModal
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        defaultYear={currentYear}
+      />
+    </>
   );
 }

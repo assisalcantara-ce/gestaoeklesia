@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
 import { checkRateLimit } from '@/lib/rate-limit';
+import {
+  filterPublicEventsForEdition,
+  getInstitutionalYearMonth,
+  DEFAULT_INSTITUTIONAL_TIMEZONE,
+  type DepartamentoRevistaPublico,
+} from '@/lib/revista-digital-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -165,8 +171,15 @@ export async function GET(
       );
     }
 
-    // 8. Sanitização do DTO de resposta
-    const eventosSanitizados = (eventos || []).map((ev) => {
+    // 8. Sanitização do DTO de resposta e ocultação automática de meses encerrados
+    const eventosVisiveis = filterPublicEventsForEdition(
+      eventos || [],
+      anoParaEventos,
+      new Date(),
+      DEFAULT_INSTITUTIONAL_TIMEZONE
+    );
+
+    const eventosSanitizados = eventosVisiveis.map((ev) => {
       const tipoInfo = ev.agenda_tipos as {
         nome?: string;
         categoria?: string;
@@ -194,6 +207,59 @@ export async function GET(
       };
     });
 
+    // 8b. Buscar departamentos selecionados (somente se seção pública ativa e edição vigente/futura)
+    const depConfig = churchProfile?.revista_edicoes?.[String(anoParaEventos)]?.departamentos;
+    const { year: anoInstitucionalAtual } = getInstitutionalYearMonth(new Date(), DEFAULT_INSTITUTIONAL_TIMEZONE);
+    let departamentosSecao: {
+      titulo: string;
+      subtitulo: string;
+      departamentos: DepartamentoRevistaPublico[];
+    } | null = null;
+
+    if (
+      depConfig?.publicada === true &&
+      Array.isArray(depConfig?.departamento_ids) &&
+      depConfig.departamento_ids.length > 0 &&
+      anoParaEventos >= anoInstitucionalAtual
+    ) {
+      const { data: depsRows } = await admin
+        .from('departamentos')
+        .select('id, sigla, nome, logo_url, coordenacao')
+        .eq('ministry_id', ministryId)
+        .eq('ativo', true)
+        .in('id', depConfig.departamento_ids);
+
+      const depMap = new Map<string, DepartamentoRevistaPublico>();
+      for (const d of depsRows || []) {
+        depMap.set(String(d.id), {
+          id: String(d.id),
+          sigla: String(d.sigla || ''),
+          nome: String(d.nome || ''),
+          logo_url: d.logo_url ? String(d.logo_url) : null,
+          lideranca: Array.isArray(d.coordenacao)
+            ? d.coordenacao.map((c: any) => ({
+                cargo: String(c?.cargo || ''),
+                nome: String(c?.nome || ''),
+              }))
+            : [],
+        });
+      }
+
+      const ordenados: DepartamentoRevistaPublico[] = [];
+      for (const id of depConfig.departamento_ids) {
+        const item = depMap.get(String(id));
+        if (item) ordenados.push(item);
+      }
+
+      if (ordenados.length > 0) {
+        departamentosSecao = {
+          titulo: String(depConfig.titulo || 'Nossos Departamentos'),
+          subtitulo: String(depConfig.subtitulo || ''),
+          departamentos: ordenados,
+        };
+      }
+    }
+
     // 9. Resposta consolidada com cabeçalho de Cache HTTP padronizado (5 min CDN/Browser + 10 min stale)
     return NextResponse.json(
       {
@@ -215,6 +281,11 @@ export async function GET(
               publicado_em: planejamentoAtivo.published_at,
             }
           : null,
+        palavra_pastor:
+          churchProfile?.revista_edicoes?.[String(anoParaEventos)]?.publicada === true
+            ? churchProfile.revista_edicoes[String(anoParaEventos)]
+            : null,
+        departamentos_secao: departamentosSecao,
         mensagem_pastoral: mensagemPastoral,
         ano: anoParaEventos,
         total_eventos: eventosSanitizados.length,

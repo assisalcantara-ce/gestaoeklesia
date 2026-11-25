@@ -3,6 +3,17 @@
 import { useEffect, useState, useMemo, Suspense, useCallback } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import {
+  MESES_NOMES,
+  getVisibleMonthsForEdition,
+  resolveTargetPageIndex,
+  getInstitutionalYearMonth,
+  paginateDepartmentsForRevista,
+  DEFAULT_INSTITUTIONAL_TIMEZONE,
+  type PalavraPastorEdicao,
+  type DepartamentoRevistaPublico,
+} from '@/lib/revista-digital-utils';
+import PageFlipBook from '@/components/revista/PageFlipBook';
+import {
   Clock,
   MapPin,
   ChevronLeft,
@@ -59,6 +70,12 @@ interface RevistaData {
     descricao: string | null;
     publicado_em: string | null;
   } | null;
+  palavra_pastor?: PalavraPastorEdicao | null;
+  departamentos_secao?: {
+    titulo: string;
+    subtitulo: string;
+    departamentos: DepartamentoRevistaPublico[];
+  } | null;
   mensagem_pastoral: {
     titulo: string;
     conteudo_texto: string | null;
@@ -72,22 +89,7 @@ interface RevistaData {
   eventos: EventoPublico[];
 }
 
-const MESES_NOMES = [
-  'Janeiro',
-  'Fevereiro',
-  'Março',
-  'Abril',
-  'Maio',
-  'Junho',
-  'Julho',
-  'Agosto',
-  'Setembro',
-  'Outubro',
-  'Novembro',
-  'Dezembro',
-];
-
-type TipoPagina = 'capa' | 'editorial' | 'mes';
+type TipoPagina = 'capa' | 'editorial' | 'institucional' | 'mes';
 
 interface PaginaRevista {
   id: string;
@@ -95,6 +97,7 @@ interface PaginaRevista {
   titulo: string;
   numeroPagina: number;
   mesIndex?: number;
+  departamentosChunk?: DepartamentoRevistaPublico[];
 }
 
 export default function RevistaPublicaPage() {
@@ -116,6 +119,7 @@ function RevistaContent() {
   const searchParams = useSearchParams();
   const slug = params?.slug as string;
   const anoParam = searchParams.get('ano');
+  const mesParam = searchParams.get('mes');
 
   const [data, setData] = useState<RevistaData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -123,8 +127,7 @@ function RevistaContent() {
 
   // Navegação de páginas da revista
   const [paginaAtual, setPaginaAtual] = useState<number>(0);
-  const [animandoDirecao, setAnimandoDirecao] = useState<'next' | 'prev' | null>(null);
-  const [isVirando, setIsVirando] = useState<boolean>(false);
+  const isVirando = false;
 
   // Modo de visualização: 'revista' (com folheamento interativo) ou 'leitura' (fluxo contínuo)
   const [modoVisualizacao, setModoVisualizacao] = useState<'revista' | 'leitura'>('revista');
@@ -215,18 +218,39 @@ function RevistaContent() {
       numeroPagina: num++,
     });
 
-    // Página 2: Editorial (Mensagem Pastoral, se existir)
-    if (data?.mensagem_pastoral) {
+    // Página 2: Palavra do Pastor / Editorial (se publicada)
+    if (data?.palavra_pastor?.publicada || data?.mensagem_pastoral) {
       lista.push({
         id: 'editorial',
         tipo: 'editorial',
-        titulo: 'Palavra Pastoral',
+        titulo: data?.palavra_pastor?.titulo || 'Palavra do Pastor',
         numeroPagina: num++,
       });
     }
 
-    // Páginas 3 a 14: Cada mês do ano
-    for (let m = 0; m < 12; m++) {
+    // Páginas Institucionais: Nossos Departamentos (até 4 por página)
+    if (data?.departamentos_secao?.departamentos?.length) {
+      const depChunks = paginateDepartmentsForRevista(data.departamentos_secao.departamentos, 4);
+      depChunks.forEach((chunk, idx) => {
+        lista.push({
+          id: `departamentos-${idx}`,
+          tipo: 'institucional',
+          titulo:
+            depChunks.length > 1
+              ? `${data.departamentos_secao!.titulo} (${idx + 1}/${depChunks.length})`
+              : data.departamentos_secao!.titulo,
+          departamentosChunk: chunk,
+          numeroPagina: num++,
+        });
+      });
+    }
+
+    // Meses visíveis (apenas mês vigente e futuros da edição anual)
+    const { year: currentYear } = getInstitutionalYearMonth(new Date(), DEFAULT_INSTITUTIONAL_TIMEZONE);
+    const editionYear = data?.ano ?? currentYear;
+    const visibleMonths = getVisibleMonthsForEdition(editionYear, new Date(), DEFAULT_INSTITUTIONAL_TIMEZONE);
+
+    for (const m of visibleMonths) {
       lista.push({
         id: `mes-${m}`,
         tipo: 'mes',
@@ -237,31 +261,34 @@ function RevistaContent() {
     }
 
     return lista;
-  }, [data?.mensagem_pastoral]);
+  }, [data?.mensagem_pastoral, data?.palavra_pastor, data?.departamentos_secao, data?.ano]);
+
+  // Redirecionar parâmetro ?mes=... (incluindo meses encerrados -> mês vigente) e garantir índice válido
+  useEffect(() => {
+    if (!data || paginas.length === 0) return;
+    if (mesParam) {
+      const targetIdx = resolveTargetPageIndex(
+        paginas,
+        mesParam,
+        data.ano,
+        new Date(),
+        DEFAULT_INSTITUTIONAL_TIMEZONE
+      );
+      setPaginaAtual(targetIdx);
+    } else if (paginaAtual >= paginas.length) {
+      setPaginaAtual(0);
+    }
+  }, [data, mesParam, paginas, paginaAtual]);
 
   const totalPaginas = paginas.length;
 
-  // Função para mudar de página com efeito 3D
+  // Função para mudar de página (sincronizada com PageFlipBook 3D)
   const irParaPagina = useCallback(
     (index: number) => {
-      if (index < 0 || index >= totalPaginas || index === paginaAtual || isVirando) return;
-
-      const direcao = index > paginaAtual ? 'next' : 'prev';
-      setAnimandoDirecao(direcao);
-      setIsVirando(true);
-
-      // Metade da transição troca o índice ativo
-      setTimeout(() => {
-        setPaginaAtual(index);
-      }, 250);
-
-      // Conclui animação
-      setTimeout(() => {
-        setIsVirando(false);
-        setAnimandoDirecao(null);
-      }, 520);
+      if (index < 0 || index >= totalPaginas || index === paginaAtual) return;
+      setPaginaAtual(index);
     },
-    [paginaAtual, totalPaginas, isVirando]
+    [paginaAtual, totalPaginas]
   );
 
   // Função utilitária para obter o índice da página correspondente ao mês vigente (Timezone: America/Belem)
@@ -535,19 +562,16 @@ function RevistaContent() {
              MODO REVISTA: FOLHEAMENTO INTERATIVO COM TRANSIÇÃO 3D
              ══════════════════════════════════════════════════════════════ */
           <div className="flex-1 flex flex-col justify-between space-y-6">
-            {/* CONTAINER PERSPECTIVA DO LIVRO / REVISTA */}
-            <div className="book-perspective w-full flex-1 flex items-center justify-center min-h-[520px]">
-              <div
-                className={`page-sheet page-spine w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden relative ${
-                  animandoDirecao === 'next'
-                    ? 'page-flip-next-exit'
-                    : animandoDirecao === 'prev'
-                    ? 'page-flip-prev-exit'
-                    : 'page-flip-enter'
-                }`}
-              >
+            {/* CONTAINER PERSPECTIVA DO LIVRO / REVISTA 3D */}
+            <PageFlipBook
+              currentPage={paginaAtual}
+              onPageChange={setPaginaAtual}
+              bookKey={`${data.ano}-${paginas.map((p) => p.id).join(',')}-${filtroCategoria}`}
+            >
+              {paginas.map((pg) => (
+                <div key={pg.id} className="w-full h-full">
                 {/* ─── PÁGINA: CAPA ───────────────────────────────────── */}
-                {paginaCorrente.tipo === 'capa' && (
+                {pg.tipo === 'capa' && (
                   <div className="relative overflow-hidden bg-slate-950 text-white p-6 sm:p-12 lg:p-14 min-h-[520px] flex flex-col justify-between">
                     {/* Imagem de Fundo Oficial da Capa */}
                     <div
@@ -645,35 +669,78 @@ function RevistaContent() {
                   </div>
                 )}
 
-                {/* ─── PÁGINA: EDITORIAL PASTORAL ─────────────────────── */}
-                {paginaCorrente.tipo === 'editorial' && mensagem_pastoral && (
-                  <div className="p-6 sm:p-10 lg:p-12 min-h-[520px] flex flex-col justify-between space-y-6">
-                    <div className="space-y-6">
-                      <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                {/* ─── PÁGINA 2: PALAVRA DO PASTOR / EDITORIAL ────────── */}
+                {pg.tipo === 'editorial' && (data?.palavra_pastor?.publicada || mensagem_pastoral) && (
+                  <div className="p-6 sm:p-10 min-h-[520px] flex flex-col justify-between space-y-5 bg-gradient-to-br from-white via-white to-teal-50/30">
+                    <div className="space-y-5">
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-200/80">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center border border-teal-100 shrink-0">
                             <FileText className="w-5 h-5" />
                           </div>
                           <div>
-                            <span className="text-[11px] font-bold text-teal-700 tracking-wider uppercase">
-                              Página Editorial
+                            <span className="text-[10px] font-bold text-teal-700 tracking-widest uppercase">
+                              Edição {data.ano} • Palavra Institucional
                             </span>
-                            <h3 className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">
-                              {mensagem_pastoral.titulo}
+                            <h3 className="text-xl sm:text-2xl font-serif font-bold text-slate-900 leading-tight">
+                              {data?.palavra_pastor?.publicada
+                                ? data.palavra_pastor.titulo || 'Palavra do Pastor'
+                                : mensagem_pastoral?.titulo}
                             </h3>
                           </div>
                         </div>
 
-                        <span className="text-xs font-mono font-bold text-slate-400">p.{paginaCorrente.numeroPagina}</span>
+                        <span className="text-xs font-mono font-bold text-slate-400">p.{pg.numeroPagina}</span>
                       </div>
 
-                      <div className="prose prose-slate max-w-none text-slate-700 leading-relaxed text-sm sm:text-base space-y-4 whitespace-pre-line max-h-[360px] overflow-y-auto pr-2">
-                        {mensagem_pastoral.conteudo_texto}
-                      </div>
+                      {data?.palavra_pastor?.publicada ? (
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
+                          {data.palavra_pastor.foto_url && (
+                            <div className="md:col-span-5">
+                              <div className="rounded-2xl overflow-hidden border-4 border-teal-50 shadow-md bg-slate-100">
+                                <img
+                                  src={data.palavra_pastor.foto_url}
+                                  alt="Pastor e Esposa"
+                                  className="w-full h-auto object-cover aspect-[4/5]"
+                                />
+                              </div>
+                            </div>
+                          )}
+                          <div className={data.palavra_pastor.foto_url ? 'md:col-span-7 space-y-4' : 'md:col-span-12 space-y-4'}>
+                            <div
+                              className="prose prose-sm sm:prose-base prose-slate max-w-none text-slate-700 leading-relaxed max-h-[380px] overflow-y-auto pr-2"
+                              dangerouslySetInnerHTML={{
+                                __html: data.palavra_pastor.conteudo_html || '',
+                              }}
+                            />
+
+                            {(data.palavra_pastor.nome_pastor || data.palavra_pastor.nome_esposa || data.palavra_pastor.assinatura) && (
+                              <div className="pt-3 border-t border-slate-200/70">
+                                {(data.palavra_pastor.nome_pastor || data.palavra_pastor.nome_esposa) && (
+                                  <p className="text-sm font-bold text-slate-900">
+                                    {data.palavra_pastor.nome_pastor}
+                                    {data.palavra_pastor.nome_pastor && data.palavra_pastor.nome_esposa ? ' & ' : ''}
+                                    {data.palavra_pastor.nome_esposa}
+                                  </p>
+                                )}
+                                {data.palavra_pastor.assinatura && (
+                                  <p className="text-xs text-teal-700 font-semibold mt-0.5">
+                                    {data.palavra_pastor.assinatura}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="prose prose-slate max-w-none text-slate-700 leading-relaxed text-sm sm:text-base space-y-4 whitespace-pre-line max-h-[380px] overflow-y-auto pr-2">
+                          {mensagem_pastoral?.conteudo_texto}
+                        </div>
+                      )}
                     </div>
 
-                    <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      {mensagem_pastoral.video_url ? (
+                    <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      {!data?.palavra_pastor?.publicada && mensagem_pastoral?.video_url ? (
                         <a
                           href={mensagem_pastoral.video_url}
                           target="_blank"
@@ -686,13 +753,86 @@ function RevistaContent() {
                         <div />
                       )}
 
-                      <span className="text-xs text-slate-400 italic">Gestão Eklésia • Palavra Institucional</span>
+                      <span className="text-xs text-slate-400 italic">{instituicao.nome} • Palavra Pastoral</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* ─── PÁGINAS INSTITUCIONAIS: NOSSOS DEPARTAMENTOS ─────── */}
+                {pg.tipo === 'institucional' && pg.departamentosChunk && (
+                  <div className="p-6 sm:p-10 min-h-[520px] flex flex-col justify-between space-y-5 bg-gradient-to-br from-white via-white to-slate-50">
+                    <div className="space-y-5">
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-200/80">
+                        <div>
+                          <span className="text-[10px] font-bold text-teal-700 tracking-widest uppercase">
+                            Edição {data.ano} • Seção Institucional
+                          </span>
+                          <h3 className="text-xl sm:text-2xl font-serif font-bold text-slate-900 leading-tight">
+                            {data.departamentos_secao?.titulo || 'Nossos Departamentos'}
+                          </h3>
+                          {data.departamentos_secao?.subtitulo && (
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              {data.departamentos_secao.subtitulo}
+                            </p>
+                          )}
+                        </div>
+                        <span className="text-xs font-mono font-bold text-slate-400">p.{pg.numeroPagina}</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {pg.departamentosChunk.map((dep) => (
+                          <div
+                            key={dep.id}
+                            className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs flex flex-col gap-3"
+                          >
+                            <div className="flex items-center gap-3">
+                              {dep.logo_url ? (
+                                <img
+                                  src={dep.logo_url}
+                                  alt={dep.sigla || dep.nome}
+                                  className="w-14 h-14 rounded-xl object-cover border border-slate-200 bg-slate-50 shrink-0"
+                                />
+                              ) : (
+                                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-teal-700 to-teal-900 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-xs">
+                                  {(dep.sigla || dep.nome.slice(0, 3)).toUpperCase()}
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                {dep.sigla && (
+                                  <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-teal-50 text-teal-800 border border-teal-200/70 mb-1">
+                                    {dep.sigla}
+                                  </span>
+                                )}
+                                <h4 className="text-sm font-bold text-slate-900 leading-snug">
+                                  {dep.nome}
+                                </h4>
+                              </div>
+                            </div>
+
+                            {dep.lideranca.length > 0 && (
+                              <div className="border-t border-slate-100 pt-2.5 space-y-1 max-h-[140px] overflow-y-auto pr-1">
+                                {dep.lideranca.map((lid, lIdx) => (
+                                  <div key={lIdx} className="text-xs flex items-baseline justify-between gap-2">
+                                    <span className="text-slate-500 font-medium shrink-0">{lid.cargo}:</span>
+                                    <span className="text-slate-800 font-semibold text-right">{lid.nome}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+                      <span>{instituicao.nome}</span>
+                      <span className="font-mono font-bold">p.{pg.numeroPagina}</span>
                     </div>
                   </div>
                 )}
 
                 {/* ─── PÁGINA: MÊS DO CALENDÁRIO ──────────────────────── */}
-                {paginaCorrente.tipo === 'mes' && paginaCorrente.mesIndex !== undefined && (
+                {pg.tipo === 'mes' && pg.mesIndex !== undefined && (
                   <div className="p-6 sm:p-10 lg:p-12 min-h-[520px] flex flex-col justify-between space-y-6">
                     <div className="space-y-6">
                       {/* Cabeçalho do Mês */}
@@ -704,11 +844,11 @@ function RevistaContent() {
                             </span>
                             <span className="text-slate-300">•</span>
                             <span className="text-[11px] font-semibold text-slate-500">
-                              {eventosPorMes[paginaCorrente.mesIndex]?.length || 0} eventos
+                              {eventosPorMes[pg.mesIndex]?.length || 0} eventos
                             </span>
                           </div>
                           <h3 className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight">
-                            {MESES_NOMES[paginaCorrente.mesIndex]}
+                            {MESES_NOMES[pg.mesIndex]}
                           </h3>
                         </div>
 
@@ -739,7 +879,7 @@ function RevistaContent() {
 
                       {/* Lista de Eventos do Mês */}
                       {(() => {
-                        const listaMes = eventosPorMes[paginaCorrente.mesIndex] || [];
+                        const listaMes = eventosPorMes[pg.mesIndex] || [];
                         const filtrados =
                           filtroCategoria === 'todos'
                             ? listaMes
@@ -832,12 +972,13 @@ function RevistaContent() {
 
                     <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
                       <span>{instituicao.nome}</span>
-                      <span className="font-mono font-bold">p.{paginaCorrente.numeroPagina}</span>
+                      <span className="font-mono font-bold">p.{pg.numeroPagina}</span>
                     </div>
                   </div>
                 )}
-              </div>
-            </div>
+                </div>
+              ))}
+            </PageFlipBook>
 
             {/* ─── CONTROLES DE FOLHEAR PÁGINAS (ANTERIOR / PRÓXIMA / INDICADOR) ─── */}
             <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm flex items-center justify-between gap-4 max-w-4xl w-full mx-auto">
