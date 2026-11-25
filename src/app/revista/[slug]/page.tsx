@@ -138,6 +138,36 @@ function RevistaContent() {
   // Controle de falha ao carregar logo
   const [logoImgError, setLogoImgError] = useState<boolean>(false);
 
+  // Bloqueio de zoom por pinça (Safari iOS gesture*) e duplo toque exclusivamente na revista pública
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const preventGesture = (e: Event) => {
+      e.preventDefault();
+    };
+
+    let lastTouchEnd = 0;
+    const preventDoubleTapZoom = (e: TouchEvent) => {
+      const now = Date.now();
+      if (now - lastTouchEnd <= 300) {
+        e.preventDefault();
+      }
+      lastTouchEnd = now;
+    };
+
+    document.addEventListener('gesturestart', preventGesture, { passive: false });
+    document.addEventListener('gesturechange', preventGesture, { passive: false });
+    document.addEventListener('gestureend', preventGesture, { passive: false });
+    document.addEventListener('touchend', preventDoubleTapZoom, { passive: false });
+
+    return () => {
+      document.removeEventListener('gesturestart', preventGesture);
+      document.removeEventListener('gesturechange', preventGesture);
+      document.removeEventListener('gestureend', preventGesture);
+      document.removeEventListener('touchend', preventDoubleTapZoom);
+    };
+  }, []);
+
   // Carregar dados públicos do endpoint existente
   useEffect(() => {
     if (!slug) return;

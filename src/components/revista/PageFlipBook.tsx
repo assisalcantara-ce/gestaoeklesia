@@ -48,7 +48,7 @@ export default function PageFlipBook({
       mobileScrollSupport: true,
       usePortrait: true,
       startPage: currentPage,
-      flippingTime: 650,
+      flippingTime: 1040,
       drawShadow: true,
       autoSize: true,
       clickEventForward: true,
@@ -90,7 +90,7 @@ export default function PageFlipBook({
         flip.flip(currentPage, 'top');
         setTimeout(() => {
           isSyncingFromProp.current = false;
-        }, 700);
+        }, 1100);
       }
     } catch {
       isSyncingFromProp.current = false;
