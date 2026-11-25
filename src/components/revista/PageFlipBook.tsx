@@ -35,6 +35,30 @@ export default function PageFlipBook({
     const pages = container.querySelectorAll<HTMLElement>('.stf-page-item');
     if (pages.length === 0) return;
 
+    // Restringe paginação por toque/arraste aos 12% laterais de cada extremidade,
+    // reservando os 76% centrais para leitura e rolagem vertical.
+    const handleCaptureStart = (e: MouseEvent | TouchEvent | PointerEvent) => {
+      const rect = container.getBoundingClientRect();
+      if (!rect.width) return;
+
+      let clientX: number | null = null;
+      if ('touches' in e && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+      } else if ('clientX' in e) {
+        clientX = e.clientX;
+      }
+
+      if (clientX === null) return;
+      const relX = (clientX - rect.left) / rect.width;
+      if (relX > 0.12 && relX < 0.88) {
+        e.stopPropagation();
+      }
+    };
+
+    container.addEventListener('pointerdown', handleCaptureStart, { capture: true });
+    container.addEventListener('mousedown', handleCaptureStart, { capture: true });
+    container.addEventListener('touchstart', handleCaptureStart, { capture: true, passive: true });
+
     const flip = new PageFlip(container, {
       width: 520,
       height: 680,
@@ -68,6 +92,9 @@ export default function PageFlipBook({
     pageFlipRef.current = flip;
 
     return () => {
+      container.removeEventListener('pointerdown', handleCaptureStart, { capture: true });
+      container.removeEventListener('mousedown', handleCaptureStart, { capture: true });
+      container.removeEventListener('touchstart', handleCaptureStart, { capture: true });
       try {
         flip.destroy();
       } catch {
