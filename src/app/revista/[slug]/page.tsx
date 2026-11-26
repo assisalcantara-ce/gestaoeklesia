@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, Suspense, useCallback } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
+import { Playfair_Display, Montserrat } from 'next/font/google';
 import {
   MESES_NOMES,
   getVisibleMonthsForEdition,
@@ -13,6 +14,20 @@ import {
   type DepartamentoRevistaPublico,
 } from '@/lib/revista-digital-utils';
 import PageFlipBook from '@/components/revista/PageFlipBook';
+import CapaEditorialV3 from '@/components/revista/CapaEditorialV3';
+
+const playfair = Playfair_Display({
+  subsets: ['latin'],
+  weight: ['700', '800'],
+  style: ['normal', 'italic'],
+  display: 'swap',
+});
+
+const montserrat = Montserrat({
+  subsets: ['latin'],
+  weight: ['500', '700', '800'],
+  display: 'swap',
+});
 import {
   Clock,
   MapPin,
@@ -24,12 +39,10 @@ import {
   FileText,
   AlertCircle,
   Loader2,
-  ExternalLink,
   Church,
   CalendarDays,
   Smartphone,
   Layers,
-  ArrowRight,
 } from 'lucide-react';
 
 interface EventoTipo {
@@ -590,103 +603,16 @@ function RevistaContent() {
             >
               {paginas.map((pg) => (
                 <div key={pg.id} className="w-full h-full">
-                {/* ─── PÁGINA: CAPA ───────────────────────────────────── */}
+                {/* ─── PÁGINA: CAPA EDITORIAL PREMIUM V3 ──────────────── */}
                 {pg.tipo === 'capa' && (
-                  <div className="capa-editorial relative overflow-hidden bg-slate-950 text-white p-4 sm:p-10 lg:p-12 pb-5 sm:pb-10 h-full min-h-0 flex flex-col justify-between gap-2.5 sm:gap-4">
-                    {/* Imagem de Fundo Oficial da Capa */}
-                    <div
-                      className="absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none"
-                      style={{ backgroundImage: "url('/img/bg_agenda.png')" }}
-                    />
-                    {/* Camada de Gradiente / Overlay para Contraste e Legibilidade */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/75 to-transparent pointer-events-none" />
-                    <div className="absolute inset-0 bg-teal-950/20 mix-blend-multiply pointer-events-none" />
-
-                    <div className="relative z-10 space-y-6">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                          {instituicao.logo_url && !logoImgError ? (
-                            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 p-2 flex items-center justify-center shrink-0 shadow-lg">
-                              <img
-                                src={instituicao.logo_url}
-                                alt={instituicao.nome}
-                                onError={() => setLogoImgError(true)}
-                                className="w-full h-full object-contain"
-                              />
-                            </div>
-                          ) : (
-                            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shrink-0 shadow-lg text-teal-200">
-                              <Church className="w-6 h-6 sm:w-7 sm:h-7" />
-                            </div>
-                          )}
-
-                          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-bold text-teal-200 uppercase tracking-widest shadow-xs">
-                            <Sparkles className="w-3.5 h-3.5 text-teal-300" /> Edição Anual {ano}
-                          </div>
-                        </div>
-
-                        <div className="text-right">
-                          <span className="text-xs font-mono text-teal-200/80 uppercase tracking-wider">
-                            Revista Oficial
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4 max-w-2xl pt-4">
-                        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight text-white drop-shadow-xs">
-                          {tema_anual?.tema || instituicao.nome}
-                        </h2>
-
-                        {tema_anual?.descricao ? (
-                          <p className="text-sm sm:text-base text-teal-100/90 leading-relaxed font-normal">
-                            {tema_anual.descricao}
-                          </p>
-                        ) : instituicao.descricao ? (
-                          <p className="text-sm sm:text-base text-teal-100/90 leading-relaxed font-normal">
-                            {instituicao.descricao}
-                          </p>
-                        ) : (
-                          <p className="text-sm sm:text-base text-teal-100/90 leading-relaxed font-normal">
-                            Programação anual completa, cultos solenes, conferências e atividades ministeriais.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Rodapé e CTA Principal da Capa */}
-                    <div className="relative z-10 pt-8 mt-6 border-t border-white/15 flex flex-col sm:flex-row sm:items-center justify-between gap-6 text-xs text-teal-200/80">
-                      {/* Informações Institucionais (Endereço e Website) */}
-                      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 order-2 sm:order-1 max-w-md">
-                        {instituicao.endereco && (
-                          <span className="flex items-center gap-1.5 leading-relaxed">
-                            <MapPin className="w-3.5 h-3.5 text-teal-300 shrink-0" />
-                            {instituicao.endereco}
-                          </span>
-                        )}
-                        {instituicao.website && (
-                          <a
-                            href={instituicao.website.startsWith('http') ? instituicao.website : `https://${instituicao.website}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 hover:text-white underline underline-offset-2 transition"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5 shrink-0" /> {instituicao.website.replace(/^https?:\/\//, '')}
-                          </a>
-                        )}
-                      </div>
-
-                      {/* Botão de Destaque Prioritário "ABRIR REVISTA" */}
-                      <button
-                        type="button"
-                        onClick={handleAbrirRevista}
-                        className="group relative order-1 sm:order-2 inline-flex items-center justify-center gap-3 h-[58px] min-w-[230px] px-8 rounded-2xl bg-teal-400 hover:bg-teal-300 active:scale-[0.98] text-slate-950 font-black text-[15px] sm:text-base uppercase tracking-wider cursor-pointer border border-teal-200/50 shadow-[0_10px_25px_-5px_rgba(20,184,166,0.4),0_0_20px_rgba(45,212,191,0.35)] hover:shadow-[0_14px_30px_-4px_rgba(20,184,166,0.55),0_0_28px_rgba(45,212,191,0.5)] hover:-translate-y-0.5 focus-visible:outline-hidden focus-visible:ring-4 focus-visible:ring-teal-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 transition-all duration-200 motion-reduce:transform-none motion-reduce:transition-none w-full sm:w-auto shrink-0 select-none"
-                      >
-                        <BookOpen className="w-5 h-5 text-slate-950 shrink-0" />
-                        <span className="font-extrabold tracking-wide">Abrir Revista</span>
-                        <ArrowRight className="w-5 h-5 text-slate-950 shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-1 motion-reduce:transform-none" />
-                      </button>
-                    </div>
-                  </div>
+                  <CapaEditorialV3
+                    nomeInstituicao={instituicao.nome}
+                    logoUrl={instituicao.logo_url}
+                    ano={ano}
+                    onAbrirRevista={handleAbrirRevista}
+                    playfairClassName={playfair.className}
+                    montserratClassName={montserrat.className}
+                  />
                 )}
 
                 {/* ─── PÁGINA 2: PALAVRA DO PASTOR / EDITORIAL ────────── */}
