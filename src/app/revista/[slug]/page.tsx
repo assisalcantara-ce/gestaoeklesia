@@ -150,9 +150,6 @@ function RevistaContent() {
   // Modo de visualização: 'revista' (com folheamento interativo) ou 'leitura' (fluxo contínuo)
   const [modoVisualizacao, setModoVisualizacao] = useState<'revista' | 'leitura'>('revista');
 
-  // Filtro de categoria de eventos
-  const [filtroCategoria, setFiltroCategoria] = useState<string>('todos');
-
   // Controle de falha ao carregar logo
   const [logoImgError, setLogoImgError] = useState<boolean>(false);
 
@@ -607,7 +604,7 @@ function RevistaContent() {
             <PageFlipBook
               currentPage={paginaAtual}
               onPageChange={setPaginaAtual}
-              bookKey={`${data.ano}-${paginas.map((p) => p.id).join(',')}-${filtroCategoria}`}
+              bookKey={`${data.ano}-${paginas.map((p) => p.id).join(',')}`}
             >
               {paginas.map((pg) => (
                 <div key={pg.id} className="w-full h-full">
@@ -715,8 +712,6 @@ function RevistaContent() {
                     ano={ano}
                     mesNome={MESES_NOMES[pg.mesIndex]}
                     eventos={eventosPorMes[pg.mesIndex] || []}
-                    filtroCategoria={filtroCategoria}
-                    onChangeFiltro={setFiltroCategoria}
                     formatarDataHora={formatarDataHora}
                     playfairClassName={playfair.className}
                     montserratClassName={montserrat.className}

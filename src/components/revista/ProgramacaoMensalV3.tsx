@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { CalendarDays, Clock, MapPin, Award } from 'lucide-react';
 
 export interface EventoRevistaV3 {
@@ -21,8 +22,6 @@ interface ProgramacaoMensalV3Props {
   ano: number;
   mesNome: string;
   eventos: EventoRevistaV3[];
-  filtroCategoria: string;
-  onChangeFiltro: (filtro: string) => void;
   formatarDataHora: (inicio: string, fim: string | null) => {
     dia: string;
     mes: string;
@@ -58,12 +57,11 @@ export default function ProgramacaoMensalV3({
   ano,
   mesNome,
   eventos,
-  filtroCategoria,
-  onChangeFiltro,
   formatarDataHora,
   playfairClassName,
   montserratClassName,
 }: ProgramacaoMensalV3Props) {
+  const [filtroCategoria, setFiltroCategoria] = useState<string>('todos');
   const filtrados =
     filtroCategoria === 'todos'
       ? eventos
@@ -99,7 +97,13 @@ export default function ProgramacaoMensalV3({
               <button
                 key={f.id}
                 type="button"
-                onClick={() => onChangeFiltro(f.id)}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFiltroCategoria(f.id);
+                }}
                 className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition cursor-pointer border ${
                   ativo
                     ? 'bg-[#031525] text-[#FAF8F2] border-[#031525]'
