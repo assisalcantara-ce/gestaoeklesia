@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, Suspense, useCallback } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
-import { Playfair_Display, Montserrat } from 'next/font/google';
+import { Playfair_Display, Montserrat, Lora } from 'next/font/google';
 import {
   MESES_NOMES,
   getVisibleMonthsForEdition,
@@ -15,6 +15,7 @@ import {
 } from '@/lib/revista-digital-utils';
 import PageFlipBook from '@/components/revista/PageFlipBook';
 import CapaEditorialV3 from '@/components/revista/CapaEditorialV3';
+import PalavraPastorV3 from '@/components/revista/PalavraPastorV3';
 
 const playfair = Playfair_Display({
   subsets: ['latin'],
@@ -26,6 +27,13 @@ const playfair = Playfair_Display({
 const montserrat = Montserrat({
   subsets: ['latin'],
   weight: ['500', '700', '800'],
+  display: 'swap',
+});
+
+const lora = Lora({
+  subsets: ['latin'],
+  weight: ['400', '600', '700'],
+  style: ['normal', 'italic'],
   display: 'swap',
 });
 import {
@@ -615,93 +623,17 @@ function RevistaContent() {
                   />
                 )}
 
-                {/* ─── PÁGINA 2: PALAVRA DO PASTOR / EDITORIAL ────────── */}
+                {/* ─── PÁGINA 2: PALAVRA DO PASTOR PREMIUM V3 ─────────── */}
                 {pg.tipo === 'editorial' && (data?.palavra_pastor?.publicada || mensagem_pastoral) && (
-                  <div className="p-6 sm:p-10 min-h-[520px] flex flex-col justify-between space-y-5 bg-gradient-to-br from-white via-white to-teal-50/30">
-                    <div className="space-y-5">
-                      <div className="flex items-center justify-between pb-3 border-b border-slate-200/80">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center border border-teal-100 shrink-0">
-                            <FileText className="w-5 h-5" />
-                          </div>
-                          <div>
-                            <span className="text-[10px] font-bold text-teal-700 tracking-widest uppercase">
-                              Edição {data.ano} • Palavra Institucional
-                            </span>
-                            <h3 className="text-xl sm:text-2xl font-serif font-bold text-slate-900 leading-tight">
-                              {data?.palavra_pastor?.publicada
-                                ? data.palavra_pastor.titulo || 'Palavra do Pastor'
-                                : mensagem_pastoral?.titulo}
-                            </h3>
-                          </div>
-                        </div>
-
-                        <span className="text-xs font-mono font-bold text-slate-400">p.{pg.numeroPagina}</span>
-                      </div>
-
-                      {data?.palavra_pastor?.publicada ? (
-                        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
-                          {data.palavra_pastor.foto_url && (
-                            <div className="md:col-span-5">
-                              <div className="rounded-2xl overflow-hidden border-2 border-teal-50 shadow-md bg-slate-100">
-                                <img
-                                  src={data.palavra_pastor.foto_url}
-                                  alt="Pastor e Esposa"
-                                  className="w-full max-h-[30vh] sm:max-h-[34vh] md:max-h-none md:aspect-[4/5] object-cover object-top"
-                                />
-                              </div>
-                            </div>
-                          )}
-                          <div className={data.palavra_pastor.foto_url ? 'md:col-span-7 space-y-3' : 'md:col-span-12 space-y-3'}>
-                            <div
-                              className="prose prose-sm sm:prose-base prose-slate max-w-none text-slate-700 leading-relaxed font-sans"
-                              dangerouslySetInnerHTML={{
-                                __html: data.palavra_pastor.conteudo_html || '',
-                              }}
-                            />
-
-                            {(data.palavra_pastor.nome_pastor || data.palavra_pastor.nome_esposa || data.palavra_pastor.assinatura) && (
-                              <div className="pt-3 border-t border-slate-200/70">
-                                {(data.palavra_pastor.nome_pastor || data.palavra_pastor.nome_esposa) && (
-                                  <p className="text-sm font-bold text-slate-900">
-                                    {data.palavra_pastor.nome_pastor}
-                                    {data.palavra_pastor.nome_pastor && data.palavra_pastor.nome_esposa ? ' & ' : ''}
-                                    {data.palavra_pastor.nome_esposa}
-                                  </p>
-                                )}
-                                {data.palavra_pastor.assinatura && (
-                                  <p className="text-xs text-teal-700 font-semibold mt-0.5">
-                                    {data.palavra_pastor.assinatura}
-                                  </p>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="prose prose-slate max-w-none text-slate-700 leading-relaxed text-sm sm:text-base space-y-4 whitespace-pre-line max-h-[380px] overflow-y-auto pr-2">
-                          {mensagem_pastoral?.conteudo_texto}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      {!data?.palavra_pastor?.publicada && mensagem_pastoral?.video_url ? (
-                        <a
-                          href={mensagem_pastoral.video_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs transition"
-                        >
-                          <Video className="w-4 h-4" /> Assistir Mensagem em Vídeo
-                        </a>
-                      ) : (
-                        <div />
-                      )}
-
-                      <span className="text-xs text-slate-400 italic">{instituicao.nome} • Palavra Pastoral</span>
-                    </div>
-                  </div>
+                  <PalavraPastorV3
+                    ano={data.ano}
+                    numeroPagina={pg.numeroPagina}
+                    palavraPastor={data.palavra_pastor}
+                    mensagemPastoral={mensagem_pastoral}
+                    playfairClassName={playfair.className}
+                    montserratClassName={montserrat.className}
+                    loraClassName={lora.className}
+                  />
                 )}
 
                 {/* ─── PÁGINAS INSTITUCIONAIS: NOSSOS DEPARTAMENTOS ─────── */}
