@@ -458,7 +458,11 @@ function RevistaContent() {
   const { instituicao, tema_anual, mensagem_pastoral, ano } = data;
 
   return (
-    <div className="min-h-[100dvh] bg-[#f4f7fa] text-slate-800 flex flex-col overflow-x-hidden touch-pan-y selection:bg-teal-100 selection:text-teal-900">
+    <div
+      className={`${
+        modoVisualizacao === 'revista' ? 'h-[100dvh] overflow-hidden' : 'min-h-[100dvh]'
+      } bg-[#f4f7fa] text-slate-800 flex flex-col overflow-x-hidden touch-pan-y selection:bg-teal-100 selection:text-teal-900`}
+    >
       {/* ─── ESTILOS CSS EDITORIAIS E ROLAGEM DISCRETA ──────────────── */}
       <style jsx global>{`
         .no-scrollbar::-webkit-scrollbar {
@@ -598,12 +602,16 @@ function RevistaContent() {
       </nav>
 
       {/* ─── CORPO PRINCIPAL (ÁREA ÚTIL MAXIMIZADA) ────────────────── */}
-      <main className="flex-1 min-h-0 max-w-6xl w-full mx-auto px-1.5 sm:px-3 py-1.5 sm:py-2 flex flex-col">
+      <main
+        className={`flex-1 min-h-0 max-w-6xl w-full mx-auto px-1.5 sm:px-3 py-1.5 sm:py-2 flex flex-col ${
+          modoVisualizacao === 'revista' ? 'overflow-hidden' : ''
+        }`}
+      >
         {modoVisualizacao === 'revista' ? (
           /* ══════════════════════════════════════════════════════════════
              MODO REVISTA: FOLHEAMENTO INTERATIVO COM TRANSIÇÃO 3D
              ══════════════════════════════════════════════════════════════ */
-          <div className="flex-1 min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
             {/* CONTAINER PERSPECTIVA DO LIVRO / REVISTA 3D */}
             <PageFlipBook
               currentPage={paginaAtual}

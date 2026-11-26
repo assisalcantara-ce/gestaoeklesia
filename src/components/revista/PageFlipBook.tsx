@@ -22,6 +22,7 @@ export default function PageFlipBook({
   onPageChange,
   bookKey,
 }: PageFlipBookProps) {
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const pageFlipRef = useRef<PageFlip | null>(null);
   const isSyncingFromProp = useRef<boolean>(false);
@@ -29,11 +30,72 @@ export default function PageFlipBook({
   onPageChangeRef.current = onPageChange;
 
   useEffect(() => {
+    const wrapper = wrapperRef.current;
     const container = containerRef.current;
-    if (!container) return;
+    if (!wrapper || !container) return;
 
     const pages = container.querySelectorAll<HTMLElement>('.stf-page-item');
     if (pages.length === 0) return;
+
+    const initOrResize = () => {
+      const rect = wrapper.getBoundingClientRect();
+      const availW = Math.max(260, Math.floor(rect.width));
+      const availH = Math.max(320, Math.floor(rect.height));
+      const isTwoPage = availW >= 768;
+      const pageW = isTwoPage ? Math.floor(availW / 2) : availW;
+
+      if (pageFlipRef.current) {
+        try {
+          pageFlipRef.current.destroy();
+        } catch {
+          // ignore
+        }
+        pageFlipRef.current = null;
+      }
+
+      const flip = new PageFlip(container, {
+        width: pageW,
+        height: availH,
+        size: 'fixed',
+        minWidth: 260,
+        maxWidth: 960,
+        minHeight: 320,
+        maxHeight: availH,
+        maxShadowOpacity: 0.45,
+        showCover: true,
+        mobileScrollSupport: true,
+        usePortrait: true,
+        startPage: currentPage,
+        flippingTime: 1040,
+        drawShadow: true,
+        autoSize: false,
+        clickEventForward: true,
+        useMouseEvents: true,
+        swipeDistance: 30,
+      });
+
+      flip.loadFromHTML(pages);
+
+      flip.on('flip', (e: any) => {
+        const idx = typeof e?.data === 'number' ? e.data : 0;
+        if (!isSyncingFromProp.current) {
+          onPageChangeRef.current(idx);
+        }
+      });
+
+      pageFlipRef.current = flip;
+    };
+
+    initOrResize();
+
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+    const ro = new ResizeObserver(() => {
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        initOrResize();
+      }, 150);
+    });
+    ro.observe(wrapper);
 
     // Restringe paginação por toque/arraste aos 12% laterais de cada extremidade,
     // reservando os 76% centrais para leitura e rolagem vertical.
@@ -59,49 +121,14 @@ export default function PageFlipBook({
     container.addEventListener('mousedown', handleCaptureStart, { capture: true });
     container.addEventListener('touchstart', handleCaptureStart, { capture: true, passive: true });
 
-    const availH = Math.max(
-      420,
-      Math.floor(container.parentElement?.clientHeight || (typeof window !== 'undefined' ? window.innerHeight - 104 : 680))
-    );
-
-    const flip = new PageFlip(container, {
-      width: 520,
-      height: availH,
-      size: 'stretch',
-      minWidth: 280,
-      maxWidth: 960,
-      minHeight: 360,
-      maxHeight: 1200,
-      maxShadowOpacity: 0.45,
-      showCover: true,
-      mobileScrollSupport: true,
-      usePortrait: true,
-      startPage: currentPage,
-      flippingTime: 1040,
-      drawShadow: true,
-      autoSize: true,
-      clickEventForward: true,
-      useMouseEvents: true,
-      swipeDistance: 30,
-    });
-
-    flip.loadFromHTML(pages);
-
-    flip.on('flip', (e: any) => {
-      const idx = typeof e?.data === 'number' ? e.data : 0;
-      if (!isSyncingFromProp.current) {
-        onPageChangeRef.current(idx);
-      }
-    });
-
-    pageFlipRef.current = flip;
-
     return () => {
+      ro.disconnect();
+      if (resizeTimer) clearTimeout(resizeTimer);
       container.removeEventListener('pointerdown', handleCaptureStart, { capture: true });
       container.removeEventListener('mousedown', handleCaptureStart, { capture: true });
       container.removeEventListener('touchstart', handleCaptureStart, { capture: true });
       try {
-        flip.destroy();
+        pageFlipRef.current?.destroy();
       } catch {
         // ignore cleanup errors
       }
@@ -130,7 +157,7 @@ export default function PageFlipBook({
   }, [currentPage]);
 
   return (
-    <div className="w-full flex-1 min-h-0 flex items-center justify-center">
+    <div ref={wrapperRef} className="w-full flex-1 min-h-0 overflow-hidden flex items-center justify-center">
       <div
         ref={containerRef}
         className="w-full h-full max-w-4xl mx-auto select-none"
