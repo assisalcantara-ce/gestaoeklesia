@@ -415,6 +415,15 @@ function RevistaContent() {
     }
   };
 
+  // Auto-centralizar item ativo do índice quando paginaAtual mudar
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const activeBtn = document.getElementById(`indice-btn-${paginaAtual}`);
+    if (activeBtn) {
+      activeBtn.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    }
+  }, [paginaAtual]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#f4f7fa] flex flex-col items-center justify-center p-4">
@@ -453,56 +462,65 @@ function RevistaContent() {
   const paginaCorrente = paginas[paginaAtual] || paginas[0];
 
   return (
-    <div className="min-h-screen bg-[#f4f7fa] text-slate-800 flex flex-col selection:bg-teal-100 selection:text-teal-900">
-      {/* ─── ESTILOS CSS DO EFEITO 3D DE FOLHEAR ───────────────────── */}
+    <div className="min-h-[100dvh] bg-[#f4f7fa] text-slate-800 flex flex-col overflow-x-hidden touch-pan-y selection:bg-teal-100 selection:text-teal-900">
+      {/* ─── ESTILOS CSS EDITORIAIS E ROLAGEM DISCRETA ──────────────── */}
       <style jsx global>{`
-        .book-perspective {
-          perspective: 2000px;
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
         }
-        .page-sheet {
-          transform-origin: left center;
-          transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease;
-          backface-visibility: hidden;
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
         }
-        .page-flip-next-exit {
-          transform: rotateY(-70deg) scale(0.96);
-          opacity: 0.3;
+        .revista-scroll::-webkit-scrollbar {
+          width: 3px;
+          height: 3px;
         }
-        .page-flip-prev-exit {
-          transform: rotateY(70deg) scale(0.96);
-          opacity: 0.3;
+        .revista-scroll::-webkit-scrollbar-track {
+          background: transparent;
         }
-        .page-flip-enter {
-          transform: rotateY(0deg) scale(1);
-          opacity: 1;
+        .revista-scroll::-webkit-scrollbar-thumb {
+          background: rgba(15, 118, 110, 0.25);
+          border-radius: 9999px;
         }
-        .page-spine {
-          box-shadow: inset 24px 0 35px -15px rgba(0, 0, 0, 0.12),
-                      inset -24px 0 35px -15px rgba(0, 0, 0, 0.05);
+        @media (max-height: 680px) {
+          .capa-editorial {
+            padding: 0.875rem !important;
+            gap: 0.5rem !important;
+          }
+          .capa-editorial h2 {
+            font-size: 1.25rem !important;
+            line-height: 1.2 !important;
+          }
+          .capa-editorial .capa-cta {
+            padding-top: 0.625rem !important;
+            padding-bottom: 0.625rem !important;
+            font-size: 0.75rem !important;
+          }
         }
       `}</style>
 
-      {/* ─── BARRA SUPERIOR INSTITUCIONAL ─────────────────────────── */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 lg:px-8 py-3 shadow-xs">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
+      {/* ─── BARRA SUPERIOR INSTITUCIONAL COMPACTA ────────────────── */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-3 sm:px-6 py-2 shadow-xs">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
             {instituicao.logo_url ? (
               <img
                 src={instituicao.logo_url}
                 alt={instituicao.nome}
-                className="w-10 h-10 object-contain rounded-xl border border-slate-200/70 p-0.5 bg-white shadow-xs shrink-0"
+                className="w-8 h-8 object-contain rounded-lg border border-slate-200/70 p-0.5 bg-white shrink-0"
               />
             ) : (
-              <div className="w-10 h-10 bg-teal-50 text-teal-700 rounded-xl flex items-center justify-center font-black border border-teal-100 shrink-0">
-                <Church className="w-5 h-5" />
+              <div className="w-8 h-8 bg-teal-50 text-teal-700 rounded-lg flex items-center justify-center font-black border border-teal-100 shrink-0">
+                <Church className="w-4 h-4" />
               </div>
             )}
             <div className="min-w-0">
-              <h1 className="font-black text-slate-900 text-sm sm:text-base leading-tight truncate">
+              <h1 className="font-serif font-bold text-slate-900 text-xs sm:text-sm leading-tight truncate">
                 {instituicao.nome}
               </h1>
-              <p className="text-[11px] font-semibold text-teal-700 uppercase tracking-wider flex items-center gap-1.5">
-                <BookOpen className="w-3 h-3" /> Revista Digital {ano}
+              <p className="text-[10px] font-semibold text-teal-700 uppercase tracking-wider flex items-center gap-1">
+                <BookOpen className="w-2.5 h-2.5" /> Edição {ano}
               </p>
             </div>
           </div>
@@ -551,16 +569,14 @@ function RevistaContent() {
       {/* ─── ÍNDICE RÁPIDO HORIZONTAL (ACESSO RÁPIDO A QUALQUER PÁGINA) ── */}
       <nav
         aria-label="Sumário da Revista"
-        className="bg-white/80 border-b border-slate-200/60 px-4 py-2 sticky top-[57px] z-30 overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200"
+        className="bg-white/90 border-b border-slate-200/60 px-3 py-1.5 sticky top-[45px] z-30 overflow-x-auto no-scrollbar"
       >
         <div className="max-w-6xl mx-auto flex items-center gap-1.5 min-w-max text-xs">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1 shrink-0">
-            Índice:
-          </span>
           {paginas.map((pg, idx) => {
             const isAtual = paginaAtual === idx;
             return (
               <button
+                id={`indice-btn-${idx}`}
                 key={pg.id}
                 onClick={() => {
                   irParaPagina(idx);
@@ -586,7 +602,7 @@ function RevistaContent() {
       </nav>
 
       {/* ─── CORPO PRINCIPAL ──────────────────────────────────────── */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 flex flex-col">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-2 sm:px-4 py-2 sm:py-4 flex flex-col">
         {modoVisualizacao === 'revista' ? (
           /* ══════════════════════════════════════════════════════════════
              MODO REVISTA: FOLHEAMENTO INTERATIVO COM TRANSIÇÃO 3D
@@ -602,7 +618,7 @@ function RevistaContent() {
                 <div key={pg.id} className="w-full h-full">
                 {/* ─── PÁGINA: CAPA ───────────────────────────────────── */}
                 {pg.tipo === 'capa' && (
-                  <div className="relative overflow-hidden bg-slate-950 text-white p-6 sm:p-12 lg:p-14 min-h-[520px] flex flex-col justify-between">
+                  <div className="capa-editorial relative overflow-hidden bg-slate-950 text-white p-4 sm:p-10 lg:p-12 pb-5 sm:pb-10 h-full min-h-0 flex flex-col justify-between gap-2.5 sm:gap-4">
                     {/* Imagem de Fundo Oficial da Capa */}
                     <div
                       className="absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none"
@@ -727,18 +743,18 @@ function RevistaContent() {
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
                           {data.palavra_pastor.foto_url && (
                             <div className="md:col-span-5">
-                              <div className="rounded-2xl overflow-hidden border-4 border-teal-50 shadow-md bg-slate-100">
+                              <div className="rounded-2xl overflow-hidden border-2 border-teal-50 shadow-md bg-slate-100">
                                 <img
                                   src={data.palavra_pastor.foto_url}
                                   alt="Pastor e Esposa"
-                                  className="w-full h-auto object-cover aspect-[4/5]"
+                                  className="w-full max-h-[30vh] sm:max-h-[34vh] md:max-h-none md:aspect-[4/5] object-cover object-top"
                                 />
                               </div>
                             </div>
                           )}
-                          <div className={data.palavra_pastor.foto_url ? 'md:col-span-7 space-y-4' : 'md:col-span-12 space-y-4'}>
+                          <div className={data.palavra_pastor.foto_url ? 'md:col-span-7 space-y-3' : 'md:col-span-12 space-y-3'}>
                             <div
-                              className="prose prose-sm sm:prose-base prose-slate max-w-none text-slate-700 leading-relaxed max-h-[380px] overflow-y-auto pr-2"
+                              className="prose prose-sm sm:prose-base prose-slate max-w-none text-slate-700 leading-relaxed font-sans"
                               dangerouslySetInnerHTML={{
                                 __html: data.palavra_pastor.conteudo_html || '',
                               }}
@@ -809,11 +825,11 @@ function RevistaContent() {
                         <span className="text-xs font-mono font-bold text-slate-400">p.{pg.numeroPagina}</span>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5 divide-y sm:divide-y-0 divide-slate-100">
                         {pg.departamentosChunk.map((dep) => (
                           <div
                             key={dep.id}
-                            className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs flex flex-col gap-3"
+                            className="pt-4 sm:pt-0 pb-3 border-b border-slate-200/70 flex flex-col gap-2.5"
                           >
                             <div className="flex items-center gap-3">
                               {dep.logo_url ? (
@@ -1010,39 +1026,32 @@ function RevistaContent() {
               ))}
             </PageFlipBook>
 
-            {/* ─── CONTROLES DE FOLHEAR PÁGINAS (ANTERIOR / PRÓXIMA / INDICADOR) ─── */}
-            <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm flex items-center justify-between gap-4 max-w-4xl w-full mx-auto">
+            {/* ─── CONTROLES DISCRETOS DE PAGINAÇÃO ────────────────────── */}
+            <div className="flex items-center justify-between gap-3 max-w-4xl w-full mx-auto px-2 py-1">
               <button
                 onClick={retrocederPagina}
                 disabled={paginaAtual === 0 || isVirando}
-                className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed font-bold text-xs text-slate-700 transition flex items-center gap-2 active:scale-95 shadow-xs"
+                className="px-3 py-1.5 rounded-full border border-slate-200/90 bg-white/90 hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed font-semibold text-xs text-slate-700 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                aria-label="Página Anterior"
               >
-                <ChevronLeft className="w-4 h-4 text-teal-700" />
-                <span className="hidden sm:inline">Página Anterior</span>
-                <span className="sm:hidden">Anterior</span>
+                <ChevronLeft className="w-3.5 h-3.5 text-teal-700" />
+                <span className="hidden sm:inline">Anterior</span>
               </button>
 
-              {/* Indicador de Páginas e Título da Página Corrente */}
-              <div className="text-center min-w-0">
-                <span className="text-xs font-black text-slate-900 block truncate">
-                  {paginaCorrente.titulo}
-                </span>
-                <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500 font-medium mt-0.5">
-                  <span>Página</span>
-                  <span className="font-bold text-teal-800">{paginaAtual + 1}</span>
-                  <span>de</span>
-                  <span>{totalPaginas}</span>
-                </div>
+              <div className="text-center text-[11px] font-medium text-slate-500 truncate px-2">
+                <span className="font-bold text-slate-800">{paginaCorrente.titulo}</span>
+                <span className="mx-1.5 text-slate-300">•</span>
+                <span className="font-mono">{paginaCorrente.numeroPagina}/{totalPaginas}</span>
               </div>
 
               <button
                 onClick={avancarPagina}
-                disabled={paginaAtual === totalPaginas - 1 || isVirando}
-                className="px-4 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white disabled:opacity-30 disabled:cursor-not-allowed font-bold text-xs transition flex items-center gap-2 active:scale-95 shadow-xs"
+                disabled={paginaAtual >= totalPaginas - 1 || isVirando}
+                className="px-3 py-1.5 rounded-full border border-slate-200/90 bg-white/90 hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed font-semibold text-xs text-slate-700 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                aria-label="Próxima Página"
               >
-                <span className="hidden sm:inline">Próxima Página</span>
-                <span className="sm:hidden">Próxima</span>
-                <ChevronRight className="w-4 h-4" />
+                <span className="hidden sm:inline">Próxima</span>
+                <ChevronRight className="w-3.5 h-3.5 text-teal-700" />
               </button>
             </div>
           </div>

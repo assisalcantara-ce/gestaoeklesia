@@ -63,9 +63,9 @@ export default function PageFlipBook({
       width: 520,
       height: 680,
       size: 'stretch',
-      minWidth: 300,
+      minWidth: 280,
       maxWidth: 960,
-      minHeight: 460,
+      minHeight: 380,
       maxHeight: 820,
       maxShadowOpacity: 0.45,
       showCover: true,
@@ -133,7 +133,9 @@ export default function PageFlipBook({
         {children.map((child, idx) => (
           <div
             key={idx}
-            className="stf-page-item bg-white shadow-xl border border-slate-200/90 overflow-y-auto"
+            className={`stf-page-item bg-white shadow-xl border border-slate-200/90 ${
+              idx === 0 ? 'overflow-hidden' : 'overflow-y-auto revista-scroll'
+            }`}
             data-density={idx === 0 ? 'hard' : 'soft'}
           >
             {child}
