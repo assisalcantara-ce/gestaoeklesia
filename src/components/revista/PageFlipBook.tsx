@@ -65,23 +65,25 @@ export default function PageFlipBook({
       clickEventForward: true,
       useMouseEvents: true,
       swipeDistance: 30,
+      showPageCorners: false, // Desativa curvatura automática nos cantos por aproximação do mouse (hover)
+      disableFlipByClick: true, // Desativa virada nativa de clique do StPageFlip para controle exclusivo nas margens de 4%
     });
 
     flip.loadFromHTML(pages);
 
     flip.on('flip', (e: any) => {
       const idx = typeof e?.data === 'number' ? e.data : 0;
-      if (!isSyncingFromProp.current) {
-        onPageChangeRef.current(idx);
-      }
+      isSyncingFromProp.current = true;
+      onPageChangeRef.current(idx);
+      setTimeout(() => {
+        isSyncingFromProp.current = false;
+      }, 50);
     });
 
     pageFlipRef.current = flip;
 
-    // Restringe paginação e curvatura por hover aos 4% laterais de cada extremidade,
-    // reservando os 92% centrais e todos os elementos interativos para leitura e interação.
-    let wasInEdgeZone = false;
-
+    // Desativa completamente a curvatura por aproximação (hover) nos eventos de mousemove/pointermove,
+    // garantindo que a virada ocorra exclusivamente por clique ou arraste intencional nos 4% externos.
     const isInteractiveTarget = (target: EventTarget | null) => {
       if (!(target instanceof Element)) return false;
       return Boolean(
@@ -104,6 +106,8 @@ export default function PageFlipBook({
       return (clientX - cRect.left) / cRect.width;
     };
 
+    let startX: number | null = null;
+
     const handleCaptureStart = (e: MouseEvent | TouchEvent | PointerEvent) => {
       if (isInteractiveTarget(e.target)) {
         e.stopPropagation();
@@ -111,28 +115,99 @@ export default function PageFlipBook({
       }
       const relX = getRelX(e);
       if (relX === null) return;
+
+      if ('touches' in e && e.touches.length > 0) {
+        startX = e.touches[0].clientX;
+      } else if ('clientX' in e) {
+        startX = e.clientX;
+      }
+
+      // Se o início do toque/clique estiver nos 92% centrais, impede que o StPageFlip inicie arraste ou clique
       if (relX > 0.04 && relX < 0.96) {
         e.stopPropagation();
       }
     };
 
+    // Suprime qualquer evento de hover para não acionar corner curl nos 92% centrais ou sobre elementos interativos
     const handleCaptureMove = (e: MouseEvent | PointerEvent) => {
       const interactive = isInteractiveTarget(e.target);
       const relX = getRelX(e);
-      const inCenter = relX !== null && relX > 0.04 && relX < 0.96;
+      const inCenter = relX === null || (relX > 0.04 && relX < 0.96);
 
       if (interactive || inCenter) {
-        if (wasInEdgeZone) {
-          wasInEdgeZone = false;
-          // Garante que a folha não permaneça inclinada ao sair da zona lateral de 4%
-          container.dispatchEvent(new MouseEvent('mouseleave', { bubbles: false }));
-        }
         e.stopPropagation();
-        return;
       }
+    };
 
-      if (relX !== null) {
-        wasInEdgeZone = true;
+    // Funções auxiliares para virada precisa
+    const turnNext = () => {
+      const flipAny = flip as any;
+      try {
+        if (typeof flipAny.flipNext === 'function') {
+          flipAny.flipNext('top');
+        } else {
+          flipAny.turnToNextPage();
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    const turnPrev = () => {
+      const flipAny = flip as any;
+      try {
+        if (typeof flipAny.flipPrev === 'function') {
+          flipAny.flipPrev('top');
+        } else {
+          flipAny.turnToPrevPage();
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    // Garante que o clique nas zonas de 4% acione a virada voluntária (flipNext/flipPrev)
+    const handleCaptureClick = (e: MouseEvent) => {
+      if (isInteractiveTarget(e.target)) return;
+      const relX = getRelX(e);
+      if (relX === null) return;
+
+      // Se houve arraste significativo, o próprio flipController gerencia
+      if (startX !== null && Math.abs(e.clientX - startX) > 10) return;
+
+      if (relX >= 0.96) {
+        e.stopPropagation();
+        turnNext();
+      } else if (relX <= 0.04) {
+        e.stopPropagation();
+        turnPrev();
+      }
+    };
+
+    // Suporte mobile: touch voluntário nas extremidades (4%)
+    const handleCaptureTouchEnd = (e: TouchEvent) => {
+      if (isInteractiveTarget(e.target)) return;
+      if (startX === null || e.changedTouches.length === 0) return;
+      const endX = e.changedTouches[0].clientX;
+      const diffX = endX - startX;
+
+      const cRect = container.getBoundingClientRect();
+      if (!cRect.width) return;
+      const relStartX = (startX - cRect.left) / cRect.width;
+
+      // Toque simples (sem swipe longo) nas zonas de 4%
+      if (Math.abs(diffX) < 15) {
+        if (relStartX >= 0.96) {
+          turnNext();
+        } else if (relStartX <= 0.04) {
+          turnPrev();
+        }
+      } else if (relStartX >= 0.94 && diffX < -20) {
+        // Swipe da borda direita para a esquerda
+        turnNext();
+      } else if (relStartX <= 0.06 && diffX > 20) {
+        // Swipe da borda esquerda para a direita
+        turnPrev();
       }
     };
 
@@ -141,6 +216,8 @@ export default function PageFlipBook({
     container.addEventListener('touchstart', handleCaptureStart, { capture: true, passive: true });
     container.addEventListener('pointermove', handleCaptureMove, { capture: true });
     container.addEventListener('mousemove', handleCaptureMove, { capture: true });
+    container.addEventListener('click', handleCaptureClick, { capture: true });
+    container.addEventListener('touchend', handleCaptureTouchEnd, { capture: true, passive: true });
 
     return () => {
       container.removeEventListener('pointerdown', handleCaptureStart, { capture: true });
@@ -148,6 +225,8 @@ export default function PageFlipBook({
       container.removeEventListener('touchstart', handleCaptureStart, { capture: true });
       container.removeEventListener('pointermove', handleCaptureMove, { capture: true });
       container.removeEventListener('mousemove', handleCaptureMove, { capture: true });
+      container.removeEventListener('click', handleCaptureClick, { capture: true });
+      container.removeEventListener('touchend', handleCaptureTouchEnd, { capture: true });
       try {
         flip.destroy();
       } catch {
@@ -164,7 +243,19 @@ export default function PageFlipBook({
     const flip = pageFlipRef.current;
     if (!flip) return;
     try {
+      if (isSyncingFromProp.current) return;
       const activeIdx = flip.getCurrentPageIndex();
+      // Em modo landscape, uma página ativa pode compartilhar o spread com a página adjacente
+      const flipAny = flip as any;
+      const pageCol = typeof flipAny.getPageCollection === 'function' ? flipAny.getPageCollection() : null;
+      if (pageCol) {
+        const curSpread = pageCol.getCurrentSpreadIndex();
+        const targetSpread = pageCol.getSpreadIndexByPage(currentPage);
+        if (curSpread === targetSpread) {
+          return;
+        }
+      }
+
       if (activeIdx !== currentPage) {
         isSyncingFromProp.current = true;
         flip.flip(currentPage, 'top');
