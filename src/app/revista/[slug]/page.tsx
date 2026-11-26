@@ -318,42 +318,12 @@ function RevistaContent() {
     [paginaAtual, totalPaginas]
   );
 
-  // Função utilitária para obter o índice da página correspondente ao mês vigente (Timezone: America/Belem)
-  const getIndicePaginaMesVigente = useCallback((): number => {
-    try {
-      const parts = new Intl.DateTimeFormat('pt-BR', {
-        timeZone: 'America/Belem',
-        year: 'numeric',
-        month: 'numeric',
-      }).formatToParts(new Date());
-
-      const anoAtualBrasil = Number(parts.find((p) => p.type === 'year')?.value);
-      const mesAtualBrasil = Number(parts.find((p) => p.type === 'month')?.value); // 1 a 12
-
-      // Se o ano da edição for o mesmo ano do calendário brasileiro vigente
-      if (data?.ano && data.ano === anoAtualBrasil && !isNaN(mesAtualBrasil)) {
-        const mesIndex0 = mesAtualBrasil - 1; // 0 a 11
-        const indicePagina = paginas.findIndex(
-          (pg) => pg.tipo === 'mes' && pg.mesIndex === mesIndex0
-        );
-
-        if (indicePagina !== -1) {
-          return indicePagina;
-        }
-      }
-    } catch {
-      // Fallback seguro caso ocorra erro no formatador de fuso horário
-    }
-
-    // Fallback previsível: primeira página após a capa (editorial ou mês 0)
-    return paginas.length > 1 ? 1 : 0;
-  }, [data?.ano, paginas]);
-
-  // Ação ao clicar no CTA principal "ABRIR REVISTA"
+  // Ação ao clicar no CTA principal "ABRIR REVISTA" — avança da Capa (0) para a Página 2 (1)
   const handleAbrirRevista = useCallback(() => {
-    const destinoIndex = getIndicePaginaMesVigente();
-    irParaPagina(destinoIndex);
-  }, [getIndicePaginaMesVigente, irParaPagina]);
+    if (paginas.length > 1) {
+      irParaPagina(1);
+    }
+  }, [paginas.length, irParaPagina]);
 
   const avancarPagina = useCallback(() => {
     if (paginaAtual < totalPaginas - 1) {

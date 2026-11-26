@@ -38,16 +38,19 @@ export default function PageFlipBook({
     if (pages.length === 0) return;
 
     const rect = wrapper.getBoundingClientRect();
+    const availW = Math.max(280, Math.floor(rect.width || (typeof window !== 'undefined' ? window.innerWidth - 12 : 380)));
     const availH = Math.max(
       360,
       Math.floor(rect.height || (typeof window !== 'undefined' ? window.innerHeight - 104 : 620))
     );
+    const isTwoPage = availW >= 768;
+    const pageW = isTwoPage ? Math.floor(availW / 2) : availW;
 
     const flip = new PageFlip(container, {
-      width: 520,
+      width: pageW,
       height: availH,
       size: 'stretch',
-      minWidth: 280,
+      minWidth: 260,
       maxWidth: 960,
       minHeight: 360,
       maxHeight: availH,
