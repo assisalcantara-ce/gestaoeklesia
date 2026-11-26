@@ -59,14 +59,19 @@ export default function PageFlipBook({
     container.addEventListener('mousedown', handleCaptureStart, { capture: true });
     container.addEventListener('touchstart', handleCaptureStart, { capture: true, passive: true });
 
+    const availH = Math.max(
+      420,
+      Math.floor(container.parentElement?.clientHeight || (typeof window !== 'undefined' ? window.innerHeight - 104 : 680))
+    );
+
     const flip = new PageFlip(container, {
       width: 520,
-      height: 680,
+      height: availH,
       size: 'stretch',
       minWidth: 280,
       maxWidth: 960,
-      minHeight: 380,
-      maxHeight: 820,
+      minHeight: 360,
+      maxHeight: 1200,
       maxShadowOpacity: 0.45,
       showCover: true,
       mobileScrollSupport: true,
@@ -125,10 +130,10 @@ export default function PageFlipBook({
   }, [currentPage]);
 
   return (
-    <div className="w-full flex items-center justify-center py-2">
+    <div className="w-full flex-1 min-h-0 flex items-center justify-center">
       <div
         ref={containerRef}
-        className="w-full max-w-4xl mx-auto select-none"
+        className="w-full h-full max-w-4xl mx-auto select-none"
       >
         {children.map((child, idx) => (
           <div

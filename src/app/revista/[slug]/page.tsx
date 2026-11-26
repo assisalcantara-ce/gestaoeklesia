@@ -16,8 +16,6 @@ import PageFlipBook from '@/components/revista/PageFlipBook';
 import {
   Clock,
   MapPin,
-  ChevronLeft,
-  ChevronRight,
   BookOpen,
   Share2,
   Sparkles,
@@ -127,7 +125,6 @@ function RevistaContent() {
 
   // Navegação de páginas da revista
   const [paginaAtual, setPaginaAtual] = useState<number>(0);
-  const isVirando = false;
 
   // Modo de visualização: 'revista' (com folheamento interativo) ou 'leitura' (fluxo contínuo)
   const [modoVisualizacao, setModoVisualizacao] = useState<'revista' | 'leitura'>('revista');
@@ -459,7 +456,6 @@ function RevistaContent() {
   }
 
   const { instituicao, tema_anual, mensagem_pastoral, ano } = data;
-  const paginaCorrente = paginas[paginaAtual] || paginas[0];
 
   return (
     <div className="min-h-[100dvh] bg-[#f4f7fa] text-slate-800 flex flex-col overflow-x-hidden touch-pan-y selection:bg-teal-100 selection:text-teal-900">
@@ -601,13 +597,13 @@ function RevistaContent() {
         </div>
       </nav>
 
-      {/* ─── CORPO PRINCIPAL ──────────────────────────────────────── */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-2 sm:px-4 py-2 sm:py-4 flex flex-col">
+      {/* ─── CORPO PRINCIPAL (ÁREA ÚTIL MAXIMIZADA) ────────────────── */}
+      <main className="flex-1 min-h-0 max-w-6xl w-full mx-auto px-1.5 sm:px-3 py-1.5 sm:py-2 flex flex-col">
         {modoVisualizacao === 'revista' ? (
           /* ══════════════════════════════════════════════════════════════
              MODO REVISTA: FOLHEAMENTO INTERATIVO COM TRANSIÇÃO 3D
              ══════════════════════════════════════════════════════════════ */
-          <div className="flex-1 flex flex-col justify-between space-y-6">
+          <div className="flex-1 min-h-0 flex flex-col">
             {/* CONTAINER PERSPECTIVA DO LIVRO / REVISTA 3D */}
             <PageFlipBook
               currentPage={paginaAtual}
@@ -1026,34 +1022,6 @@ function RevistaContent() {
               ))}
             </PageFlipBook>
 
-            {/* ─── CONTROLES DISCRETOS DE PAGINAÇÃO ────────────────────── */}
-            <div className="flex items-center justify-between gap-3 max-w-4xl w-full mx-auto px-2 py-1">
-              <button
-                onClick={retrocederPagina}
-                disabled={paginaAtual === 0 || isVirando}
-                className="px-3 py-1.5 rounded-full border border-slate-200/90 bg-white/90 hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed font-semibold text-xs text-slate-700 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-                aria-label="Página Anterior"
-              >
-                <ChevronLeft className="w-3.5 h-3.5 text-teal-700" />
-                <span className="hidden sm:inline">Anterior</span>
-              </button>
-
-              <div className="text-center text-[11px] font-medium text-slate-500 truncate px-2">
-                <span className="font-bold text-slate-800">{paginaCorrente.titulo}</span>
-                <span className="mx-1.5 text-slate-300">•</span>
-                <span className="font-mono">{paginaCorrente.numeroPagina}/{totalPaginas}</span>
-              </div>
-
-              <button
-                onClick={avancarPagina}
-                disabled={paginaAtual >= totalPaginas - 1 || isVirando}
-                className="px-3 py-1.5 rounded-full border border-slate-200/90 bg-white/90 hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed font-semibold text-xs text-slate-700 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-                aria-label="Próxima Página"
-              >
-                <span className="hidden sm:inline">Próxima</span>
-                <ChevronRight className="w-3.5 h-3.5 text-teal-700" />
-              </button>
-            </div>
           </div>
         ) : (
           /* ══════════════════════════════════════════════════════════════
@@ -1209,16 +1177,6 @@ function RevistaContent() {
             })}
           </div>
         )}
-
-        {/* ─── RODAPÉ INSTITUCIONAL ─────────────────────────────────── */}
-        <footer className="text-center pt-8 mt-8 border-t border-slate-200/80 text-xs text-slate-500 space-y-1">
-          <p className="font-semibold text-slate-700">
-            {instituicao.nome} • Edição Oficial {ano}
-          </p>
-          <p className="text-[11px] text-slate-400">
-            Revista Digital Pública • Plataforma Gestão Eklésia
-          </p>
-        </footer>
       </main>
     </div>
   );
