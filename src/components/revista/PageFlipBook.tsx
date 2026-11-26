@@ -78,11 +78,20 @@ export default function PageFlipBook({
 
     pageFlipRef.current = flip;
 
-    // Restringe paginação por toque/arraste aos 12% laterais de cada extremidade,
-    // reservando os 76% centrais para leitura e rolagem vertical.
-    const handleCaptureStart = (e: MouseEvent | TouchEvent | PointerEvent) => {
+    // Restringe paginação e curvatura por hover aos 4% laterais de cada extremidade,
+    // reservando os 92% centrais e todos os elementos interativos para leitura e interação.
+    let wasInEdgeZone = false;
+
+    const isInteractiveTarget = (target: EventTarget | null) => {
+      if (!(target instanceof Element)) return false;
+      return Boolean(
+        target.closest('button, a, input, select, textarea, [role="button"]')
+      );
+    };
+
+    const getRelX = (e: MouseEvent | TouchEvent | PointerEvent): number | null => {
       const cRect = container.getBoundingClientRect();
-      if (!cRect.width) return;
+      if (!cRect.width) return null;
 
       let clientX: number | null = null;
       if ('touches' in e && e.touches.length > 0) {
@@ -91,21 +100,54 @@ export default function PageFlipBook({
         clientX = e.clientX;
       }
 
-      if (clientX === null) return;
-      const relX = (clientX - cRect.left) / cRect.width;
-      if (relX > 0.12 && relX < 0.88) {
+      if (clientX === null) return null;
+      return (clientX - cRect.left) / cRect.width;
+    };
+
+    const handleCaptureStart = (e: MouseEvent | TouchEvent | PointerEvent) => {
+      if (isInteractiveTarget(e.target)) {
         e.stopPropagation();
+        return;
+      }
+      const relX = getRelX(e);
+      if (relX === null) return;
+      if (relX > 0.04 && relX < 0.96) {
+        e.stopPropagation();
+      }
+    };
+
+    const handleCaptureMove = (e: MouseEvent | PointerEvent) => {
+      const interactive = isInteractiveTarget(e.target);
+      const relX = getRelX(e);
+      const inCenter = relX !== null && relX > 0.04 && relX < 0.96;
+
+      if (interactive || inCenter) {
+        if (wasInEdgeZone) {
+          wasInEdgeZone = false;
+          // Garante que a folha não permaneça inclinada ao sair da zona lateral de 4%
+          container.dispatchEvent(new MouseEvent('mouseleave', { bubbles: false }));
+        }
+        e.stopPropagation();
+        return;
+      }
+
+      if (relX !== null) {
+        wasInEdgeZone = true;
       }
     };
 
     container.addEventListener('pointerdown', handleCaptureStart, { capture: true });
     container.addEventListener('mousedown', handleCaptureStart, { capture: true });
     container.addEventListener('touchstart', handleCaptureStart, { capture: true, passive: true });
+    container.addEventListener('pointermove', handleCaptureMove, { capture: true });
+    container.addEventListener('mousemove', handleCaptureMove, { capture: true });
 
     return () => {
       container.removeEventListener('pointerdown', handleCaptureStart, { capture: true });
       container.removeEventListener('mousedown', handleCaptureStart, { capture: true });
       container.removeEventListener('touchstart', handleCaptureStart, { capture: true });
+      container.removeEventListener('pointermove', handleCaptureMove, { capture: true });
+      container.removeEventListener('mousemove', handleCaptureMove, { capture: true });
       try {
         flip.destroy();
       } catch {
