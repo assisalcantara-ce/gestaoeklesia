@@ -21,6 +21,7 @@ import {
   GripVertical,
   ArrowUp,
   ArrowDown,
+  Lock,
 } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/api-client';
 import {
@@ -60,6 +61,8 @@ export default function PersonalizarRevistaModal({
   const [draggedDepId, setDraggedDepId] = useState<string | null>(null);
 
   const [loading, setLoading] = useState<boolean>(false);
+  const [loadError, setLoadError] = useState<boolean>(false);
+  const [isEditingExisting, setIsEditingExisting] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   const [uploading, setUploading] = useState<boolean>(false);
   const [previewMode, setPreviewMode] = useState<boolean>(false);
@@ -79,6 +82,7 @@ export default function PersonalizarRevistaModal({
     if (!isOpen) return;
     let active = true;
     setLoading(true);
+    setLoadError(false);
     setFeedback(null);
 
     authenticatedFetch(`/api/v1/agenda/revista-personalizacao?ano=${ano}`)
@@ -89,6 +93,7 @@ export default function PersonalizarRevistaModal({
       .then((json) => {
         if (!active) return;
         const ed: PalavraPastorEdicao | null = json?.edicao || null;
+        const nomePastorPresidente = String(json?.nome_pastor_presidente || '').trim();
         const disponiveis: DepartamentoRevistaPublico[] = Array.isArray(json?.departamentos_disponiveis)
           ? json.departamentos_disponiveis
           : [];
@@ -108,31 +113,28 @@ export default function PersonalizarRevistaModal({
         }
 
         if (ed) {
+          setIsEditingExisting(true);
           setTitulo(ed.titulo || 'Palavra do Pastor');
           setConteudoHtml(ed.conteudo_html || '');
           setFotoUrl(ed.foto_url || null);
-          setNomePastor(ed.nome_pastor || '');
+          setNomePastor(nomePastorPresidente || ed.nome_pastor || '');
           setNomeEsposa(ed.nome_esposa || '');
           setAssinatura(ed.assinatura || '');
           setPublicada(Boolean(ed.publicada));
-          if (editorRef.current) {
-            editorRef.current.innerHTML = ed.conteudo_html || '';
-          }
         } else {
+          setIsEditingExisting(false);
           setTitulo('Palavra do Pastor');
           setConteudoHtml('');
           setFotoUrl(null);
-          setNomePastor('');
+          setNomePastor(nomePastorPresidente);
           setNomeEsposa('');
           setAssinatura('');
           setPublicada(true);
-          if (editorRef.current) {
-            editorRef.current.innerHTML = '';
-          }
         }
       })
       .catch((err) => {
         if (!active) return;
+        setLoadError(true);
         setFeedback({ tipo: 'err', texto: err?.message || 'Falha ao carregar edição.' });
       })
       .finally(() => {
@@ -143,6 +145,14 @@ export default function PersonalizarRevistaModal({
       active = false;
     };
   }, [isOpen, ano]);
+
+  // Hidrata o editor contentEditable após o término do loading ou ao retornar da pré-visualização/outra aba
+  useEffect(() => {
+    if (!isOpen || loading || previewMode || activeTab !== 'palavra') return;
+    if (editorRef.current && editorRef.current.innerHTML !== conteudoHtml) {
+      editorRef.current.innerHTML = conteudoHtml;
+    }
+  }, [isOpen, loading, previewMode, activeTab, conteudoHtml]);
 
   const execFormat = (command: string) => {
     if (typeof document === 'undefined') return;
@@ -223,6 +233,7 @@ export default function PersonalizarRevistaModal({
   const depPreviewPages = paginateDepartmentsForRevista(depsSelecionadosOrdenados, 4);
 
   const handleSave = async () => {
+    if (loadError) return;
     setSaving(true);
     setFeedback(null);
     try {
@@ -264,6 +275,10 @@ export default function PersonalizarRevistaModal({
       const json = await res.json();
       if (!res.ok) {
         throw new Error(json?.error || 'Erro ao salvar personalização.');
+      }
+
+      if (activeTab === 'palavra') {
+        setIsEditingExisting(true);
       }
 
       setFeedback({
@@ -685,9 +700,16 @@ export default function PersonalizarRevistaModal({
               {/* Linha 1: Ano e Controle de Exibição Pública */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-slate-200">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Ano da Edição Anual
-                  </label>
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700">
+                      Ano da Edição Anual
+                    </label>
+                    {isEditingExisting && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                        Editando edição {ano}
+                      </span>
+                    )}
+                  </div>
                   <select
                     value={ano}
                     onChange={(e) => setAno(Number(e.target.value))}
@@ -799,15 +821,23 @@ export default function PersonalizarRevistaModal({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Nome do Pastor
+                      <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-1">
+                        <span>Nome do Pastor Presidente</span>
+                        <span
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px] font-semibold"
+                          title="Preenchido automaticamente a partir de Configurações > Geral > Dados do Ministério"
+                        >
+                          <Lock className="w-2.5 h-2.5" />
+                          Bloqueado
+                        </span>
                       </label>
                       <input
                         type="text"
                         value={nomePastor}
-                        onChange={(e) => setNomePastor(e.target.value)}
-                        placeholder="Ex: Pr. João Silva"
-                        className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 outline-none"
+                        readOnly
+                        disabled
+                        placeholder="Configurado em Dados do Ministério"
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-100 text-sm text-slate-600 cursor-not-allowed outline-none"
                       />
                     </div>
                     <div>
@@ -912,11 +942,15 @@ export default function PersonalizarRevistaModal({
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving || loading}
+            disabled={saving || loading || loadError}
             className="px-5 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs sm:text-sm font-bold flex items-center gap-2 shadow-sm transition cursor-pointer disabled:opacity-60"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            <span>Salvar Edição {ano}</span>
+            <span>
+              {activeTab === 'palavra' && isEditingExisting
+                ? 'Salvar Alterações'
+                : `Salvar Edição ${ano}`}
+            </span>
           </button>
         </div>
       </div>

@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
 
     const churchProfile = (configRow?.church_profile as Record<string, any>) || {};
     const edicoes = (churchProfile.revista_edicoes as Record<string, any>) || {};
+    const nomePastorPresidente = String(churchProfile.responsavel || '').trim();
 
     // Carregar departamentos ativos da Secretaria (fonte única de verdade)
     const { data: depsData } = await ctx.admin
@@ -82,12 +83,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         edicao: edicaoAno,
         edicoes,
+        nome_pastor_presidente: nomePastorPresidente,
         departamentos_config,
         departamentos_disponiveis,
       });
     }
 
-    return NextResponse.json({ edicoes, departamentos_disponiveis });
+    return NextResponse.json({
+      edicoes,
+      nome_pastor_presidente: nomePastorPresidente,
+      departamentos_disponiveis,
+    });
   } catch (err) {
     return authTenantErrorResponse(err) ?? NextResponse.json({ error: 'Erro interno.' }, { status: 500 });
   }
@@ -143,12 +149,20 @@ export async function PUT(request: NextRequest) {
         updated_at: new Date().toISOString(),
       };
     } else {
+      const pastorOficial = String(currentProfile.responsavel || '').trim();
+      const nomePastorResolvido =
+        pastorOficial ||
+        String(existingYearEntry?.nome_pastor || body?.nome_pastor || '').trim();
+
       const novaEdicao: PalavraPastorEdicao = {
         ano,
         titulo: String(body?.titulo || 'Palavra do Pastor').trim() || 'Palavra do Pastor',
-        conteudo_html: String(body?.conteudo_html || ''),
+        conteudo_html:
+          body?.conteudo_html !== undefined
+            ? String(body.conteudo_html || '')
+            : String(existingYearEntry?.conteudo_html || ''),
         foto_url: body?.foto_url ? String(body.foto_url) : null,
-        nome_pastor: String(body?.nome_pastor || '').trim(),
+        nome_pastor: nomePastorResolvido,
         nome_esposa: String(body?.nome_esposa || '').trim(),
         assinatura: String(body?.assinatura || '').trim(),
         publicada: Boolean(body?.publicada),
