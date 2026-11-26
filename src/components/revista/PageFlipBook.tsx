@@ -37,71 +37,49 @@ export default function PageFlipBook({
     const pages = container.querySelectorAll<HTMLElement>('.stf-page-item');
     if (pages.length === 0) return;
 
-    const initOrResize = () => {
-      const rect = wrapper.getBoundingClientRect();
-      const availW = Math.max(260, Math.floor(rect.width));
-      const availH = Math.max(320, Math.floor(rect.height));
-      const isTwoPage = availW >= 768;
-      const pageW = isTwoPage ? Math.floor(availW / 2) : availW;
+    const rect = wrapper.getBoundingClientRect();
+    const availH = Math.max(
+      360,
+      Math.floor(rect.height || (typeof window !== 'undefined' ? window.innerHeight - 104 : 620))
+    );
 
-      if (pageFlipRef.current) {
-        try {
-          pageFlipRef.current.destroy();
-        } catch {
-          // ignore
-        }
-        pageFlipRef.current = null;
-      }
-
-      const flip = new PageFlip(container, {
-        width: pageW,
-        height: availH,
-        size: 'fixed',
-        minWidth: 260,
-        maxWidth: 960,
-        minHeight: 320,
-        maxHeight: availH,
-        maxShadowOpacity: 0.45,
-        showCover: true,
-        mobileScrollSupport: true,
-        usePortrait: true,
-        startPage: currentPage,
-        flippingTime: 1040,
-        drawShadow: true,
-        autoSize: false,
-        clickEventForward: true,
-        useMouseEvents: true,
-        swipeDistance: 30,
-      });
-
-      flip.loadFromHTML(pages);
-
-      flip.on('flip', (e: any) => {
-        const idx = typeof e?.data === 'number' ? e.data : 0;
-        if (!isSyncingFromProp.current) {
-          onPageChangeRef.current(idx);
-        }
-      });
-
-      pageFlipRef.current = flip;
-    };
-
-    initOrResize();
-
-    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
-    const ro = new ResizeObserver(() => {
-      if (resizeTimer) clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
-        initOrResize();
-      }, 150);
+    const flip = new PageFlip(container, {
+      width: 520,
+      height: availH,
+      size: 'stretch',
+      minWidth: 280,
+      maxWidth: 960,
+      minHeight: 360,
+      maxHeight: availH,
+      maxShadowOpacity: 0.45,
+      showCover: true,
+      mobileScrollSupport: true,
+      usePortrait: true,
+      startPage: currentPage,
+      flippingTime: 1040,
+      drawShadow: true,
+      autoSize: true,
+      clickEventForward: true,
+      useMouseEvents: true,
+      swipeDistance: 30,
     });
-    ro.observe(wrapper);
+
+    flip.loadFromHTML(pages);
+
+    flip.on('flip', (e: any) => {
+      const idx = typeof e?.data === 'number' ? e.data : 0;
+      if (!isSyncingFromProp.current) {
+        onPageChangeRef.current(idx);
+      }
+    });
+
+    pageFlipRef.current = flip;
 
     // Restringe paginação por toque/arraste aos 12% laterais de cada extremidade,
     // reservando os 76% centrais para leitura e rolagem vertical.
     const handleCaptureStart = (e: MouseEvent | TouchEvent | PointerEvent) => {
-      const rect = container.getBoundingClientRect();
-      if (!rect.width) return;
+      const cRect = container.getBoundingClientRect();
+      if (!cRect.width) return;
 
       let clientX: number | null = null;
       if ('touches' in e && e.touches.length > 0) {
@@ -111,7 +89,7 @@ export default function PageFlipBook({
       }
 
       if (clientX === null) return;
-      const relX = (clientX - rect.left) / rect.width;
+      const relX = (clientX - cRect.left) / cRect.width;
       if (relX > 0.12 && relX < 0.88) {
         e.stopPropagation();
       }
@@ -122,13 +100,11 @@ export default function PageFlipBook({
     container.addEventListener('touchstart', handleCaptureStart, { capture: true, passive: true });
 
     return () => {
-      ro.disconnect();
-      if (resizeTimer) clearTimeout(resizeTimer);
       container.removeEventListener('pointerdown', handleCaptureStart, { capture: true });
       container.removeEventListener('mousedown', handleCaptureStart, { capture: true });
       container.removeEventListener('touchstart', handleCaptureStart, { capture: true });
       try {
-        pageFlipRef.current?.destroy();
+        flip.destroy();
       } catch {
         // ignore cleanup errors
       }
