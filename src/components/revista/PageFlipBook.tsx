@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PageFlip } from 'page-flip';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface PageFlipBookProps {
   children: React.ReactNode[];
@@ -13,8 +14,8 @@ interface PageFlipBookProps {
 /**
  * Componente de folheamento 3D realista baseado em StPageFlip (`page-flip`),
  * compatível com React 19 e Next.js 16.
- * Oferece curvatura de página, sombras dinâmicas, arraste/clique nos cantos e
- * sincronização bidirecional com os botões Anterior/Próxima e Índice.
+ * Oferece curvatura de página, sombras dinâmicas, setas flutuantes premium,
+ * zonas externas de 4% e proteção total contra travamentos na última página.
  */
 export default function PageFlipBook({
   children,
@@ -28,6 +29,48 @@ export default function PageFlipBook({
   const isSyncingFromProp = useRef<boolean>(false);
   const onPageChangeRef = useRef(onPageChange);
   onPageChangeRef.current = onPageChange;
+
+  // Estados locais para controle de visibilidade das setas e desbloqueio pós-animação
+  const [isFlipping, setIsFlipping] = useState<boolean>(false);
+  const [activeSpread, setActiveSpread] = useState<{
+    index: number;
+    totalSpreads: number;
+    isCover: boolean;
+    isLastPage: boolean;
+  }>({
+    index: 0,
+    totalSpreads: 1,
+    isCover: true,
+    isLastPage: false,
+  });
+
+  // Atualiza informações do spread ativo para exibição condicional das setas
+  const updateSpreadState = useCallback((flipInstance: PageFlip) => {
+    try {
+      const flipAny = flipInstance as any;
+      const pageCol = typeof flipAny.getPageCollection === 'function' ? flipAny.getPageCollection() : null;
+      if (pageCol) {
+        const curSpread = pageCol.getCurrentSpreadIndex();
+        const spreads = pageCol.getSpread();
+        const totalSpreads = Array.isArray(spreads) ? spreads.length : 1;
+        setActiveSpread({
+          index: curSpread,
+          totalSpreads,
+          isCover: curSpread === 0,
+          isLastPage: curSpread >= totalSpreads - 1,
+        });
+        return;
+      }
+    } catch {
+      // fallback
+    }
+    setActiveSpread({
+      index: currentPage,
+      totalSpreads: children.length,
+      isCover: currentPage === 0,
+      isLastPage: currentPage >= children.length - 1,
+    });
+  }, [children.length, currentPage]);
 
   useEffect(() => {
     const wrapper = wrapperRef.current;
@@ -65,8 +108,8 @@ export default function PageFlipBook({
       clickEventForward: true,
       useMouseEvents: true,
       swipeDistance: 30,
-      showPageCorners: false, // Desativa curvatura automática nos cantos por aproximação do mouse (hover)
-      disableFlipByClick: true, // Desativa virada nativa de clique do StPageFlip para controle exclusivo nas margens de 4%
+      showPageCorners: false, // Desativa nativamente curvatura automática por hover nos 4 cantos
+      disableFlipByClick: false, // Permite que chamadas controladas flipNext/flipPrev e flipToPage funcionem sem abortar
     });
 
     flip.loadFromHTML(pages);
@@ -75,15 +118,31 @@ export default function PageFlipBook({
       const idx = typeof e?.data === 'number' ? e.data : 0;
       isSyncingFromProp.current = true;
       onPageChangeRef.current(idx);
+      updateSpreadState(flip);
       setTimeout(() => {
         isSyncingFromProp.current = false;
+        setIsFlipping(false);
       }, 50);
     });
 
-    pageFlipRef.current = flip;
+    flip.on('changeState', (e: any) => {
+      const state = typeof e?.data === 'string' ? e.data : '';
+      if (state === 'flipping') {
+        setIsFlipping(true);
+      } else if (state === 'read') {
+        setIsFlipping(false);
+        updateSpreadState(flip);
+      }
+    });
 
-    // Desativa completamente a curvatura por aproximação (hover) nos eventos de mousemove/pointermove,
-    // garantindo que a virada ocorra exclusivamente por clique ou arraste intencional nos 4% externos.
+    flip.on('init', () => {
+      updateSpreadState(flip);
+    });
+
+    pageFlipRef.current = flip;
+    updateSpreadState(flip);
+
+    // Proteção de elementos interativos dentro das páginas
     const isInteractiveTarget = (target: EventTarget | null) => {
       if (!(target instanceof Element)) return false;
       return Boolean(
@@ -139,7 +198,7 @@ export default function PageFlipBook({
       }
     };
 
-    // Funções auxiliares para virada precisa
+    // Funções auxiliares para virada precisa e segura
     const turnNext = () => {
       const flipAny = flip as any;
       try {
@@ -252,24 +311,83 @@ export default function PageFlipBook({
         const curSpread = pageCol.getCurrentSpreadIndex();
         const targetSpread = pageCol.getSpreadIndexByPage(currentPage);
         if (curSpread === targetSpread) {
+          updateSpreadState(flip);
           return;
         }
       }
 
       if (activeIdx !== currentPage) {
         isSyncingFromProp.current = true;
+        setIsFlipping(true);
         flip.flip(currentPage, 'top');
         setTimeout(() => {
           isSyncingFromProp.current = false;
+          setIsFlipping(false);
+          updateSpreadState(flip);
         }, 1100);
       }
     } catch {
       isSyncingFromProp.current = false;
+      setIsFlipping(false);
     }
-  }, [currentPage]);
+  }, [currentPage, updateSpreadState]);
+
+  // Ações das setas flutuantes com proteção contra duplo disparo e sincronização de estado
+  const handleRetroceder = useCallback(() => {
+    if (isFlipping) return;
+    const flip = pageFlipRef.current;
+    if (!flip) return;
+    setIsFlipping(true);
+    try {
+      const flipAny = flip as any;
+      if (typeof flipAny.flipPrev === 'function') {
+        flipAny.flipPrev('top');
+      } else {
+        flipAny.turnToPrevPage();
+      }
+    } catch {
+      setIsFlipping(false);
+    }
+    setTimeout(() => {
+      setIsFlipping(false);
+      if (pageFlipRef.current) updateSpreadState(pageFlipRef.current);
+    }, 1100);
+  }, [isFlipping, updateSpreadState]);
+
+  const handleAvancar = useCallback(() => {
+    if (isFlipping) return;
+    const flip = pageFlipRef.current;
+    if (!flip) return;
+    setIsFlipping(true);
+    try {
+      const flipAny = flip as any;
+      if (typeof flipAny.flipNext === 'function') {
+        flipAny.flipNext('top');
+      } else {
+        flipAny.turnToNextPage();
+      }
+    } catch {
+      setIsFlipping(false);
+    }
+    setTimeout(() => {
+      setIsFlipping(false);
+      if (pageFlipRef.current) updateSpreadState(pageFlipRef.current);
+    }, 1100);
+  }, [isFlipping, updateSpreadState]);
+
+  // Regras de exibição das setas flutuantes:
+  // - Na capa (isCover): não exibir as setas (o botão Abrir Revista é o CTA exclusivo).
+  // - Nas páginas intermediárias: exibir ambas.
+  // - Na última página (isLastPage): exibir somente a seta de retorno.
+  const showPrevArrow = !activeSpread.isCover;
+  const showNextArrow = !activeSpread.isCover && !activeSpread.isLastPage;
 
   return (
-    <div ref={wrapperRef} className="w-full flex-1 min-h-0 overflow-hidden flex items-center justify-center">
+    <div
+      ref={wrapperRef}
+      className="relative w-full flex-1 min-h-0 overflow-hidden flex items-center justify-center"
+    >
+      {/* Camada independente StPageFlip */}
       <div
         ref={containerRef}
         className="w-full h-full max-w-4xl mx-auto select-none"
@@ -286,6 +404,31 @@ export default function PageFlipBook({
           </div>
         ))}
       </div>
+
+      {/* ─── SETAS FLUTUANTES PREMIUM (CAMADA INDEPENDENTE DO DOM) ─── */}
+      {showPrevArrow && (
+        <button
+          type="button"
+          onClick={handleRetroceder}
+          disabled={isFlipping}
+          aria-label="Página anterior"
+          className="absolute left-2.5 sm:left-4 bottom-3 sm:bottom-5 z-30 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#031525]/80 hover:bg-[#031525] active:scale-95 text-white backdrop-blur-md border border-[#C9A24D]/50 shadow-xl flex items-center justify-center transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed group"
+        >
+          <ChevronLeft className="w-5 h-5 text-white group-hover:-translate-x-0.5 transition-transform duration-150" />
+        </button>
+      )}
+
+      {showNextArrow && (
+        <button
+          type="button"
+          onClick={handleAvancar}
+          disabled={isFlipping}
+          aria-label="Próxima página"
+          className="absolute right-2.5 sm:right-4 bottom-3 sm:bottom-5 z-30 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#031525]/80 hover:bg-[#031525] active:scale-95 text-white backdrop-blur-md border border-[#C9A24D]/50 shadow-xl flex items-center justify-center transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed group"
+        >
+          <ChevronRight className="w-5 h-5 text-white group-hover:translate-x-0.5 transition-transform duration-150" />
+        </button>
+      )}
     </div>
   );
 }
