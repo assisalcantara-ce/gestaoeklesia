@@ -16,6 +16,7 @@ import {
 import PageFlipBook from '@/components/revista/PageFlipBook';
 import CapaEditorialV3 from '@/components/revista/CapaEditorialV3';
 import PalavraPastorV3 from '@/components/revista/PalavraPastorV3';
+import ProgramacaoMensalV3 from '@/components/revista/ProgramacaoMensalV3';
 
 const playfair = Playfair_Display({
   subsets: ['latin'],
@@ -48,7 +49,6 @@ import {
   AlertCircle,
   Loader2,
   Church,
-  CalendarDays,
   Smartphone,
   Layers,
 } from 'lucide-react';
@@ -711,148 +711,16 @@ function RevistaContent() {
 
                 {/* ─── PÁGINA: MÊS DO CALENDÁRIO ──────────────────────── */}
                 {pg.tipo === 'mes' && pg.mesIndex !== undefined && (
-                  <div className="p-6 sm:p-10 lg:p-12 min-h-[520px] flex flex-col justify-between space-y-6">
-                    <div className="space-y-6">
-                      {/* Cabeçalho do Mês */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-bold text-teal-700 tracking-wider uppercase">
-                              Calendário {ano}
-                            </span>
-                            <span className="text-slate-300">•</span>
-                            <span className="text-[11px] font-semibold text-slate-500">
-                              {eventosPorMes[pg.mesIndex]?.length || 0} eventos
-                            </span>
-                          </div>
-                          <h3 className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight">
-                            {MESES_NOMES[pg.mesIndex]}
-                          </h3>
-                        </div>
-
-                        {/* Filtro rápido dentro da página */}
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {[
-                            { id: 'todos', label: 'Todos' },
-                            { id: 'oficial', label: 'Oficiais' },
-                            { id: 'culto', label: 'Cultos' },
-                            { id: 'reuniao', label: 'Reuniões' },
-                            { id: 'evento', label: 'Eventos' },
-                            { id: 'departamento', label: 'Departamentos' },
-                          ].map((f) => (
-                            <button
-                              key={f.id}
-                              onClick={() => setFiltroCategoria(f.id)}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
-                                filtroCategoria === f.id
-                                  ? 'bg-teal-700 text-white shadow-xs'
-                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                              }`}
-                            >
-                              {f.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Lista de Eventos do Mês */}
-                      {(() => {
-                        const listaMes = eventosPorMes[pg.mesIndex] || [];
-                        const filtrados =
-                          filtroCategoria === 'todos'
-                            ? listaMes
-                            : filtroCategoria === 'oficial'
-                            ? listaMes.filter((e) => e.calendario_oficial)
-                            : listaMes.filter((e) => e.tipo?.categoria === filtroCategoria);
-
-                        if (filtrados.length === 0) {
-                          return (
-                            <div className="text-center py-16 px-4 rounded-2xl bg-slate-50/70 border border-dashed border-slate-200">
-                              <CalendarDays className="w-10 h-10 text-slate-400 mx-auto mb-3" />
-                              <h4 className="text-base font-bold text-slate-800">Sem eventos programados</h4>
-                              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                                Nenhuma atividade pública cadastrada para este mês com o filtro selecionado.
-                              </p>
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 max-h-[380px] overflow-y-auto pr-1">
-                            {filtrados.map((evento) => {
-                              const { dia, mes, horario } = formatarDataHora(
-                                evento.data_inicio,
-                                evento.data_fim
-                              );
-                              const corTipo = evento.tipo?.cor || '#0f766e';
-
-                              return (
-                                <article
-                                  key={evento.id}
-                                  className="group bg-white rounded-2xl p-4 border border-slate-200/90 hover:border-teal-300 hover:shadow-xs transition flex gap-3.5 items-start"
-                                >
-                                  <div className="shrink-0 flex flex-col items-center justify-center w-12 h-14 rounded-xl bg-teal-50 border border-teal-100/80 text-teal-900 group-hover:bg-teal-700 group-hover:text-white transition">
-                                    <span className="text-base font-black leading-none">{dia}</span>
-                                    <span className="text-[9px] font-bold tracking-wider uppercase mt-1 opacity-80">
-                                      {mes}
-                                    </span>
-                                  </div>
-
-                                  <div className="flex-1 min-w-0 space-y-1.5">
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                      {evento.tipo?.nome && (
-                                        <span
-                                          className="text-[9px] font-bold px-2 py-0.5 rounded-md text-white"
-                                          style={{ backgroundColor: corTipo }}
-                                        >
-                                          {evento.tipo.nome}
-                                        </span>
-                                      )}
-                                      {evento.calendario_oficial && (
-                                        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
-                                          <Award className="w-2.5 h-2.5 text-amber-600" /> Oficial
-                                        </span>
-                                      )}
-                                    </div>
-
-                                    <h4 className="text-sm font-bold text-slate-900 leading-snug group-hover:text-teal-900 transition">
-                                      {evento.titulo}
-                                    </h4>
-
-                                    {evento.descricao && (
-                                      <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
-                                        {evento.descricao}
-                                      </p>
-                                    )}
-
-                                    <div className="pt-1 flex flex-col gap-0.5 text-[11px] text-slate-500 font-medium">
-                                      {horario && (
-                                        <span className="flex items-center gap-1">
-                                          <Clock className="w-3 h-3 text-slate-400 shrink-0" />
-                                          {horario}
-                                        </span>
-                                      )}
-                                      {evento.local && (
-                                        <span className="flex items-center gap-1 truncate">
-                                          <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                                          <span className="truncate">{evento.local}</span>
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                </article>
-                              );
-                            })}
-                          </div>
-                        );
-                      })()}
-                    </div>
-
-                    <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
-                      <span>{instituicao.nome}</span>
-                      <span className="font-mono font-bold">p.{pg.numeroPagina}</span>
-                    </div>
-                  </div>
+                  <ProgramacaoMensalV3
+                    ano={ano}
+                    mesNome={MESES_NOMES[pg.mesIndex]}
+                    eventos={eventosPorMes[pg.mesIndex] || []}
+                    filtroCategoria={filtroCategoria}
+                    onChangeFiltro={setFiltroCategoria}
+                    formatarDataHora={formatarDataHora}
+                    playfairClassName={playfair.className}
+                    montserratClassName={montserrat.className}
+                  />
                 )}
                 </div>
               ))}
